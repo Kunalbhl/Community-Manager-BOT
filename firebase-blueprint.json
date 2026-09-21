@@ -1,0 +1,298 @@
+{
+  "entities": {
+    "Community": {
+      "title": "Community",
+      "description": "Discord community or server workspace entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "guildId": { "type": "string" },
+        "name": { "type": "string" },
+        "ownerUserId": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "guildId", "name", "ownerUserId", "isActive"]
+    },
+    "Application": {
+      "title": "Application",
+      "description": "Recruitment membership application record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "communityId": { "type": "string" },
+        "applicantDiscordUserId": { "type": "string" },
+        "applicantUsername": { "type": "string" },
+        "status": { "type": "string" },
+        "source": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "communityId", "applicantDiscordUserId", "status"]
+    },
+    "Interview": {
+      "title": "Interview",
+      "description": "Applicant interview record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "communityId": { "type": "string" },
+        "applicationId": { "type": "string" },
+        "applicantDiscordId": { "type": "string" },
+        "interviewerUserId": { "type": "string" },
+        "status": { "type": "string" },
+        "googleCalendarEventId": { "type": "string" },
+        "scheduledTime": { "type": "string" }
+      },
+      "required": ["id", "communityId", "applicationId", "status"]
+    },
+    "FormsConfiguration": {
+      "title": "FormsConfiguration",
+      "description": "Google Forms integration mapping configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "communityId": { "type": "string" },
+        "formId": { "type": "string" },
+        "formTitleSnapshot": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "lastSyncStatus": { "type": "string" }
+      },
+      "required": ["id", "communityId", "formId", "enabled"]
+    },
+    "CalendarConfiguration": {
+      "title": "CalendarConfiguration",
+      "description": "Google Calendar integration configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "communityId": { "type": "string" },
+        "calendarId": { "type": "string" },
+        "timezone": { "type": "string" },
+        "enabled": { "type": "boolean" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "communityId", "calendarId", "enabled"]
+    },
+    "SpreadsheetConfiguration": {
+      "title": "SpreadsheetConfiguration",
+      "description": "Google Sheets export sync configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "communityId": { "type": "string" },
+        "spreadsheetId": { "type": "string" },
+        "enabled": { "type": "boolean" }
+      },
+      "required": ["id", "communityId", "spreadsheetId", "enabled"]
+    },
+    "IntegrationEvent": {
+      "title": "IntegrationEvent",
+      "description": "Generic integration ledger event for idempotency",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "eventId": { "type": "string" },
+        "provider": { "type": "string" },
+        "eventType": { "type": "string" },
+        "communityId": { "type": "string" },
+        "externalResourceId": { "type": "string" },
+        "status": { "type": "string" },
+        "receivedAt": { "type": "string" }
+      },
+      "required": ["id", "eventId", "provider", "eventType", "communityId", "status"]
+    },
+    "OnboardingOperation": {
+      "title": "OnboardingOperation",
+      "description": "Durable onboarding operation lifecycle record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "communityId": { "type": "string" },
+        "applicantDiscordUserId": { "type": "string" },
+        "operationType": { "type": "string" },
+        "status": { "type": "string" },
+        "attempts": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "communityId", "applicantDiscordUserId", "operationType", "status"]
+    },
+    "Event": {
+      "title": "Event",
+      "description": "Community calendar and interactive event metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "communityId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "startAt": { "type": "string" },
+        "endAt": { "type": "string" },
+        "timezone": { "type": "string" },
+        "organizer": { "type": "string" },
+        "capacity": { "type": "number" },
+        "registrationEnabled": { "type": "boolean" },
+        "status": { "type": "string" },
+        "visibility": { "type": "string" },
+        "discordEventId": { "type": "string" },
+        "googleEventId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "communityId", "title", "startAt", "endAt", "status"]
+    },
+    "EventRegistration": {
+      "title": "EventRegistration",
+      "description": "Discord member event registration and attendance tracking record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "communityId": { "type": "string" },
+        "eventId": { "type": "string" },
+        "discordUserId": { "type": "string" },
+        "username": { "type": "string" },
+        "status": { "type": "string" },
+        "attendanceStatus": { "type": "string" },
+        "registeredAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "communityId", "eventId", "discordUserId", "status"]
+    },
+    "EventReminder": {
+      "title": "EventReminder",
+      "description": "Automated background event reminder notification record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "communityId": { "type": "string" },
+        "eventId": { "type": "string" },
+        "scheduledExecutionId": { "type": "string" },
+        "recipientScope": { "type": "string" },
+        "template": { "type": "string" },
+        "triggerAt": { "type": "string" },
+        "reminderType": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "communityId", "eventId", "recipientScope", "triggerAt", "status"]
+    },
+    "MemberHandoff": {
+      "title": "MemberHandoff",
+      "description": "Durable recruitment-to-member handoff record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "workspaceId": { "type": "string" },
+        "communityId": { "type": "string" },
+        "applicationId": { "type": "string" },
+        "candidateId": { "type": "string" },
+        "discordUserId": { "type": "string" },
+        "recruiterId": { "type": "string" },
+        "campaignId": { "type": "string" },
+        "source": { "type": "string" },
+        "recruitmentSuccessfulAt": { "type": "string" },
+        "memberActivatedAt": { "type": "string" },
+        "status": { "type": "string" },
+        "roleStatus": { "type": "string" },
+        "roleId": { "type": "string" },
+        "welcomeStatus": { "type": "string" },
+        "onboardingStatus": { "type": "string" },
+        "failureReason": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "communityId", "applicationId", "discordUserId", "status"]
+    },
+    "MemberOnboardingChecklist": {
+      "title": "MemberOnboardingChecklist",
+      "description": "Member onboarding checklist state",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "communityId": { "type": "string" },
+        "discordUserId": { "type": "string" },
+        "applicationId": { "type": "string" },
+        "overallStatus": { "type": "string" },
+        "completedCount": { "type": "number" },
+        "totalConfiguredCount": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "communityId", "discordUserId", "overallStatus"]
+    },
+    "EarlyEngagementEvent": {
+      "title": "EarlyEngagementEvent",
+      "description": "Real early-life community engagement record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "communityId": { "type": "string" },
+        "discordUserId": { "type": "string" },
+        "eventType": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "communityId", "discordUserId", "eventType", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/communities/{communityId}": {
+      "schema": { "$ref": "#/entities/Community" },
+      "description": "Tenant community configurations"
+    },
+    "/applications/{applicationId}": {
+      "schema": { "$ref": "#/entities/Application" },
+      "description": "Recruitment applications"
+    },
+    "/interviews/{interviewId}": {
+      "schema": { "$ref": "#/entities/Interview" },
+      "description": "Applicant interviews"
+    },
+    "/formsConfiguration/{configId}": {
+      "schema": { "$ref": "#/entities/FormsConfiguration" },
+      "description": "Google Forms integration configs"
+    },
+    "/calendarConfiguration/{configId}": {
+      "schema": { "$ref": "#/entities/CalendarConfiguration" },
+      "description": "Google Calendar integration configs"
+    },
+    "/spreadsheetConfiguration/{configId}": {
+      "schema": { "$ref": "#/entities/SpreadsheetConfiguration" },
+      "description": "Google Sheets integration configs"
+    },
+    "/integrationEvents/{eventId}": {
+      "schema": { "$ref": "#/entities/IntegrationEvent" },
+      "description": "Integration event ledger"
+    },
+    "/onboardingOperations/{operationId}": {
+      "schema": { "$ref": "#/entities/OnboardingOperation" },
+      "description": "Onboarding operations for retry and audit"
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/Event" },
+      "description": "Community events"
+    },
+    "/eventRegistrations/{regId}": {
+      "schema": { "$ref": "#/entities/EventRegistration" },
+      "description": "Event registration list"
+    },
+    "/eventReminders/{reminderId}": {
+      "schema": { "$ref": "#/entities/EventReminder" },
+      "description": "Event scheduled reminders"
+    },
+    "/memberHandoffs/{handoffId}": {
+      "schema": { "$ref": "#/entities/MemberHandoff" },
+      "description": "Durable recruitment-to-member handoff records"
+    },
+    "/memberOnboardingChecklists/{checklistId}": {
+      "schema": { "$ref": "#/entities/MemberOnboardingChecklist" },
+      "description": "Member onboarding checklist states"
+    },
+    "/earlyEngagementEvents/{eventId}": {
+      "schema": { "$ref": "#/entities/EarlyEngagementEvent" },
+      "description": "Real early member engagement event ledger"
+    }
+  }
+}

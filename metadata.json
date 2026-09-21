@@ -1,0 +1,6 @@
+{
+  "name": "Community Manager",
+  "description": "Professional Discord-first Community Management Platform covering community operations, member engagement, moderation, recruitment pipelines, workflow automation, analytics, and Community Brain AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

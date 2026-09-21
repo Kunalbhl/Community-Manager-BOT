@@ -1,0 +1,204 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSystemAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'PLATFORM_OWNER';
+    }
+
+    function isCommunityOwner(communityId) {
+      return isAuthenticated() && (
+        request.auth.token.role == 'OWNER' || 
+        request.auth.token.role == 'ADMIN'
+      ) && request.auth.token.communityId == communityId;
+    }
+
+    function isCommunityMember(communityId) {
+      return isAuthenticated() && request.auth.token.communityId == communityId;
+    }
+
+    function isSelf(discordUserId) {
+      return isAuthenticated() && request.auth.token.discordUserId == discordUserId;
+    }
+
+    // Immutable Tenant Identity check
+    function keepsTenantId() {
+      return resource == null || request.resource.data.communityId == resource.data.communityId;
+    }
+
+    // Health check endpoint for Firebase connection validation
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // Communities
+    match /communities/{communityId} {
+      allow read: if isAuthenticated();
+      allow write: if isCommunityOwner(communityId) || isSystemAdmin();
+    }
+
+    // Applications - Tenant Isolated
+    match /applications/{applicationId} {
+      allow read: if isAuthenticated() && (
+        isCommunityOwner(resource.data.communityId) ||
+        isSelf(resource.data.applicantDiscordUserId)
+      );
+      allow create: if isAuthenticated() && 
+        request.resource.data.communityId == request.auth.token.communityId &&
+        isSelf(request.resource.data.applicantDiscordUserId);
+      allow update: if isAuthenticated() && 
+        isCommunityOwner(resource.data.communityId) &&
+        keepsTenantId() &&
+        request.resource.data.applicantDiscordUserId == resource.data.applicantDiscordUserId;
+      allow delete: if false; // Server-only / Audit preservation
+    }
+
+    // Interviews - Tenant Isolated
+    match /interviews/{interviewId} {
+      allow read: if isAuthenticated() && (
+        isCommunityOwner(resource.data.communityId) ||
+        isSelf(resource.data.applicantDiscordId) ||
+        isSelf(resource.data.interviewerUserId)
+      );
+      allow create, update: if isAuthenticated() && 
+        isCommunityOwner(request.resource.data.communityId) &&
+        keepsTenantId();
+      allow delete: if false;
+    }
+
+    // Integration Configurations (Forms, Calendar, Sheets) - Owner Only
+    match /formsConfiguration/{configId} {
+      allow read, write: if isAuthenticated() && isCommunityOwner(request.resource.data.communityId || resource.data.communityId);
+    }
+
+    match /calendarConfiguration/{configId} {
+      allow read, write: if isAuthenticated() && isCommunityOwner(request.resource.data.communityId || resource.data.communityId);
+    }
+
+    match /spreadsheetConfiguration/{configId} {
+      allow read, write: if isAuthenticated() && isCommunityOwner(request.resource.data.communityId || resource.data.communityId);
+    }
+
+    // Integration Events Ledger - Server Controlled
+    match /integrationEvents/{eventId} {
+      allow read: if isAuthenticated() && isCommunityOwner(resource.data.communityId);
+      allow write: if false; // Only backend server can write integration ledger events
+    }
+
+    // Onboarding Operations - Server Controlled
+    match /onboardingOperations/{operationId} {
+      allow read: if isAuthenticated() && isCommunityOwner(resource.data.communityId);
+      allow write: if false; // Server-controlled durable writes
+    }
+
+    // Audit Logs - Read-only for Community Owners, Write Server-Only
+    match /auditLogs/{auditId} {
+      allow read: if isAuthenticated() && isCommunityOwner(resource.data.communityId);
+      allow write: if false; // Immutable audit log
+    }
+
+    // Recruiters - Tenant Isolated Sourcing & Performance Records
+    match /recruiters/{recruiterId} {
+      allow read: if isAuthenticated() && (
+        isCommunityOwner(resource.data.communityId) ||
+        isCommunityMember(resource.data.communityId)
+      );
+      allow create, update: if isAuthenticated() && 
+        isCommunityOwner(request.resource.data.communityId) &&
+        keepsTenantId();
+      allow delete: if false;
+    }
+
+    // Referrals - Tenant Isolated Sourcing Links
+    match /referrals/{referralId} {
+      allow read: if isAuthenticated() && (
+        isCommunityOwner(resource.data.communityId) ||
+        isCommunityMember(resource.data.communityId)
+      );
+      allow create, update: if isAuthenticated() && 
+        isCommunityOwner(request.resource.data.communityId) &&
+        keepsTenantId();
+      allow delete: if false;
+    }
+
+    // Goals - Performance milestones
+    match /goals/{goalId} {
+      allow read: if isAuthenticated() && (
+        isCommunityOwner(resource.data.communityId) ||
+        isCommunityMember(resource.data.communityId)
+      );
+      allow create, update: if isAuthenticated() && 
+        isCommunityOwner(request.resource.data.communityId) &&
+        keepsTenantId();
+      allow delete: if false;
+    }
+
+    // Rewards - Evidence-based payouts
+    match /rewards/{rewardId} {
+      allow read: if isAuthenticated() && (
+        isCommunityOwner(resource.data.communityId) ||
+        isCommunityMember(resource.data.communityId)
+      );
+      allow create, update: if isAuthenticated() && 
+        isCommunityOwner(request.resource.data.communityId) &&
+        keepsTenantId();
+      allow delete: if false;
+    }
+
+    // Member Handoffs - Task 51
+    match /memberHandoffs/{handoffId} {
+      allow read: if isAuthenticated() && (
+        isCommunityOwner(resource.data.communityId) ||
+        isSelf(resource.data.discordUserId)
+      );
+      allow create, update: if isAuthenticated() && 
+        isCommunityOwner(request.resource.data.communityId) &&
+        keepsTenantId();
+      allow delete: if false;
+    }
+
+    // Member Onboarding Checklists - Task 51
+    match /memberOnboardingChecklists/{checklistId} {
+      allow read: if isAuthenticated() && (
+        isCommunityOwner(resource.data.communityId) ||
+        isSelf(resource.data.discordUserId)
+      );
+      allow create, update: if isAuthenticated() && (
+        isCommunityOwner(request.resource.data.communityId) ||
+        isSelf(request.resource.data.discordUserId)
+      ) && keepsTenantId();
+      allow delete: if false;
+    }
+
+    // Early Engagement Events - Task 51
+    match /earlyEngagementEvents/{eventId} {
+      allow read: if isAuthenticated() && (
+        isCommunityOwner(resource.data.communityId) ||
+        isSelf(resource.data.discordUserId)
+      );
+      allow create, update: if isAuthenticated() && (
+        isCommunityOwner(request.resource.data.communityId) ||
+        isSelf(request.resource.data.discordUserId)
+      ) && keepsTenantId();
+      allow delete: if false;
+    }
+
+    // Platform Level Metadata
+    match /platformServers/{serverId} {
+      allow read, write: if isSystemAdmin();
+    }
+    match /platformSettings/{settingId} {
+      allow read, write: if isSystemAdmin();
+    }
+
+    // Default Fallback: Block direct client writes to unknown documents
+    match /{document=**} {
+      allow read, write: if isSystemAdmin();
+    }
+  }
+}
