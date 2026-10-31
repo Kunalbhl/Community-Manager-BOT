@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="cm_bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#312E81"/>
+    </linearGradient>
+    <linearGradient id="cm_glow" x1="16" y1="12" x2="32" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A5B4FC"/>
+      <stop offset="1" stop-color="#6366F1"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded squircle -->
+  <rect x="2" y="2" width="44" height="44" rx="12" fill="url(#cm_bg)"/>
+  <rect x="2" y="2" width="44" height="44" rx="12" stroke="#6366F1" stroke-width="1.5" stroke-opacity="0.4"/>
+  
+  <!-- Outer hexagonal network hub -->
+  <path d="M24 10L36 17V31L24 38L12 31V17L24 10Z" stroke="url(#cm_glow)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Inner node links -->
+  <path d="M24 10V24M36 31L24 24M12 31L24 24" stroke="#C7D2FE" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Central core pulse node -->
+  <circle cx="24" cy="24" r="4" fill="#FFFFFF"/>
+  <circle cx="24" cy="24" r="2" fill="#4F46E5"/>
+  
+  <!-- Satellite community nodes -->
+  <circle cx="24" cy="10" r="2.5" fill="#C7D2FE"/>
+  <circle cx="36" cy="17" r="2.5" fill="#818CF8"/>
+  <circle cx="36" cy="31" r="2.5" fill="#818CF8"/>
+  <circle cx="24" cy="38" r="2.5" fill="#C7D2FE"/>
+  <circle cx="12" cy="31" r="2.5" fill="#818CF8"/>
+  <circle cx="12" cy="17" r="2.5" fill="#818CF8"/>
+</svg>

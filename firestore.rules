@@ -80,6 +80,15 @@ service cloud.firestore {
       allow read, write: if isAuthenticated() && isCommunityOwner(request.resource.data.communityId || resource.data.communityId);
     }
 
+    match /userCalendarConfigurations/{configId} {
+      allow read, write: if isAuthenticated() && (
+        isSelf(resource.data.userId) ||
+        isSelf(request.resource.data.userId) ||
+        isCommunityOwner(request.resource.data.communityId || resource.data.communityId) ||
+        isSystemAdmin()
+      );
+    }
+
     match /spreadsheetConfiguration/{configId} {
       allow read, write: if isAuthenticated() && isCommunityOwner(request.resource.data.communityId || resource.data.communityId);
     }

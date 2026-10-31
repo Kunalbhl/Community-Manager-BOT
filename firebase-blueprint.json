@@ -75,6 +75,22 @@
       },
       "required": ["id", "communityId", "calendarId", "enabled"]
     },
+    "UserCalendarConfiguration": {
+      "title": "UserCalendarConfiguration",
+      "description": "User-scoped recruitment calendar synchronization preference and status",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "communityId": { "type": "string" },
+        "calendarId": { "type": "string" },
+        "preference": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "preference", "status"]
+    },
     "SpreadsheetConfiguration": {
       "title": "SpreadsheetConfiguration",
       "description": "Google Sheets export sync configuration",
@@ -257,6 +273,10 @@
     "/calendarConfiguration/{configId}": {
       "schema": { "$ref": "#/entities/CalendarConfiguration" },
       "description": "Google Calendar integration configs"
+    },
+    "/userCalendarConfigurations/{configId}": {
+      "schema": { "$ref": "#/entities/UserCalendarConfiguration" },
+      "description": "User-scoped recruitment calendar synchronization preference and status"
     },
     "/spreadsheetConfiguration/{configId}": {
       "schema": { "$ref": "#/entities/SpreadsheetConfiguration" },

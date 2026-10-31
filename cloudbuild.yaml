@@ -1,24 +1,49 @@
 steps:
-  # 1. Build Docker Image
+  # 1. Build Docker Image using Cloud Build (no local Docker needed)
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/$PROJECT_ID/community-manager:$COMMIT_SHA', '.']
+    args:
+      - 'build'
+      - '-t'
+      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/community-manager:$BUILD_ID'
+      - '.'
 
-  # 2. Push Image to Container Registry
+  # 2. Push to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/community-manager:$COMMIT_SHA']
+    args:
+      - 'push'
+      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/community-manager:$BUILD_ID'
 
-  # 3. Deploy to Cloud Run
+  # 3. Deploy to Cloud Run with all production config
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
       - 'deploy'
-      - 'community-manager'
-      - '--image=gcr.io/$PROJECT_ID/community-manager:$COMMIT_SHA'
-      - '--region=us-central1'
+      - 'community-manager-bot'
+      - '--image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/community-manager:$BUILD_ID'
+      - '--region=asia-southeast1'
       - '--platform=managed'
       - '--allow-unauthenticated'
       - '--port=3000'
+      - '--memory=512Mi'
+      - '--cpu=1'
+      - '--service-account=720940628402-compute@developer.gserviceaccount.com'
+      - '--set-secrets=DISCORD_BOT_TOKEN=DISCORD_BOT_TOKEN:latest,DISCORD_CLIENT_SECRET=DISCORD_CLIENT_SECRET:latest,SESSION_SECRET=SESSION_SECRET:latest'
+      - >-
+        --set-env-vars=APP_RUNTIME_MODE=PRODUCTION,NODE_ENV=production,
+        GOOGLE_CLOUD_PROJECT_ID=$PROJECT_ID,
+        GOOGLE_CLOUD_REGION=asia-southeast1,
+        FIRESTORE_DATABASE_ID=ai-studio-communitymanager-59f17f1d-8b74-490e-9248-bc41e69de7ef,
+        DISCORD_CLIENT_ID=1547515985416822884,
+        DISCORD_APPLICATION_ID=1547515985416822884,
+        DISCORD_PUBLIC_KEY=522efd135b52e2b8e56ad6d7bebd2b787e5e78584301d4a69368ef5d98d3717f,
+        DISCORD_REDIRECT_URI=https://community-manager-bot-720940628402.asia-southeast1.run.app/api/v1/auth/callback,
+        APP_URL=https://community-manager-bot-720940628402.asia-southeast1.run.app,
+        VITE_DISCORD_CLIENT_ID=1547515985416822884,
+        PLATFORM_OWNER_EMAIL=kunalpareekusa@gmail.com,
+        PLATFORM_OWNER_USER_ID=436486741080408064,
+        FREE_MODE=true
+      - '--project=$PROJECT_ID'
 
 images:
-  - 'gcr.io/$PROJECT_ID/community-manager:$COMMIT_SHA'
+  - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/community-manager:$BUILD_ID'

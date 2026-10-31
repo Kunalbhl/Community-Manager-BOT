@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Community Manager Discord-Native Design System Tokens */
+    --cm-bg: #0f172a;
+    --cm-surface: #1e293b;
+    --cm-surface-hover: #334155;
+    --cm-border: #334155;
+    --cm-primary: #5865f2; /* Discord Blurple */
+    --cm-primary-hover: #4752c4;
+    --cm-text-primary: #f8fafc;
+    --cm-text-secondary: #94a3b8;
+    --cm-accent-green: #57f287;
+    --cm-accent-yellow: #fee75c;
+    --cm-accent-red: #ed4245;
+  }
+}
+
+body {
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}

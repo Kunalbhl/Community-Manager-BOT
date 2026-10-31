@@ -1,0 +1,51 @@
+{
+  "applicationName": "community-manager",
+  "applicationVersion": "1.0.0",
+  "releaseVersion": "159.0.0",
+  "runtimeModeRequirement": "PRODUCTION",
+  "releaseLockState": {
+    "productReleaseLocked": true
+  },
+  "requiredProviders": [
+    "discordRest",
+    "discordGateway",
+    "firestore",
+    "auth",
+    "session",
+    "scheduler",
+    "engagementDelivery",
+    "audit"
+  ],
+  "requiredEnvironmentVariables": [
+    "NODE_ENV",
+    "APP_ENV",
+    "PORT",
+    "APP_URL",
+    "SESSION_SECRET",
+    "DISCORD_BOT_TOKEN",
+    "DISCORD_CLIENT_ID",
+    "DISCORD_CLIENT_SECRET",
+    "DISCORD_REDIRECT_URI",
+    "GOOGLE_CLOUD_PROJECT_ID",
+    "FIRESTORE_DATABASE_ID",
+    "PRODUCT_RELEASE_LOCKED"
+  ],
+  "healthEndpoints": [
+    "/health",
+    "/health/live",
+    "/health/ready",
+    "/health/external"
+  ],
+  "verificationEndpoints": [
+    "/api/v1/ops/production/verification",
+    "/api/production-readiness/verify-firestore"
+  ],
+  "migrationRequirements": {
+    "engine": "firestore-native-automatic-boot",
+    "seeding": "bypassed-in-production",
+    "rollbackSupport": "yes",
+    "destructiveOperations": "disabled"
+  },
+  "rollbackVersion": "158.0.0",
+  "buildIdentifier": "build-159-live-discord-verification-rc1"
+}

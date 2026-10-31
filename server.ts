@@ -10,9 +10,10 @@ import { v1Router } from './server/routes/v1.routes.js';
 import { rateLimiter } from './server/security/rateLimiter.js';
 import { communitiesRepository, communityMemberAccessRepository, discordMembersRepository } from './server/repositories/index.js';
 import { httpSecurityMiddleware } from './server/security/httpSecurity.js';
-import { getHealth, getLiveness, getReadiness, verifyFirestoreReadiness } from './server/controllers/health.controller.js';
+import { getHealth, getLiveness, getReadiness, getExternalDependenciesHealth, verifyFirestoreReadiness } from './server/controllers/health.controller.js';
 import { discordService } from './server/integrations/discord/discord.service.js';
 import { DEFAULT_ROLE_PERMISSIONS } from './shared/types/rbac.js';
+import { ProductionRuntimeActivationService } from './server/services/productionRuntimeActivation.service.js';
 
 async function seedDefaultCommunity() {
   if (config.NODE_ENV === 'production' || config.APP_RUNTIME_MODE !== 'DEVELOPMENT_SIMULATION') {
@@ -95,8 +96,9 @@ async function seedDefaultCommunity() {
     }
   };
 
-    await seedCommunityWithPersonas('comm_default', 'Primary Community', '1547515985416822884');
-    await seedCommunityWithPersonas('comm_1547515985416822884', 'Development Community Guild', '1547515985416822884');
+    const devGuildId = process.env.DEV_GUILD_ID || 'dev_guild_local';
+    await seedCommunityWithPersonas('comm_default', 'Primary Community', devGuildId);
+    await seedCommunityWithPersonas(`comm_${devGuildId}`, 'Development Community Guild', devGuildId);
   } catch (err) {
     logger.warn('Failed to seed default community:', err);
   }
@@ -122,6 +124,7 @@ async function connectDiscordBot() {
 }
 
 async function startServer() {
+  ProductionRuntimeActivationService.verifyStartup();
   await seedDefaultCommunity();
   const app = express();
   const PORT = Number(process.env.PORT || config.PORT || 3000);
@@ -137,6 +140,7 @@ async function startServer() {
   app.get('/health', getHealth);
   app.get('/health/live', getLiveness);
   app.get('/health/ready', getReadiness);
+  app.get('/health/external', getExternalDependenciesHealth);
 
   // Body parsing & rate limiting
   app.use(express.json({ limit: '1mb' }));

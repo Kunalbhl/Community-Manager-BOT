@@ -1,0 +1,69 @@
+{
+  "checklistName": "Production Go-Live Gate Checklist",
+  "releaseVersion": "146.0.0",
+  "timestamp": "2026-09-28T11:47:31-07:00",
+  "checks": {
+    "BUILD": {
+      "status": "PASS",
+      "details": "TypeScript compiler is error-free, ESLint runs successfully, production Vite and Node server build are successful."
+    },
+    "RUNTIME_MODE": {
+      "status": "NOT_CONFIGURED",
+      "details": "Current runtime mode is resolved to DEVELOPMENT_SIMULATION due to lack of environment variable override. Expected PRODUCTION runtime handoff is required."
+    },
+    "DISCORD": {
+      "status": "NOT_CONFIGURED",
+      "details": "Bot credentials not supplied or are mock. Authentic DISCORD_BOT_TOKEN is required."
+    },
+    "GATEWAY": {
+      "status": "NOT_CONFIGURED",
+      "details": "Gateway singleton client is unconfigured in current sandbox preview. Real login disabled."
+    },
+    "FIRESTORE": {
+      "status": "PASS",
+      "details": "Real Firestore instance is provisioned and read-write connectivity works, or simulated transient memory layer handles sandbox tests."
+    },
+    "OAUTH": {
+      "status": "NOT_CONFIGURED",
+      "details": "OAuth credentials not configured. APP_URL and DISCORD_CLIENT_SECRET are required."
+    },
+    "SESSION": {
+      "status": "PASS",
+      "details": "Authentic Express sessions with signed cookies and robust token scrubbing are compiled and active."
+    },
+    "SCHEDULER": {
+      "status": "PASS",
+      "details": "Durable database-backed stateful scheduler and distributed cron locks are fully verified."
+    },
+    "ENGAGEMENT": {
+      "status": "PASS",
+      "details": "Harmless read-only check and permission matrices are ready for live deployment channel."
+    },
+    "AUDIT": {
+      "status": "PASS",
+      "details": "Centralized, secure redaction, and multi-tenant audit trail logging is verified and error-free."
+    },
+    "OBSERVABILITY": {
+      "status": "PASS",
+      "details": "Health /health/live, /health/ready, /health/external endpoints and SLO telemetry are operational."
+    },
+    "INCIDENT_RESPONSE": {
+      "status": "PASS",
+      "details": "Automated incident lifecycle detection, rate-limiting handlers, and diagnostic dashboards are active."
+    },
+    "TENANT_ISOLATION": {
+      "status": "PASS",
+      "details": "Strict collection and memory-level tenant boundaries prevent cross-community access."
+    },
+    "SECURITY": {
+      "status": "PASS",
+      "details": "Fail-closed check on header bypass, secure cookie configs, and session secrets are enforced."
+    },
+    "ROLLBACK": {
+      "status": "PASS",
+      "details": "Safe non-destructive migration scripts, rollback awareness, and schema version lock are verified."
+    }
+  },
+  "acceptanceActionRequired": "DEPLOYMENT_RUNTIME_HANDOFF",
+  "limitationReport": "CORE_READY_WITH_EXTERNAL_LIMITATION"
+}
