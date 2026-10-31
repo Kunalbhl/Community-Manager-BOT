@@ -80,7 +80,6 @@ export class RealDiscordProvider implements DiscordProvider {
       'GuildMessageReactions',
       'MessageContent',
       'DirectMessages',
-      'GuildPresences',
     ];
 
     const effectiveState = (!config.DISCORD_BOT_TOKEN || config.DISCORD_BOT_TOKEN.startsWith('mock_'))
@@ -202,7 +201,7 @@ export class RealDiscordProvider implements DiscordProvider {
         return true;
       } catch (err) {
         const errMsg = (err as Error).message;
-        if (errMsg.includes('TOKEN_INVALID') || errMsg.includes('401') || errMsg.includes('Disallowed')) {
+        if (errMsg.includes('TOKEN_INVALID') || errMsg.toLowerCase().includes('invalid token') || (err as any)?.code === 'TokenInvalid' || errMsg.includes('401') || errMsg.includes('Disallowed')) {
           this.state = 'AUTHENTICATION_REQUIRED';
           this.disconnectReason = secretsManager.redactString(errMsg);
           logger.error('[DiscordGateway] Authentication failed (token invalid or disallowed intents):', undefined, {
