@@ -1,0 +1,36 @@
+# Community Manager — always-on bot engine on the Oracle Always Free VM.
+# Runs next to SocialCord's container; shares nothing with it except the machine.
+name: community-manager
+services:
+  bot:
+    build:
+      context: ../..
+      dockerfile: deploy/vm/Dockerfile.bot
+    image: community-manager-bot:latest
+    container_name: community-manager-bot
+    restart: unless-stopped
+    env_file:
+      - /opt/community-manager/bot.env
+    environment:
+      NODE_ENV: production
+      APP_RUNTIME_MODE: PRODUCTION
+      BOT_INSTANCE_ROLE: vm
+      BOT_LEADER_PRIORITY: "100"
+      BOT_ENABLED: "true"
+      DB_POOL_MAX: "4"
+      PORT: "3000"
+      GIT_SHA: ${GIT_SHA:-unknown}
+    ports:
+      - "127.0.0.1:3101:3000"   # local health checks only; never exposed publicly
+    mem_limit: 450m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health/live"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

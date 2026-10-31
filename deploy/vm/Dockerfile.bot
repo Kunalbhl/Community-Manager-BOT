@@ -1,0 +1,11 @@
+# Always-on bot engine for the Oracle Always Free VM.
+# Builds only the server bundle (no website build), so it fits a 1 GB VM.
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production PORT=3000
+COPY package.json package-lock.json* ./
+RUN npm install --no-audit --no-fund --omit=dev && npm install --no-save esbuild@0.25.0 && npm cache clean --force
+COPY . .
+RUN npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/server.cjs \
+  && mkdir -p dist && printf '<!doctype html><title>Community Manager bot</title><p>Bot engine running. Dashboard is served from the website.</p>' > dist/index.html
+CMD ["node", "--max-old-space-size=384", "dist/server.cjs"]

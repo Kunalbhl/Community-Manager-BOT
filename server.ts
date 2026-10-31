@@ -14,6 +14,16 @@ import { getHealth, getLiveness, getReadiness, getExternalDependenciesHealth, ve
 import { discordService } from './server/integrations/discord/discord.service.js';
 import { DEFAULT_ROLE_PERMISSIONS } from './shared/types/rbac.js';
 import { ProductionRuntimeActivationService } from './server/services/productionRuntimeActivation.service.js';
+import { startLeadership, stopLeadership, getLeadershipStatus } from './server/runtime/leadership.js';
+import { EngagementSchedulerService } from './server/services/engagement.service.js';
+
+// A 24/7 bot must never die from one stray error: log it and keep running.
+process.on('unhandledRejection', (reason: any) => {
+  logger.error('[Process] Unhandled promise rejection (kept alive):', undefined, { error: reason?.message || String(reason) });
+});
+process.on('uncaughtException', (err: Error) => {
+  logger.error('[Process] Uncaught exception (kept alive):', undefined, { error: err?.message, stack: err?.stack });
+});
 
 async function seedDefaultCommunity() {
   if (config.NODE_ENV === 'production' || config.APP_RUNTIME_MODE !== 'DEVELOPMENT_SIMULATION') {
@@ -141,6 +151,9 @@ async function startServer() {
   app.get('/health/live', getLiveness);
   app.get('/health/ready', getReadiness);
   app.get('/health/external', getExternalDependenciesHealth);
+  app.get('/health/leader', (_req: Request, res: Response) => {
+    res.json({ ...getLeadershipStatus(), discord: discordService.getDiagnostics?.() });
+  });
 
   // Body parsing & rate limiting
   app.use(express.json({ limit: '1mb' }));
@@ -194,7 +207,16 @@ async function startServer() {
     );
   });
 
-  connectDiscordBot();
+  startLeadership({
+    onBecomeLeader: async () => {
+      await connectDiscordBot();
+      EngagementSchedulerService.startScheduler();
+    },
+    onLoseLeadership: async () => {
+      EngagementSchedulerService.stopScheduler();
+      await discordService.disconnect();
+    },
+  }).catch((err) => logger.error('[Leadership] Failed to start:', undefined, { error: err?.message }));
 
   // Graceful Shutdown Handler
   const handleShutdown = async (signal: string) => {
@@ -212,7 +234,9 @@ async function startServer() {
     }, 10000);
 
     try {
+      EngagementSchedulerService.stopScheduler();
       await discordService.disconnect();
+      await stopLeadership();
       // 3. Flush log buffers and telemetry
       logger.info('Flushed operational telemetry and log buffers.');
       clearTimeout(timeoutTimer);

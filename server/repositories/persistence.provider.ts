@@ -2,6 +2,7 @@ import { Firestore } from '@google-cloud/firestore';
 import { QueryOptions } from './base.repository.js';
 import { config } from '../config/env.js';
 import { logger } from '../logging/logger.js';
+import { isPostgresEnabled, postgresStore } from './postgres.store.js';
 
 export interface IPersistenceProvider {
   getById<T extends { id: string }>(collectionName: string, id: string): Promise<T | null>;
@@ -242,6 +243,18 @@ export class DevelopmentSimulationPersistenceProvider implements IPersistencePro
 // Select active provider
 const isRealPersistence = config.APP_RUNTIME_MODE === 'PRODUCTION' || config.APP_RUNTIME_MODE === 'REAL_DISCORD_PREVIEW';
 
-export const activePersistenceProvider: IPersistenceProvider = isRealPersistence
-  ? new FirestorePersistenceProvider()
-  : new DevelopmentSimulationPersistenceProvider();
+export class PostgresPersistenceProvider implements IPersistenceProvider {
+  getById<T extends { id: string }>(c: string, id: string) { return postgresStore.getById(c, id) as Promise<T | null>; }
+  list<T extends { id: string }>(c: string, o?: QueryOptions) { return postgresStore.list(c, o) as Promise<T[]>; }
+  create<T extends { id: string }>(c: string, id: string, data: any) { return postgresStore.set(c, id, data) as Promise<T>; }
+  update<T extends { id: string }>(c: string, id: string, u: Partial<T>) { return postgresStore.update(c, id, u) as Promise<T>; }
+  upsert<T extends { id: string }>(c: string, id: string, data: any) { return postgresStore.upsert(c, id, data) as Promise<T>; }
+  delete(c: string, id: string) { return postgresStore.delete(c, id); }
+  count(c: string, o?: QueryOptions) { return postgresStore.count(c, o); }
+}
+
+export const activePersistenceProvider: IPersistenceProvider = isPostgresEnabled()
+  ? new PostgresPersistenceProvider()
+  : isRealPersistence
+    ? new FirestorePersistenceProvider()
+    : new DevelopmentSimulationPersistenceProvider();

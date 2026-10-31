@@ -23,7 +23,7 @@ export const AUTHORITATIVE_GATEWAY_INTENTS = [
   GatewayIntentBits.GuildMessageReactions,
   GatewayIntentBits.MessageContent,
   GatewayIntentBits.DirectMessages,
-  GatewayIntentBits.GuildPresences,
+  // GuildPresences removed: privileged, unused, and heavy on memory/bandwidth.
 ] as const;
 
 export class RealDiscordProvider implements DiscordProvider {
@@ -166,7 +166,8 @@ export class RealDiscordProvider implements DiscordProvider {
         });
 
         this.client.on('shardError', (error, shardId) => {
-          this.state = 'FAILED';
+          // discord.js keeps retrying the shard itself; mark degraded rather than failed.
+          this.state = 'RECONNECTING';
           this.disconnectReason = `Shard ${shardId} error: ${error.message}`;
           logger.error(`[DiscordGateway] Shard ${shardId} error:`, undefined, {
             error: error.message,
@@ -180,6 +181,15 @@ export class RealDiscordProvider implements DiscordProvider {
         this.heartbeatInterval = setInterval(() => {
           if (this.client?.isReady()) {
             this.lastHeartbeatAt = new Date().toISOString();
+            return;
+          }
+          // Watchdog: if the gateway has been down for 10 minutes, rebuild the client from scratch.
+          const last = this.lastHeartbeatAt ? Date.parse(this.lastHeartbeatAt) : 0;
+          if (last && Date.now() - last > 10 * 60 * 1000 && this.state !== 'CONNECTING') {
+            logger.warn('[DiscordGateway] Watchdog: gateway not ready for 10 minutes. Rebuilding client.');
+            this.disconnect()
+              .then(() => this.connect())
+              .catch((err) => logger.error(`[DiscordGateway] Watchdog reconnect failed: ${err?.message}`));
           }
         }, 30000);
 
@@ -206,11 +216,12 @@ export class RealDiscordProvider implements DiscordProvider {
             state: this.state,
             error: this.disconnectReason,
           });
-          this.scheduleReconnect();
         }
         this.messageContentIntentActive = false;
+        try { await this.client?.destroy(); } catch { /* ignore */ }
         this.client = null;
         this.connectionPromise = null;
+        if (this.state === 'FAILED') this.scheduleReconnect();
         return false;
       }
     })();
@@ -226,12 +237,12 @@ export class RealDiscordProvider implements DiscordProvider {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
-      logger.warn(`[DiscordGateway] Maximum reconnection attempts (${this.MAX_RECONNECT_ATTEMPTS}) reached. Halting auto-reconnect.`);
-      return;
-    }
+    // Never give up: a 24/7 bot must recover from any outage on its own.
+    // Backoff grows to a 5-minute ceiling after MAX_RECONNECT_ATTEMPTS fast retries.
     this.reconnectAttempts++;
-    const baseDelay = Math.min(30000, 1000 * Math.pow(2, this.reconnectAttempts));
+    const baseDelay = this.reconnectAttempts > this.MAX_RECONNECT_ATTEMPTS
+      ? 300000
+      : Math.min(30000, 1000 * Math.pow(2, this.reconnectAttempts));
     const jitter = Math.floor(Math.random() * 1000);
     const delayMs = baseDelay + jitter;
     logger.info(`[DiscordGateway] Scheduling reconnect attempt ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS} in ${delayMs}ms...`);

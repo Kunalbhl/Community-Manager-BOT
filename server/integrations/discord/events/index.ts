@@ -13,6 +13,7 @@ import { channelAccessService } from '../../../services/channelAccess.service.js
 import { discordGuildLinkService } from '../../../services/discordGuildLink.service.js';
 import { handleCommandInteraction } from '../commands/index.js';
 import { registerSlashCommands } from '../registration.service.js';
+import { guardInteraction, replyWithError } from '../interactionGuard.js';
 
 /**
  * Registers all real Discord Gateway event listeners onto the Discord.js client.
@@ -183,6 +184,18 @@ export function attachGatewayEventHandlers(client: Client): void {
 
   // 6. INTERACTION_CREATE Event (Slash Commands & Components)
   client.on(Events.InteractionCreate, async (interaction: Interaction) => {
+    const release = guardInteraction(interaction);
+    try {
+      await handleInteraction(interaction);
+    } catch (err) {
+      logger.error('[DiscordGateway] Interaction handler failed:', undefined, { error: (err as Error)?.message });
+      await replyWithError(interaction, '⚠️ Something went wrong while handling that. Please try again in a moment.');
+    } finally {
+      release();
+    }
+  });
+
+  const handleInteraction = async (interaction: Interaction): Promise<void> => {
     if (interaction.isChatInputCommand()) {
       await handleCommandInteraction(interaction);
     } else if (interaction.isButton()) {
@@ -253,7 +266,7 @@ export function attachGatewayEventHandlers(client: Client): void {
         }
       }
     }
-  });
+  };
 
   // 7. MESSAGE_CREATE Event (Channel message processing with allowlist)
   client.on(Events.MessageCreate, async (message: Message) => {

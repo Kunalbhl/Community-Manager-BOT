@@ -661,5 +661,5 @@ export class EngagementSchedulerService {
   }
 }
 
-// Start Scheduler automatically
-EngagementSchedulerService.startScheduler();
+// The scheduler is started by server/runtime/leadership.ts only on the active (leader) instance,
+// so scheduled posts never run twice.

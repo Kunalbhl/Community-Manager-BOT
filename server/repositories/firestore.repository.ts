@@ -4,6 +4,7 @@ import path from 'path';
 import { IRepository, QueryOptions } from './base.repository.js';
 import { logger } from '../logging/logger.js';
 import { config } from '../config/env.js';
+import { isPostgresEnabled, postgresStore } from './postgres.store.js';
 
 let firestoreInstance: Firestore | null = null;
 let firestoreInitialized = false;
@@ -161,6 +162,14 @@ function handleFirestoreOpError(err: any, op: string, collection: string, id?: s
  * Performs a live connectivity check against Firestore without falling back.
  */
 export async function checkFirestoreReadiness(): Promise<{ isReady: boolean; error?: string }> {
+  if (isPostgresEnabled()) {
+    try {
+      await postgresStore.ping();
+      return { isReady: true };
+    } catch (err: any) {
+      return { isReady: false, error: `POSTGRES_UNAVAILABLE: ${err?.message || err}` };
+    }
+  }
   try {
     const db = getFirestoreDb();
     if (!db) {
@@ -290,6 +299,7 @@ export class FirestoreRepository<T extends { id: string }> implements IRepositor
   }
 
   async getById(id: string): Promise<T | null> {
+    if (isPostgresEnabled()) return postgresStore.getById(this.collectionName, id) as Promise<T | null>;
     if (isRealPersistenceMode()) {
       const db = getFirestoreDb();
       const dbVersionAtStart = currentDbVersion;
@@ -393,6 +403,7 @@ export class FirestoreRepository<T extends { id: string }> implements IRepositor
   }
 
   async list(options?: QueryOptions): Promise<T[]> {
+    if (isPostgresEnabled()) return postgresStore.list(this.collectionName, options) as Promise<T[]>;
     if (isRealPersistenceMode()) {
       const db = getFirestoreDb();
       const dbVersionAtStart = currentDbVersion;
@@ -582,6 +593,8 @@ export class FirestoreRepository<T extends { id: string }> implements IRepositor
       }
     }
 
+    if (isPostgresEnabled()) return postgresStore.set(this.collectionName, id, cleanData) as Promise<T>;
+
     if (isRealPersistenceMode()) {
       const db = getFirestoreDb();
       if (!db || !firestoreAvailable) {
@@ -633,6 +646,8 @@ export class FirestoreRepository<T extends { id: string }> implements IRepositor
         cleanUpdates[k] = null;
       }
     }
+
+    if (isPostgresEnabled()) return postgresStore.update(this.collectionName, id, cleanUpdates) as Promise<T>;
 
     if (isRealPersistenceMode()) {
       const db = getFirestoreDb();
@@ -709,6 +724,8 @@ export class FirestoreRepository<T extends { id: string }> implements IRepositor
       }
     }
 
+    if (isPostgresEnabled()) return postgresStore.upsert(this.collectionName, id, cleanData) as Promise<T>;
+
     if (isRealPersistenceMode()) {
       const db = getFirestoreDb();
       if (!db || !firestoreAvailable) {
@@ -768,6 +785,7 @@ export class FirestoreRepository<T extends { id: string }> implements IRepositor
   }
 
   async delete(id: string): Promise<boolean> {
+    if (isPostgresEnabled()) return postgresStore.delete(this.collectionName, id);
     if (isRealPersistenceMode()) {
       const db = getFirestoreDb();
       if (!db || !firestoreAvailable) {
@@ -801,6 +819,7 @@ export class FirestoreRepository<T extends { id: string }> implements IRepositor
   }
 
   async count(options?: QueryOptions): Promise<number> {
+    if (isPostgresEnabled()) return postgresStore.count(this.collectionName, options);
     if (isRealPersistenceMode()) {
       const db = getFirestoreDb();
       if (!db || !firestoreAvailable) {

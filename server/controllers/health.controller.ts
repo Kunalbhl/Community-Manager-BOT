@@ -212,11 +212,11 @@ export async function getProductionReadiness(req: Request, res: Response) {
  */
 export async function verifyFirestoreReadiness(req: Request, res: Response) {
   const { performance } = await import('perf_hooks');
-  const { activePersistenceProvider, FirestorePersistenceProvider } = await import('../repositories/persistence.provider.js');
+  const { activePersistenceProvider, DevelopmentSimulationPersistenceProvider } = await import('../repositories/persistence.provider.js');
   const { logger } = await import('../logging/logger.js');
 
   const startTotal = performance.now();
-  const isReal = activePersistenceProvider instanceof FirestorePersistenceProvider;
+  const isReal = !(activePersistenceProvider instanceof DevelopmentSimulationPersistenceProvider);
 
   if (!isReal) {
     return res.status(400).json({
