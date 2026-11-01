@@ -108,14 +108,14 @@ export function SiteLanding() {
             <div className="flex items-start gap-4">
               <BellRing className="mt-1 h-7 w-7 shrink-0 text-[var(--site-signal)]" aria-hidden />
               <div>
-                <h3 className="text-2xl font-bold">Also posting from Instagram or YouTube?</h3>
+                <h3 className="text-2xl font-bold">Also posting on Instagram?</h3>
                 <p className="mt-2 max-w-xl text-[var(--site-muted)]">
                   Switch on SocialCord Notifier from your dashboard to share new posts in your channels. It has
                   its own settings page, one click away.
                 </p>
               </div>
             </div>
-            <a href={loginHref} className="cm-btn-ghost self-start md:self-auto">Manage in dashboard</a>
+            <a href={loginHref} className="cm-btn-ghost shrink-0 self-start whitespace-nowrap md:self-auto">Manage in dashboard</a>
           </div>
         </section>
       </main>
