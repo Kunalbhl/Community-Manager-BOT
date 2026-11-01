@@ -565,6 +565,8 @@ export const moderationLogService = new ModerationLogService();
 /**
  * 6. AUTO MODERATION SERVICE
  */
+const automodRuleCache = new Map<string, { at: number; rules: AutoModerationRule[] }>();
+
 export class AutoModerationService {
   async createRule(params: {
     communityId: string;
@@ -599,6 +601,7 @@ export class AutoModerationService {
       targetId: rule.id,
     });
 
+    automodRuleCache.delete(params.communityId);
     return rule;
   }
 
@@ -608,6 +611,7 @@ export class AutoModerationService {
       throw new Error('Rule not found');
     }
 
+    automodRuleCache.delete(communityId);
     const updated = await autoModerationRulesRepository.update(ruleId, {
       enabled,
       updatedAt: new Date().toISOString(),
@@ -640,7 +644,13 @@ export class AutoModerationService {
     messageText: string,
     channelId: string
   ): Promise<{ actionExecuted: boolean; actionType?: string; matchedRule?: string }> {
-    const rules = await this.listRules(communityId);
+    const cached = automodRuleCache.get(communityId);
+    let rules: AutoModerationRule[];
+    if (cached && Date.now() - cached.at < 30_000) rules = cached.rules;
+    else {
+      rules = await this.listRules(communityId);
+      automodRuleCache.set(communityId, { at: Date.now(), rules });
+    }
     const sortedRules = rules.filter((r) => r.enabled).sort((a, b) => b.priority - a.priority);
 
     for (const rule of sortedRules) {

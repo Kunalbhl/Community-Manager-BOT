@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LogIn, Plus, Menu, MessagesSquare } from 'lucide-react';
+import { LogIn, Plus, Menu } from 'lucide-react';
 import { getAddToDiscordUrl, getDiscordLoginUrl } from '../../lib/discordUrls.js';
 
 /** Fluid page width: uses the whole screen on large and HD displays instead of a narrow centre column. */
@@ -107,13 +107,13 @@ export function SiteFooter() {
             </div>
           </div>
           <a href={invite} target={c?.invite ? '_blank' : undefined} rel="noopener noreferrer" className="cm-btn-ghost mt-5 !py-2 text-[15px]">
-            <MessagesSquare className="h-4 w-4" aria-hidden /> Development Area & Feedback
+            <DiscordLogo className="h-5 w-5 text-[#8EA1FF]" /> Kunal Pareek
           </a>
         </div>
       </div>
       <div className={`${WRAP} flex flex-col gap-2 border-t border-[var(--site-line)] py-6 text-[14px] text-[var(--site-muted)] sm:flex-row sm:justify-between`}>
         <span>© {new Date().getFullYear()} Kunal Pareek. Community Manager is not affiliated with Discord Inc.</span>
-        <span>Also by Kunal: SocialCord Notifier, the social media bot for Discord.</span>
+        <span>Also by Kunal: SocialCord Notifier, The Social Media Alert Bot for Discord.</span>
       </div>
     </footer>
   );
@@ -127,5 +127,14 @@ function FooterCol({ title, links }: { title: string; links: [string, string][] 
         {links.map(([l, h]) => <li key={h}><a href={h} className="text-[var(--site-text)]/85 hover:text-[var(--site-text)]">{l}</a></li>)}
       </ul>
     </div>
+  );
+}
+
+/** Discord logo mark (used only to link to our Discord server). */
+export function DiscordLogo({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 127.14 96.36" className={className} fill="currentColor" aria-label="Discord" role="img">
+      <path d="M107.7 8.07A105.15 105.15 0 0 0 81.47 0a72.06 72.06 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 64.32 0c.87.71 1.76 1.39 2.66 2a68.68 68.68 0 0 1-10.87 5.19 77 77 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15ZM42.45 65.69C36.18 65.69 31 60 31 53s5-12.74 11.43-12.74S54 46 53.89 53s-5.05 12.69-11.44 12.69Zm42.24 0C78.41 65.69 73.25 60 73.25 53s5-12.74 11.44-12.74S96.23 46 96.12 53s-5.04 12.69-11.43 12.69Z"/>
+    </svg>
   );
 }

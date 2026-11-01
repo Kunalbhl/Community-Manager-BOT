@@ -9,6 +9,7 @@ import {
 import { referralLifecycleService } from '../../../services/referralLifecycle.service.js';
 import { applicationWorkflowService } from '../../../services/applicationWorkflow.service.js';
 import { applicantRestrictionService } from '../../../services/applicantRestriction.service.js';
+import { autoModerationService } from '../../../services/moderation.service.js';
 import { channelAccessService } from '../../../services/channelAccess.service.js';
 import { discordGuildLinkService } from '../../../services/discordGuildLink.service.js';
 import { handleCommandInteraction } from '../commands/index.js';
@@ -281,6 +282,20 @@ export function attachGatewayEventHandlers(client: Client): void {
 
     if (communities.length === 0) return;
     const communityId = communities[0].id;
+
+    // Auto-moderation: every channel, staff with Manage Messages are exempt.
+    try {
+      const isStaff = message.member?.permissions?.has?.('ManageMessages');
+      if (!isStaff) {
+        const verdict = await autoModerationService.evaluateMessage(communityId, message.author.id, message.content || '', message.channel.id);
+        if (verdict.actionExecuted && verdict.actionType !== 'LOG') {
+          await message.delete().catch(() => undefined);
+          return;
+        }
+      }
+    } catch (err: any) {
+      logger.warn(`[AutoMod] evaluation failed: ${err?.message}`);
+    }
 
     // Strict channel allowlist verification
     const allowCheck = await channelAccessService.isChannelAllowedForProcessing(communityId, message.channel.id);

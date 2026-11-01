@@ -16,6 +16,7 @@ import {
   communityMemberAccessRepository,
   communitiesRepository,
 } from '../repositories/index.js';
+import { moderationSchedulerService } from './moderation.service.js';
 import { NotificationPreferenceService } from './notificationPreference.service.js';
 
 const REVIEWER_ROLES = new Set(['OWNER', 'CONTROLLER', 'RECRUITER', 'INTERVIEWER', 'PLATFORM_OWNER']);
@@ -136,6 +137,7 @@ export function startReminderScheduler() {
     try {
       await reviewReminders.sendInterviewReminders();
       if (ticks % 30 === 1) await reviewReminders.sendWaitingDigests(); // every ~30 min check, sends at most once a day
+      if (ticks % 10 === 1) await moderationSchedulerService.processScheduledPass(); // expire warnings, blacklists, restrictions
     } catch (err: any) {
       logger.warn(`[Reminders] Scheduler pass failed: ${err?.message}`);
     }
