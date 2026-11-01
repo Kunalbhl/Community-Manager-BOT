@@ -1,53 +1,51 @@
+# Auto-deploy of the website (Cloud Run) on every push to GitHub main.
+# Triggered by a Cloud Build trigger; keeps the same service and URL:
+#   https://community-manager-bot-720940628402.asia-southeast1.run.app
+#
+# Uses --update-* flags (never --set-*), so settings added by hand or by AI Studio are kept.
+# Cloud Run runs as a STANDBY bot (priority 10); the Oracle VM (priority 100) is the active bot.
+substitutions:
+  _REGION: asia-southeast1
+  _SERVICE: community-manager-bot
+  _IMAGE: asia-southeast1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/community-manager
+
 steps:
-  # 1. Build Docker Image using Cloud Build (no local Docker needed)
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/community-manager:$BUILD_ID'
-      - '.'
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args: ['build', '-t', '${_IMAGE}:${SHORT_SHA}', '-t', '${_IMAGE}:latest', '.']
 
-  # 2. Push to Artifact Registry
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/community-manager:$BUILD_ID'
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args: ['push', '--all-tags', '${_IMAGE}']
 
-  # 3. Deploy to Cloud Run with all production config
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args:
-      - 'run'
-      - 'deploy'
-      - 'community-manager-bot'
-      - '--image=asia-southeast1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/community-manager:$BUILD_ID'
-      - '--region=asia-southeast1'
-      - '--platform=managed'
-      - '--allow-unauthenticated'
-      - '--port=3000'
-      - '--memory=512Mi'
-      - '--cpu=1'
-      - '--min-instances=0'
-      - '--max-instances=1'
-      - '--service-account=720940628402-compute@developer.gserviceaccount.com'
-      - '--set-secrets=DISCORD_BOT_TOKEN=DISCORD_BOT_TOKEN:latest,DISCORD_CLIENT_SECRET=DISCORD_CLIENT_SECRET:latest,SESSION_SECRET=SESSION_SECRET:latest,DATABASE_URL=DATABASE_URL:latest'
-      - >-
-        --set-env-vars=APP_RUNTIME_MODE=PRODUCTION,NODE_ENV=production,
-        GOOGLE_CLOUD_PROJECT_ID=$PROJECT_ID,
-        GOOGLE_CLOUD_REGION=asia-southeast1,
-        FIRESTORE_DATABASE_ID=ai-studio-communitymanager-59f17f1d-8b74-490e-9248-bc41e69de7ef,
-        DISCORD_CLIENT_ID=1547515985416822884,
-        DISCORD_APPLICATION_ID=1547515985416822884,
-        DISCORD_PUBLIC_KEY=522efd135b52e2b8e56ad6d7bebd2b787e5e78584301d4a69368ef5d98d3717f,
-        DISCORD_REDIRECT_URI=https://community-manager-bot-720940628402.asia-southeast1.run.app/api/v1/auth/callback,
-        APP_URL=https://community-manager-bot-720940628402.asia-southeast1.run.app,
-        VITE_DISCORD_CLIENT_ID=1547515985416822884,
-        PLATFORM_OWNER_EMAIL=kunalpareekusa@gmail.com,
-        PLATFORM_OWNER_USER_ID=436486741080408064,
-        BOT_INSTANCE_ROLE=web,
-        BOT_LEADER_PRIORITY=10,
-        FREE_MODE=true
-      - '--project=$PROJECT_ID'
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_IMAGE}:${SHORT_SHA}
+      - --region=${_REGION}
+      - --allow-unauthenticated
+      - --port=3000
+      - --memory=512Mi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=1
+      - --update-secrets=DISCORD_BOT_TOKEN=DISCORD_BOT_TOKEN:latest,DISCORD_CLIENT_SECRET=DISCORD_CLIENT_SECRET:latest,SESSION_SECRET=SESSION_SECRET:latest,DATABASE_URL=DATABASE_URL:latest
+      - --update-env-vars=APP_RUNTIME_MODE=PRODUCTION,NODE_ENV=production,GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},GOOGLE_CLOUD_REGION=${_REGION},FIRESTORE_DATABASE_ID=ai-studio-communitymanager-59f17f1d-8b74-490e-9248-bc41e69de7ef,DISCORD_CLIENT_ID=1547515985416822884,DISCORD_APPLICATION_ID=1547515985416822884,DISCORD_PUBLIC_KEY=522efd135b52e2b8e56ad6d7bebd2b787e5e78584301d4a69368ef5d98d3717f,DISCORD_REDIRECT_URI=https://community-manager-bot-720940628402.asia-southeast1.run.app/api/v1/auth/callback,APP_URL=https://community-manager-bot-720940628402.asia-southeast1.run.app,PLATFORM_OWNER_USER_ID=436486741080408064,BOT_INSTANCE_ROLE=web,BOT_LEADER_PRIORITY=10,FREE_MODE=true,GIT_SHA=${SHORT_SHA}
 
-images:
-  - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/community-manager:$BUILD_ID'
+  # Keep the free Artifact Registry quota (0.5 GB): delete all but the 2 newest images.
+  - id: cleanup
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gcloud artifacts docker images list ${_IMAGE} --include-tags --sort-by=~CREATE_TIME --format='value(version)' \
+          | tail -n +3 | while read -r d; do gcloud artifacts docker images delete "${_IMAGE}@$d" --delete-tags --quiet || true; done
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+timeout: 1800s

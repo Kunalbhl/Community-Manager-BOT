@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Type check (app code)
+        shell: bash
+        run: |
+          # Known legacy errors live in test/ and vite.config.ts; fail only on errors in app code.
+          npx tsc --noEmit -p . 2>&1 | tee tsc.log || true
+          if grep -E '^(server|src|shared|server\.ts)' tsc.log | grep -v '^test/'; then
+            echo "::error::TypeScript errors in app code (see above)"; exit 1
+          fi
+      - name: Production build (website + server)
+        run: npm run build
+      - name: Bot engine bundle (VM image)
+        run: npx esbuild server.ts --bundle --platform=node --format=cjs --packages=external --outfile=/tmp/vm-server.cjs
+      - name: Server boots (smoke)
+        shell: bash
+        run: |
+          APP_RUNTIME_MODE=DEVELOPMENT_SIMULATION NODE_ENV=development PORT=3999 timeout 40 node dist/server.cjs > boot.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:3999/health/live && exit 0; sleep 1; done
+          cat boot.log; exit 1
