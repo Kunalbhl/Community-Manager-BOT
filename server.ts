@@ -9,7 +9,7 @@ import { errorHandlerMiddleware } from './server/middleware/errorHandler.js';
 import { v1Router } from './server/routes/v1.routes.js';
 import { rateLimiter } from './server/security/rateLimiter.js';
 import { communitiesRepository, communityMemberAccessRepository, discordMembersRepository } from './server/repositories/index.js';
-import { httpSecurityMiddleware } from './server/security/httpSecurity.js';
+import { httpSecurityMiddleware, sameOriginGuard } from './server/security/httpSecurity.js';
 import { getHealth, getLiveness, getReadiness, getExternalDependenciesHealth, verifyFirestoreReadiness } from './server/controllers/health.controller.js';
 import { discordService } from './server/integrations/discord/discord.service.js';
 import { DEFAULT_ROLE_PERMISSIONS } from './shared/types/rbac.js';
@@ -157,6 +157,7 @@ async function startServer() {
   });
 
   // Standby instances forward API calls to the active bot (must run before body parsing).
+  app.use('/api', sameOriginGuard);
   app.use('/api', leaderProxy());
 
   // Body parsing & rate limiting
