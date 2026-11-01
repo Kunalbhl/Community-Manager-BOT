@@ -1,3 +1,4 @@
+import { googleIntegrationsAvailable, GOOGLE_NOT_AVAILABLE_MESSAGE } from './availability.js';
 import {
   IGoogleSheetsService,
   SheetAppendResult,
@@ -85,6 +86,7 @@ export class GoogleSheetsService implements IGoogleSheetsService {
     actorRole: UserRole,
     requestId?: string
   ): Promise<GoogleSheetsConfig> {
+    if (!googleIntegrationsAvailable()) throw new Error(`GOOGLE_SHEETS_NOT_AVAILABLE: ${GOOGLE_NOT_AVAILABLE_MESSAGE}`);
     const hasGlobalGoogleConfig = Boolean(config.GOOGLE_CLOUD_PROJECT_ID || config.GOOGLE_SHEETS_SPREADSHEET_ID);
     const targetSpreadsheetId = params.spreadsheetId || config.GOOGLE_SHEETS_SPREADSHEET_ID;
 
@@ -259,6 +261,9 @@ export class GoogleSheetsService implements IGoogleSheetsService {
     recordsFailed: number;
     message: string;
   }> {
+    if (!googleIntegrationsAvailable()) {
+      return { status: 'NOT_CONFIGURED' as any, recordsProcessed: 0, recordsSucceeded: 0, recordsFailed: 0, message: GOOGLE_NOT_AVAILABLE_MESSAGE };
+    }
     const sheetConfig = await this.getConfig(communityId);
 
     if (!sheetConfig.configured || !sheetConfig.spreadsheetId) {
@@ -337,6 +342,7 @@ export class GoogleSheetsService implements IGoogleSheetsService {
   }
 
   async appendApplication(application: ApplicationDocument): Promise<SheetAppendResult> {
+    if (!googleIntegrationsAvailable()) return { spreadsheetId: '', sheetName: '', rowNumber: 0, status: 'DISABLED' } as any;
     const now = new Date().toISOString();
     const quota = quotaService.consumeQuota('sheetWrites', application.communityId);
     if (!quota.allowed) {
@@ -402,6 +408,7 @@ export class GoogleSheetsService implements IGoogleSheetsService {
   }
 
   async appendRecruiter(recruiter: RecruiterDocument): Promise<SheetAppendResult> {
+    if (!googleIntegrationsAvailable()) return { spreadsheetId: '', sheetName: '', rowNumber: 0, status: 'DISABLED' } as any;
     if (!this.isConfigured()) {
       return {
         spreadsheetId: '',
@@ -424,6 +431,7 @@ export class GoogleSheetsService implements IGoogleSheetsService {
   }
 
   async appendReferral(referral: ReferralDocument): Promise<SheetAppendResult> {
+    if (!googleIntegrationsAvailable()) return { spreadsheetId: '', sheetName: '', rowNumber: 0, status: 'DISABLED' } as any;
     if (!this.isConfigured()) {
       return {
         spreadsheetId: '',
@@ -441,6 +449,7 @@ export class GoogleSheetsService implements IGoogleSheetsService {
   }
 
   async appendAuditLog(auditLog: AuditLogDocument): Promise<SheetAppendResult> {
+    if (!googleIntegrationsAvailable()) return { spreadsheetId: '', sheetName: '', rowNumber: 0, status: 'DISABLED' } as any;
     if (!this.isConfigured()) {
       return {
         spreadsheetId: '',
@@ -466,8 +475,9 @@ export class GoogleSheetsService implements IGoogleSheetsService {
     sheetName: string,
     values: Array<string | number | boolean | null | undefined>
   ): Promise<{ success: boolean; rowNumber: number }> {
+    if (!googleIntegrationsAvailable()) return { success: false, rowNumber: 0 };
     logger.info(`[GoogleSheets] Appending row to spreadsheet ${spreadsheetId}, sheet ${sheetName}`);
-    return { success: true, rowNumber: Math.floor(Math.random() * 100) + 2 };
+    return { success: true, rowNumber: 0 };
   }
 }
 

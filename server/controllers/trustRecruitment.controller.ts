@@ -1,3 +1,4 @@
+import { googleIntegrationsAvailable, GOOGLE_NOT_AVAILABLE_MESSAGE } from '../integrations/google/availability.js';
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config/env.js';
 import { logger } from '../logging/logger.js';
@@ -930,6 +931,11 @@ export async function getGoogleOAuthAuthorizeUrlHandler(req: Request, res: Respo
 
 export async function handleGoogleOAuthCallbackHandler(req: Request, res: Response, next: NextFunction) {
   try {
+    // The callback never exchanged the code with Google and trusted IDs from the URL. Closed until real OAuth exists.
+    if (!googleIntegrationsAvailable()) {
+      res.status(503).json({ success: false, code: 'GOOGLE_CALENDAR_NOT_AVAILABLE', message: GOOGLE_NOT_AVAILABLE_MESSAGE });
+      return;
+    }
     const user = req.user;
     const { code, state, googleAccountId } = req.query as { code?: string; state?: string; googleAccountId?: string };
 

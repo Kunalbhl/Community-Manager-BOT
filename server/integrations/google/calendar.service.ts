@@ -1,3 +1,4 @@
+import { googleIntegrationsAvailable, GOOGLE_NOT_AVAILABLE_MESSAGE } from './availability.js';
 import { logger } from '../../logging/logger.js';
 import { config } from '../../config/env.js';
 import {
@@ -59,6 +60,7 @@ export class GoogleCalendarService {
     role?: string;
     redirectUri?: string;
   }): { url: string; state: string; isConfigured: boolean } {
+    if (!googleIntegrationsAvailable()) return { url: '', state: '', isConfigured: false };
     const { userId, communityId, role = 'INTERVIEWER' } = params;
     const canonicalOrigin = 'https://community-manager-bot-720940628402.asia-southeast1.run.app';
     const redirectUri = params.redirectUri || `${canonicalOrigin}/api/v1/calendar/oauth/callback`;
@@ -101,6 +103,16 @@ export class GoogleCalendarService {
   }
 
   async getUserCalendarStatus(userId: string, communityId: string, role: string) {
+    if (!googleIntegrationsAvailable()) {
+      return {
+        eligible: false,
+        shouldShowFirstLoginPrompt: false,
+        preference: 'NEVER_CONFIGURED' as const,
+        status: 'NEVER_CONFIGURED' as const,
+        available: false,
+        message: GOOGLE_NOT_AVAILABLE_MESSAGE,
+      };
+    }
     const eligible = this.isEligibleRole(role);
     if (!eligible) {
       return {
@@ -249,6 +261,7 @@ export class GoogleCalendarService {
     calendarId = 'primary',
     timezone = 'UTC'
   ): Promise<UserCalendarConfigDocument> {
+    if (!googleIntegrationsAvailable()) throw new Error(`GOOGLE_CALENDAR_NOT_AVAILABLE: ${GOOGLE_NOT_AVAILABLE_MESSAGE}`);
     const now = new Date().toISOString();
     const existing = await this.getUserCalendarConfig(userId);
     const safeAccount = googleAccountId || (userId.includes('@') ? userId : `${userId}@google.account`);
@@ -517,6 +530,9 @@ export class GoogleCalendarService {
     workflowRequiresCalendar?: boolean;
   }): Promise<CalendarEventResult> {
     const now = new Date().toISOString();
+    if (!googleIntegrationsAvailable()) {
+      return { status: 'CALENDAR_NOT_CONNECTED', message: 'Interview scheduled. Google Calendar events are not available yet.' };
+    }
 
     // Check interviewer user calendar status if interviewerUserId provided
     let userCalConnected = false;
