@@ -31,6 +31,7 @@ jobs:
         run: |
           npx tsc --noEmit -p . > tsc.log 2>&1 || true
           n=$(grep -cE '^(server|src|shared|server\.ts).*error TS' tsc.log || true)
+          grep -E '^(server|src|shared|server\.ts).*error TS' tsc.log || true
           echo "::warning title=TypeScript::$n type errors in app code (not blocking yet)"
       - name: Database layer (real Postgres)
         env:
