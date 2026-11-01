@@ -62,25 +62,25 @@ interface PrimaryNavModule {
 const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
   {
     id: 'home',
-    label: 'HOME',
+    label: 'Home',
     icon: LayoutDashboard,
     matchingSections: ['home', 'dashboard', 'overview'],
   },
   {
     id: 'community',
-    label: 'COMMUNITY',
+    label: 'Community',
     icon: Users,
     matchingSections: ['community', 'members', 'permissions', 'channels', 'welcome-onboarding', 'notifications', 'discord-ops', 'server-hygiene'],
   },
   {
     id: 'engagement',
-    label: 'ENGAGEMENT',
+    label: 'Engagement',
     icon: Megaphone,
     matchingSections: ['engagement', 'announcements', 'campaigns', 'polls', 'templates'],
   },
   {
     id: 'recruitment',
-    label: 'RECRUITMENT',
+    label: 'Recruitment',
     icon: FileText,
     matchingSections: [
       'recruitment',
@@ -101,31 +101,31 @@ const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
   },
   {
     id: 'moderation',
-    label: 'MODERATION & SAFETY',
+    label: 'Moderation & safety',
     icon: ShieldCheck,
     matchingSections: ['moderation', 'warnings', 'community-config', 'blacklist'],
   },
   {
     id: 'events-automation',
-    label: 'EVENTS & AUTOMATION',
+    label: 'Events & automation',
     icon: Radio,
     matchingSections: ['events-automation', 'events', 'automation'],
   },
   {
     id: 'insights-ai',
-    label: 'INSIGHTS & AI',
+    label: 'Insights & AI',
     icon: Sparkles,
     matchingSections: ['insights-ai', 'insights-dashboard', 'ai', 'reports'],
   },
   {
     id: 'integrations',
-    label: 'INTEGRATIONS',
+    label: 'Integrations',
     icon: Sheet,
     matchingSections: ['integrations', 'spreadsheet', 'google-calendar', 'discord-gateway'],
   },
   {
     id: 'settings',
-    label: 'SETTINGS',
+    label: 'Settings',
     icon: Settings,
     matchingSections: ['settings', 'pricing-trust'],
   },
@@ -190,7 +190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-slate-900 text-slate-300 transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/5 bg-slate-950 text-slate-300 transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-0 max-lg:-translate-x-full'
         }`}
       >
@@ -200,7 +200,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             variant="full"
             theme="dark"
             size="sm"
-            subtitle={isPlatformMode ? 'Platform Owner Console' : 'Discord Native SaaS'}
+            subtitle={isPlatformMode ? 'Platform owner console' : 'Command center'}
           />
           <button
             onClick={onClose}
@@ -240,7 +240,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <Icon
                       className={`h-4 w-4 shrink-0 ${
-                        isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
+                        isActive ? 'text-indigo-300' : 'text-slate-400 group-hover:text-white'
                       }`}
                     />
                     <span className="truncate">{item.label}</span>
@@ -267,7 +267,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             /* 9 PRIMARY MODULES COMMUNITY MANAGER NAVIGATION */
             <div className="space-y-1">
               <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Primary Modules
+                Workspace
               </div>
 
               {PRIMARY_COMMUNITY_NAV.map((mod) => {
@@ -288,10 +288,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onSelectCommunitySection(mod.id);
                       onClose();
                     }}
-                    className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-bold transition tracking-wide ${
+                    className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition ${
                       isActive
-                        ? 'bg-indigo-600 text-white shadow-xs'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        ? 'bg-gradient-to-r from-indigo-500/25 to-indigo-500/5 text-white before:absolute before:left-0 before:top-2 before:bottom-2 before:w-1 before:rounded-r-full before:bg-[#FF5C8A]'
+                        : 'text-slate-300 hover:bg-white/5 hover:text-white'
                     }`}
                   >
                     <Icon
