@@ -209,6 +209,7 @@ import {
   getPlatformAiUsage,
 } from '../controllers/platform.controller.js';
 import { recruiterRecordsController } from '../controllers/recruiterRecords.controller.js';
+import { getSocialCordStatus, setSocialCordEnabled } from '../controllers/socialcord.controller.js';
 import { requirePermission, requirePlatformOwner, requireTenantAccess, requirePermissionOrApplicant } from '../middleware/auth.js';
 import { AiCommunityManagerController } from '../controllers/aiCommunityManager.controller.js';
 import {
@@ -346,6 +347,9 @@ router.get('/discord/communities/:communityId/members', DiscordResourcesControll
 router.get('/communities/:communityId/discord/members', DiscordResourcesController.getCommunityMembers);
 
 // Community Persistent Discord Settings
+// SocialCord Notifier add-on (separate bot; this only stores the on/off choice and links).
+router.get('/communities/:communityId/integrations/socialcord', requireTenantAccess(), getSocialCordStatus);
+router.put('/communities/:communityId/integrations/socialcord', requireTenantAccess(), requirePermission('settings.manage'), setSocialCordEnabled);
 router.get('/communities/:communityId/discord-settings', getCommunityDiscordSettings);
 router.put('/communities/:communityId/discord-settings', updateCommunityDiscordSettings);
 router.patch('/communities/:communityId/discord-settings', updateCommunityDiscordSettings);

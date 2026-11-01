@@ -1,3 +1,4 @@
+import { SocialCordCard } from './SocialCordCard.js';
 import React, { useState, useEffect } from 'react';
 import { Network, Database, Calendar, FileSpreadsheet, Key, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { getDiscordClientId } from '../../../lib/discordUrls.js';
@@ -78,6 +79,7 @@ export const ConnectionCenterView: React.FC<ConnectionCenterViewProps> = ({ comm
 
   return (
     <div id="connection-center" className="space-y-6">
+      <SocialCordCard communityId={communityId} />
       {/* Banner */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
