@@ -17,6 +17,7 @@ import { ProductionRuntimeActivationService } from './server/services/production
 import { startLeadership, stopLeadership, getLeadershipStatus } from './server/runtime/leadership.js';
 import { leaderProxy } from './server/runtime/leaderProxy.js';
 import { EngagementSchedulerService } from './server/services/engagement.service.js';
+import { startReminderScheduler, stopReminderScheduler } from './server/services/reviewReminders.service.js';
 
 // A 24/7 bot must never die from one stray error: log it and keep running.
 process.on('unhandledRejection', (reason: any) => {
@@ -216,9 +217,11 @@ async function startServer() {
     onBecomeLeader: async () => {
       await connectDiscordBot();
       EngagementSchedulerService.startScheduler();
+      startReminderScheduler();
     },
     onLoseLeadership: async () => {
       EngagementSchedulerService.stopScheduler();
+      stopReminderScheduler();
       await discordService.disconnect();
     },
   }).catch((err) => logger.error('[Leadership] Failed to start:', undefined, { error: err?.message }));
@@ -240,6 +243,7 @@ async function startServer() {
 
     try {
       EngagementSchedulerService.stopScheduler();
+      stopReminderScheduler();
       await discordService.disconnect();
       await stopLeadership();
       // 3. Flush log buffers and telemetry
