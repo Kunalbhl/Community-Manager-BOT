@@ -56,6 +56,8 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
   --site-rose: #FF5C8A;
   --site-text: #E7E9FF;
   --site-muted: #9AA3D9;
+  --site-deep: #0E1230;
+  --site-mint: #7FE0B0;
   min-height: 100vh;
   background: var(--site-night);
   color: var(--site-text);
@@ -88,3 +90,21 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
 @keyframes cm-advance { 0%,18% { transform: translateX(0) } 33%,51% { transform: translateX(100%) } 66%,100% { transform: translateX(200%) } }
 .cm-advance { animation: cm-advance 7s cubic-bezier(.7,0,.2,1) infinite; }
 @media (prefers-reduced-motion: reduce) { .cm-advance { animation: none; transform: translateX(200%); } .cm-btn-primary { transition: none; } }
+
+/* ---------- Website v2 ---------- */
+html { scroll-behavior: smooth; }
+.cm-kicker { font-size: 14px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--site-rose); }
+.cm-eyebrow { display: inline-flex; align-items: center; gap: .6rem; padding: .4rem .9rem; border: 1px solid var(--site-line); border-radius: 999px; background: rgba(28,35,80,.6); font-size: 14px; color: var(--site-muted); }
+.cm-live { width: 8px; height: 8px; border-radius: 999px; background: var(--site-mint); box-shadow: 0 0 0 0 rgba(127,224,176,.6); animation: cm-pulse 2s infinite; }
+@keyframes cm-pulse { 0% { box-shadow: 0 0 0 0 rgba(127,224,176,.6) } 70% { box-shadow: 0 0 0 10px rgba(127,224,176,0) } 100% { box-shadow: 0 0 0 0 rgba(127,224,176,0) } }
+.cm-gradient-text { background: linear-gradient(100deg, #A7B0FF 0%, #7C8CFF 35%, #FF5C8A 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.cm-aurora { position: absolute; inset: -20% -10% auto -10%; height: 640px; pointer-events: none;
+  background: radial-gradient(40% 50% at 25% 30%, rgba(124,140,255,.28), transparent 70%), radial-gradient(35% 45% at 75% 20%, rgba(255,92,138,.18), transparent 70%); filter: blur(10px); }
+.cm-aurora-right { inset: 0 -10% auto 30%; }
+.cm-grain { position: relative; }
+.cm-fade { animation: cm-fade .45s ease both; }
+@keyframes cm-fade { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+.cm-bar { transform-origin: bottom; animation: cm-grow .9s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes cm-grow { from { transform: scaleY(0) } to { transform: scaleY(1) } }
+.cm-feed { animation: cm-fade .5s ease both; }
+@media (prefers-reduced-motion: reduce) { .cm-live, .cm-fade, .cm-bar, .cm-feed { animation: none; } html { scroll-behavior: auto; } }
