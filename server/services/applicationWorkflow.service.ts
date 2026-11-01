@@ -312,7 +312,18 @@ export class ApplicationWorkflowService {
       updatedAt: now,
     });
 
-    // Put a "review this application" event (with reminders) on connected reviewers' Google Calendars.
+    // Tell reviewers on Discord right away (free, always on).
+    import('./reviewReminders.service.js')
+      .then(({ reviewReminders }) =>
+        reviewReminders.notifyNewApplication({
+          communityId,
+          applicationId: createdApp.id,
+          applicantName: input.applicantDisplayName || applicantUsername || 'New applicant',
+        })
+      )
+      .catch(() => undefined);
+
+    // Optional extra: "review this application" event on connected reviewers' Google Calendars.
     import('../integrations/google/calendar.service.js')
       .then(({ googleCalendarService }) =>
         googleCalendarService.notifyNewApplication({
