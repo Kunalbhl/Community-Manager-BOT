@@ -268,11 +268,6 @@ export const RetentionIntelligenceSection: React.FC<RetentionIntelligenceSection
                 )}
               </div>
             ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ))}
           </div>
         )}
       </div>
