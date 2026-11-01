@@ -7,12 +7,13 @@
 substitutions:
   _REGION: asia-southeast1
   _SERVICE: community-manager-bot
+  _TAG: manual
   _IMAGE: asia-southeast1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/community-manager
 
 steps:
   - id: build
     name: gcr.io/cloud-builders/docker
-    args: ['build', '-t', '${_IMAGE}:${SHORT_SHA}', '-t', '${_IMAGE}:latest', '.']
+    args: ['build', '-t', '${_IMAGE}:${_TAG}', '-t', '${_IMAGE}:latest', '.']
 
   - id: push
     name: gcr.io/cloud-builders/docker
@@ -25,7 +26,7 @@ steps:
       - run
       - deploy
       - ${_SERVICE}
-      - --image=${_IMAGE}:${SHORT_SHA}
+      - --image=${_IMAGE}:${_TAG}
       - --region=${_REGION}
       - --allow-unauthenticated
       - --port=3000
@@ -34,7 +35,7 @@ steps:
       - --min-instances=0
       - --max-instances=1
       - --update-secrets=DISCORD_BOT_TOKEN=DISCORD_BOT_TOKEN:latest,DISCORD_CLIENT_SECRET=DISCORD_CLIENT_SECRET:latest,SESSION_SECRET=SESSION_SECRET:latest,DATABASE_URL=DATABASE_URL:latest
-      - --update-env-vars=APP_RUNTIME_MODE=PRODUCTION,NODE_ENV=production,GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},GOOGLE_CLOUD_REGION=${_REGION},FIRESTORE_DATABASE_ID=ai-studio-communitymanager-59f17f1d-8b74-490e-9248-bc41e69de7ef,DISCORD_CLIENT_ID=1547515985416822884,DISCORD_APPLICATION_ID=1547515985416822884,DISCORD_PUBLIC_KEY=522efd135b52e2b8e56ad6d7bebd2b787e5e78584301d4a69368ef5d98d3717f,DISCORD_REDIRECT_URI=https://community-manager-bot-720940628402.asia-southeast1.run.app/api/v1/auth/callback,APP_URL=https://community-manager-bot-720940628402.asia-southeast1.run.app,PLATFORM_OWNER_USER_ID=436486741080408064,BOT_INSTANCE_ROLE=web,BOT_LEADER_PRIORITY=10,FREE_MODE=true,GIT_SHA=${SHORT_SHA}
+      - --update-env-vars=APP_RUNTIME_MODE=PRODUCTION,NODE_ENV=production,GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},GOOGLE_CLOUD_REGION=${_REGION},FIRESTORE_DATABASE_ID=ai-studio-communitymanager-59f17f1d-8b74-490e-9248-bc41e69de7ef,DISCORD_CLIENT_ID=1547515985416822884,DISCORD_APPLICATION_ID=1547515985416822884,DISCORD_PUBLIC_KEY=522efd135b52e2b8e56ad6d7bebd2b787e5e78584301d4a69368ef5d98d3717f,DISCORD_REDIRECT_URI=https://community-manager-bot-720940628402.asia-southeast1.run.app/api/v1/auth/callback,APP_URL=https://community-manager-bot-720940628402.asia-southeast1.run.app,PLATFORM_OWNER_USER_ID=436486741080408064,BOT_INSTANCE_ROLE=web,BOT_LEADER_PRIORITY=10,FREE_MODE=true,GIT_SHA=${_TAG}
 
   # Keep the free Artifact Registry quota (0.5 GB): delete all but the 2 newest images.
   - id: cleanup

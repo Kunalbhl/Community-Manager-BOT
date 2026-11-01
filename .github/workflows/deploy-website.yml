@@ -30,7 +30,7 @@ jobs:
       - name: Build and deploy with Cloud Build
         run: |
           gcloud builds submit --project=community-manager-bot-508316 --region=asia-southeast1 \
-            --config=cloudbuild.yaml --substitutions=SHORT_SHA=${GITHUB_SHA::7} .
+            --config=cloudbuild.yaml --substitutions=_TAG=${GITHUB_SHA::7} .
       - name: Health check
         run: |
           for i in $(seq 1 20); do
