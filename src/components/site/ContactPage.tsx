@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { MessagesSquare, Users, Server, Bot, IndianRupee, Clock, Send, CheckCircle2, Handshake, Bug, Lightbulb, Rocket } from 'lucide-react';
+import { MessagesSquare, Users, Server, Bot, Clock, Send, CheckCircle2, Handshake, Bug, Lightbulb, Rocket } from 'lucide-react';
 import { SiteHeader, SiteFooter, WRAP, usePublicContact, MadeInIndia } from './SiteChrome.js';
 
 const TOPICS = ['Business', 'Collaboration', 'Feedback', 'Bug report', 'Support', 'Other'];
-const fmt = (n?: number | null) => (n == null ? '…' : n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}K` : String(n));
 
 /** "/contact": the developer, the community server, achievements and a message form. */
 export function ContactPage() {
@@ -44,9 +43,9 @@ export function ContactPage() {
             <p className="cm-kicker">What we have built</p>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <Stat icon={Bot} value="2" label="Discord bots live 24/7" sub="Community Manager and SocialCord Notifier" />
-              <Stat icon={Server} value={fmt(c?.stats?.servers)} label="Servers running Community Manager" sub="Live count from the bot" />
-              <Stat icon={Users} value={fmt(c?.stats?.members)} label="Members in those servers" sub="Live count from the bot" />
-              <Stat icon={IndianRupee} value="₹0" label="Cost to every server" sub="All features, free forever" />
+              <Stat icon={Server} value="60+" label="Capabilities in one bot" sub="Recruitment to moderation" />
+              <Stat icon={Clock} value="24/7" label="Always online" sub="With automatic failover" />
+              <Stat icon={Users} value="1:1" label="Direct line to the developer" sub="Through our Discord server" />
             </div>
           </div>
         </section>
@@ -71,10 +70,10 @@ export function ContactPage() {
             <p className="mt-5 text-lg text-[var(--site-muted)]">
               I’m Kunal Pareek, and I build Discord bots that take the busywork out of running a community.
               Community Manager handles recruitment, interviews, onboarding, moderation and engagement in one place.
-              SocialCord Notifier shares your social media posts in your Discord channels automatically.
+              SocialCord Notifier is a social media alert bot that posts your new social media updates in your Discord channels automatically.
             </p>
             <p className="mt-4 text-lg text-[var(--site-muted)]">
-              Both are free, run around the clock, and grow from what server owners ask for in our Development Area & Feedback.
+              Both run around the clock and grow from what server owners ask for in our Development Area & Feedback.
               If you have an idea, that is where it starts.
             </p>
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -116,7 +115,7 @@ function ServerCard({ c }: { c: ReturnType<typeof usePublicContact> }) {
         <div className="cm-display mt-4 text-2xl font-extrabold">{g?.name || 'Our Discord server'}</div>
         {g?.description && <p className="mt-2 text-[var(--site-muted)]">{g.description}</p>}
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[15px] text-[var(--site-muted)]">
-          <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[var(--site-mint)]" /> {fmt(g?.memberCount)} members</span>
+          <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-[var(--site-mint)]" /> Open community</span>
           {g?.createdAt && <span>Since {new Date(g.createdAt).getFullYear()}</span>}
           {!!g?.boosts && <span>{g.boosts} boosts · level {g.boostLevel}</span>}
         </div>

@@ -28,7 +28,7 @@ export function SiteLanding() {
           <div className="cm-aurora" aria-hidden />
           <div className={`relative ${WRAP} grid items-center gap-14 pb-24 pt-16 lg:grid-cols-[1fr_1.05fr] lg:pt-24`}>
             <div>
-              <div className="flex flex-wrap gap-2"><span className="cm-eyebrow"><span className="cm-live" /> Online 24/7 · Free for every server</span><span className="cm-eyebrow"><MadeInIndia /></span></div>
+              <div className="flex flex-wrap gap-2"><span className="cm-eyebrow"><span className="cm-live" /> Online 24/7 · Free to get started</span><span className="cm-eyebrow"><MadeInIndia /></span></div>
               <h1 className="mt-6 text-[clamp(2.8rem,6.4vw,5.2rem)] font-extrabold">
                 The command center for <span className="cm-gradient-text">serious Discord communities.</span>
               </h1>
@@ -37,11 +37,11 @@ export function SiteLanding() {
                 Replace the stack of single-purpose bots, spreadsheets and Google Forms your team juggles today.
               </p>
               <div className="mt-9 flex flex-wrap gap-3">
-                <a href={addHref} className="cm-btn-primary text-[17px]"><Plus className="h-5 w-5" aria-hidden /> Add to Discord, free</a>
+                <a href={addHref} className="cm-btn-primary text-[17px]"><Plus className="h-5 w-5" aria-hidden /> Add to Discord</a>
                 <a href={loginHref} className="cm-btn-ghost text-[17px]">{signedIn ? 'Open my servers' : 'Open the dashboard'} <ArrowRight className="h-4 w-4" aria-hidden /></a>
               </div>
               <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-[15px] text-[var(--site-muted)]">
-                {['No credit card', 'Setup in about 5 minutes', 'Works inside Discord'].map((t) => (
+                {['Free to get started', 'Setup in about 5 minutes', 'Works inside Discord'].map((t) => (
                   <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-[var(--site-mint)]" aria-hidden /> {t}</li>
                 ))}
               </ul>
@@ -250,11 +250,11 @@ export function SiteLanding() {
 const CATALOG: { icon: any; title: string; items: string[] }[] = [
   { icon: ClipboardList, title: 'Recruitment', items: ['Custom application forms', '/apply inside Discord', 'Review queue', 'Approve or reject in one click', 'Escalate and flag', 'Reviewer notes', 'Applicant status checks', 'Requirement checks', 'Blacklist screening', 'Applicant portal'] },
   { icon: Radar, title: 'Recruiters & referrals', items: ['Personal recruiter codes', 'Referral tracking', 'Recruiter benefits', 'Recruiter leaderboard', 'Recruiter portal', 'Recruiter performance records', 'Shareable portal links'] },
-  { icon: Mic, title: 'Interviews', items: ['Interview scheduling', 'DM reminders 60 and 10 min before', 'Voice-channel interviews', 'Outcomes and scorecards', 'Interview notes', 'Optional Google Calendar sync'] },
-  { icon: PartyPopper, title: 'Onboarding', items: ['Roles given on approval', 'Welcome messages', 'Welcome DMs', 'Server rules command', 'Guided setup wizard', 'Onboarding checklist'] },
+  { icon: Mic, title: 'Interviews', items: ['Interview scheduling', 'DM reminders 60 and 10 min before', 'Interview sessions inside Discord', 'Recorded answers and outcomes', 'Interview notes', 'Optional Google Calendar sync'] },
+  { icon: PartyPopper, title: 'Onboarding', items: ['Roles given on approval', 'Welcome messages', 'Welcome DMs', 'Server rules command', 'Guided setup wizard', 'Setup checklist for admins'] },
   { icon: Users, title: 'Members', items: ['Member directory sync', 'Member 360 timeline', 'Lifecycle stages', 'Member status lookups', 'Cohorts', 'Search across everything'] },
   { icon: ShieldCheck, title: 'Moderation & safety', items: ['Warnings and cases', 'Blacklists', 'Auto-moderation rules', 'Escalation queue', 'Staff audit trail', 'Security audit log'] },
-  { icon: CalendarDays, title: 'Events & engagement', items: ['Events with sign-ups', 'Event reminders', 'Announcements', 'Polls', 'Engagement campaigns', 'Win-back campaigns', 'Rewards and recognition'] },
+  { icon: CalendarDays, title: 'Events & engagement', items: ['Events with sign-ups', 'Event reminders', 'Announcements', 'Polls', 'Engagement campaigns', 'Re-engagement campaigns', 'Rewards and recognition'] },
   { icon: Workflow, title: 'Automation', items: ['Workflow triggers', 'Scheduled jobs', 'New-application DMs', 'Daily reviewer digests', 'Follow-ups and nudges', 'Notification routing'] },
   { icon: BarChart3, title: 'Insights & AI', items: ['Application funnel', 'Drop-off analysis', 'Retention by cohort', 'Recruiter quality scores', 'Exportable reports', 'Community Brain suggestions', 'Lifecycle intelligence'] },
   { icon: Layers, title: 'Team & platform', items: ['Staff roles and permissions', 'Multi-server workspaces', 'Per-user notification settings', 'Discord diagnostics', 'SocialCord social media bot', 'Support command', '24/7 hosting with failover'] },
@@ -280,7 +280,6 @@ const COMPARE: [string, MarkV, MarkV, MarkV][] = [
   ['One member timeline across everything', 'yes', 'no', 'no'],
   ['Staff roles without Discord admin', 'yes', 'part', 'part'],
   ['AI insights you approve', 'yes', 'no', 'no'],
-  ['Every feature free', 'yes', 'part', 'yes'],
 ];
 
 const SECURITY = [
@@ -299,7 +298,7 @@ const USES = [
 ];
 
 const FAQ: [string, string][] = [
-  ['Is it really free?', 'Yes. Every module is included for every server, with no premium tier and no credit card.'],
+  ['How much does it cost?', 'It is free to get started today, and no credit card is needed to add the bot.'],
   ['What permissions does the bot need?', 'Only what its features use: managing roles for onboarding, sending messages and DMs, and reading the channels you point it at. You can review them on the Discord invite screen.'],
   ['Do my members need to sign up for anything?', 'No. Applicants apply with slash commands or a form inside Discord. Only your staff use the dashboard, and they log in with Discord.'],
   ['Does it replace my moderation bot?', 'For most servers, yes: warnings, cases, blacklists and auto-moderation rules are built in. You can also run it alongside your current bots while you switch.'],
@@ -319,10 +318,10 @@ function Mark({ v }: { v: MarkV }) {
 const STAGES = [
   { key: 'Attract', icon: Radar, title: 'Recruiters bring the right people', text: 'Each recruiter gets their own code. You see who brings members that stay, not just members that join.', bullets: ['Personal recruiter codes', 'Referral leaderboard', 'Portal link to share anywhere'] },
   { key: 'Apply', icon: ClipboardList, title: 'Applications that feel native', text: 'Applicants answer your questions with /apply inside Discord. Reviewers get a DM the moment it lands.', bullets: ['Custom questions and requirements', 'Instant reviewer DMs', 'Daily digest of anything waiting'] },
-  { key: 'Interview', icon: Mic, title: 'Interviews that actually happen', text: 'Book a slot, and both sides get reminders 60 and 10 minutes before. Notes and outcomes stay on the record.', bullets: ['Scheduling and voice channels', 'DM reminders, optional Calendar', 'Scorecards and outcomes'] },
-  { key: 'Welcome', icon: PartyPopper, title: 'Day one, handled', text: 'Approval gives roles, posts the welcome and DMs the new member their first steps, automatically.', bullets: ['Automatic roles', 'Welcome message and DM', 'Onboarding checklist'] },
+  { key: 'Interview', icon: Mic, title: 'Interviews that actually happen', text: 'Book a slot, and both sides get reminders 60 and 10 minutes before. Notes and outcomes stay on the record.', bullets: ['Scheduling inside Discord', 'DM reminders, optional Calendar', 'Answers, notes and outcomes'] },
+  { key: 'Welcome', icon: PartyPopper, title: 'Day one, handled', text: 'Approval gives roles, posts the welcome and DMs the new member their first steps, automatically.', bullets: ['Automatic roles', 'Welcome message and DM', 'Guided first steps'] },
   { key: 'Engage', icon: Zap, title: 'Keep the energy up', text: 'Events, polls, announcements and rewards that keep members showing up week after week.', bullets: ['Events with sign-ups', 'Polls and announcements', 'Rewards and recognition'] },
-  { key: 'Retain', icon: Gift, title: 'Catch members before they drift', text: 'See who is going quiet and bring them back with a campaign, before they leave for good.', bullets: ['Inactivity signals', 'Win-back campaigns', 'Retention by cohort'] },
+  { key: 'Retain', icon: Gift, title: 'Catch members before they drift', text: 'See who is going quiet and bring them back with a campaign, before they leave for good.', bullets: ['Inactivity signals', 'Re-engagement campaigns', 'Retention by cohort'] },
 ];
 
 function Lifecycle() {
@@ -442,7 +441,7 @@ function AiMock() {
       <div className="flex items-center gap-2 text-[14px] text-[var(--site-muted)]"><Brain className="h-4 w-4 text-[var(--site-rose)]" aria-hidden /> Community Brain · Example</div>
       <div className="mt-5 space-y-3">
         {[
-          ['Retention', '6 members from the March cohort have been quiet for 10 days.', 'Send win-back DM'],
+          ['Retention', '6 members from the March cohort have been quiet for 10 days.', 'Send a check-in DM'],
           ['Recruitment', '3 applications have waited more than 24 hours.', 'Notify reviewers'],
           ['Recruiters', 'Code ASHISH brings members who stay 2× longer.', 'View report'],
         ].map(([tag, text, action]) => (
@@ -470,9 +469,9 @@ function Catalog() {
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
             <p className="cm-kicker">Everything included</p>
-            <h2 className="mt-3 max-w-4xl text-[clamp(2rem,4vw,3.4rem)] font-bold">{total}+ capabilities across {CATALOG.length} areas. <span className="cm-gradient-text">Zero paywalls.</span></h2>
+            <h2 className="mt-3 max-w-4xl text-[clamp(2rem,4vw,3.4rem)] font-bold">{total}+ capabilities across {CATALOG.length} areas. <span className="cm-gradient-text">One bot.</span></h2>
           </div>
-          <p className="max-w-md text-[var(--site-muted)]">Pick an area to see everything inside it. Every capability is free on every server.</p>
+          <p className="max-w-md text-[var(--site-muted)]">Pick an area to see everything inside it. Everything listed here is live today.</p>
         </div>
         <div className="mt-12 grid gap-6 xl:grid-cols-[360px_1fr]">
           <div className="flex gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible">

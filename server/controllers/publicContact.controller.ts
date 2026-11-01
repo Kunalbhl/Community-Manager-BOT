@@ -36,7 +36,7 @@ function findChannels(guild: any): { invite: any | null; form: any | null } {
 
 async function build(): Promise<any> {
   const client: any = discordService.client;
-  const out: any = { guild: null, invite: null, owner: null, stats: null };
+  const out: any = { guild: null, invite: null, owner: null };
   if (!client || !discordService.isConnected()) return out;
 
   const guild: any = client.guilds.cache.get(GUILD_ID()) || (await client.guilds.fetch(GUILD_ID()).catch(() => null));
@@ -46,7 +46,6 @@ async function build(): Promise<any> {
       icon: guild.iconURL?.({ size: 256 }) || null,
       banner: guild.bannerURL?.({ size: 1024 }) || null,
       description: guild.description || null,
-      memberCount: guild.memberCount || null,
       createdAt: guild.createdAt?.toISOString?.() || null,
       boostLevel: guild.premiumTier || 0,
       boosts: guild.premiumSubscriptionCount || 0,
@@ -68,8 +67,6 @@ async function build(): Promise<any> {
     out.owner = { id: owner.id, username: owner.username, displayName: owner.globalName || owner.username, avatar: owner.displayAvatarURL?.({ size: 256 }) || null };
   }
 
-  const guilds = Array.from(client.guilds.cache.values()) as any[];
-  out.stats = { servers: guilds.length, members: guilds.reduce((n, g) => n + (g.memberCount || 0), 0) };
   return out;
 }
 
