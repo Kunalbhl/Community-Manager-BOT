@@ -90,18 +90,29 @@ export const GoogleCalendarSettingsCard: React.FC<GoogleCalendarSettingsCardProp
     setActionLoading(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/v1/calendar/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ communityId }),
+      const res = await fetch(`/api/v1/calendar/oauth/authorize?communityId=${encodeURIComponent(communityId)}`, {
+        credentials: 'include',
+        headers: { 'x-community-id': communityId },
       });
       const json = await res.json();
-      if (json.success) {
-        setMessage({ type: 'success', text: json.message || 'Google Calendar connected successfully.' });
-        await fetchStatus();
-      } else {
-        setMessage({ type: 'error', text: json.message || 'Failed to connect Google Calendar.' });
+      const url = json?.data?.url;
+      if (!json.success || !url) {
+        setMessage({ type: 'error', text: json.message || json.error?.message || 'Google Calendar is not set up on this server yet.' });
+        return;
       }
+      const popup = window.open(url, 'GoogleCalendarOAuth', 'width=600,height=700');
+      if (!popup) { window.location.href = url; return; }
+      const onMsg = async (e: MessageEvent) => {
+        if (e.origin !== window.location.origin) return;
+        if (e.data?.type === 'GOOGLE_CALENDAR_CONNECTED') {
+          setMessage({ type: 'success', text: 'Google Calendar connected.' });
+          await fetchStatus();
+        } else if (e.data?.type === 'GOOGLE_CALENDAR_FAILED') {
+          setMessage({ type: 'error', text: 'Google Calendar was not connected. Please try again.' });
+        }
+        window.removeEventListener('message', onMsg);
+      };
+      window.addEventListener('message', onMsg);
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message || 'Connection error.' });
     } finally {

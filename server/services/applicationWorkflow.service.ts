@@ -312,6 +312,18 @@ export class ApplicationWorkflowService {
       updatedAt: now,
     });
 
+    // Put a "review this application" event (with reminders) on connected reviewers' Google Calendars.
+    import('../integrations/google/calendar.service.js')
+      .then(({ googleCalendarService }) =>
+        googleCalendarService.notifyNewApplication({
+          communityId,
+          applicationId: createdApp.id,
+          applicantName: input.applicantDisplayName || applicantUsername || 'New applicant',
+          dashboardUrl: `${(process.env.APP_URL || 'https://community-manager-bot-720940628402.asia-southeast1.run.app').replace(/\/$/, '')}/dashboard`,
+        })
+      )
+      .catch(() => undefined);
+
     // Save individual answers
     for (const ans of processedAnswers) {
       await applicationAnswersRepository.create({

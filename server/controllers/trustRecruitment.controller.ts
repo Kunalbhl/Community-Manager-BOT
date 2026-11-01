@@ -1,4 +1,12 @@
-import { googleIntegrationsAvailable, GOOGLE_NOT_AVAILABLE_MESSAGE } from '../integrations/google/availability.js';
+import { calendarAvailable, calendarIsReal, CALENDAR_NOT_CONFIGURED_MESSAGE } from '../integrations/google/availability.js';
+import { verifyState, exchangeCode } from '../integrations/google/googleApi.js';
+
+/** Never send Google tokens to the browser. */
+function safeCal<T>(doc: T): T {
+  if (!doc || typeof doc !== 'object') return doc;
+  const { accessToken, accessTokenExpiresAt, refreshTokenEnc, ...rest } = doc as any;
+  return rest as T;
+}
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config/env.js';
 import { logger } from '../logging/logger.js';
@@ -769,7 +777,7 @@ export async function skipUserCalendarSetupHandler(req: Request, res: Response, 
     const doc = await googleCalendarService.skipUserCalendarSetup(user.userId, communityId, user.role);
     res.json({
       success: true,
-      data: doc,
+      data: safeCal(doc),
       message: 'Google Calendar setup skipped. You can enable it anytime from Recruitment Settings.',
       requestId: req.id,
     });
@@ -816,7 +824,7 @@ export async function connectUserCalendarHandler(req: Request, res: Response, ne
 
     res.json({
       success: true,
-      data: doc,
+      data: safeCal(doc),
       message: 'Google Calendar connected successfully. Your recruitment interviews can now be scheduled on your calendar.',
       requestId: req.id,
     });
@@ -854,7 +862,7 @@ export async function disconnectUserCalendarHandler(req: Request, res: Response,
     const doc = await googleCalendarService.disconnectUserCalendar(user.userId, communityId, user.role);
     res.json({
       success: true,
-      data: doc,
+      data: safeCal(doc),
       message: 'Google Calendar disconnected',
       requestId: req.id,
     });
@@ -931,9 +939,30 @@ export async function getGoogleOAuthAuthorizeUrlHandler(req: Request, res: Respo
 
 export async function handleGoogleOAuthCallbackHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    // The callback never exchanged the code with Google and trusted IDs from the URL. Closed until real OAuth exists.
-    if (!googleIntegrationsAvailable()) {
-      res.status(503).json({ success: false, code: 'GOOGLE_CALENDAR_NOT_AVAILABLE', message: GOOGLE_NOT_AVAILABLE_MESSAGE });
+    if (!calendarAvailable()) {
+      res.status(503).json({ success: false, code: 'GOOGLE_CALENDAR_NOT_AVAILABLE', message: CALENDAR_NOT_CONFIGURED_MESSAGE });
+      return;
+    }
+    if (calendarIsReal()) {
+      const page = (title: string, msg: string, ok: boolean) => `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>
+        <body style="font-family:system-ui;background:#121735;color:#E7E9FF;display:grid;place-items:center;min-height:100vh;margin:0">
+        <div style="max-width:28rem;padding:2rem"><h2>${title}</h2><p style="color:#9AA3D9">${msg}</p>
+        <a href="/dashboard" style="color:#FF5C8A">Back to the dashboard</a></div>
+        <script>if (window.opener) { window.opener.postMessage({ type: ${ok ? "'GOOGLE_CALENDAR_CONNECTED'" : "'GOOGLE_CALENDAR_FAILED'"} }, window.location.origin); setTimeout(() => window.close(), 1500); }</script>
+        </body></html>`;
+      const q = req.query as { code?: string; state?: string; error?: string };
+      if (q.error) { res.status(400).send(page('Google Calendar not connected', 'Google sign-in was cancelled.', false)); return; }
+      let payload;
+      try { payload = verifyState(String(q.state || '')); } catch {
+        res.status(400).send(page('Link expired', 'This sign-in link is invalid or expired. Start again from the dashboard.', false)); return;
+      }
+      try {
+        const tokens = await exchangeCode(String(q.code || ''));
+        await googleCalendarService.connectUserCalendar(payload.userId, payload.communityId, payload.role, undefined, 'primary', 'UTC', tokens);
+        res.send(page('Google Calendar connected', `Connected ${tokens.email || 'your Google account'}. New applications and interviews will appear on your calendar with reminders.`, true));
+      } catch (err: any) {
+        res.status(502).send(page('Google Calendar not connected', 'Google did not accept the sign-in. Please try again.', false));
+      }
       return;
     }
     const user = req.user;
@@ -986,7 +1015,7 @@ export async function handleGoogleOAuthCallbackHandler(req: Request, res: Respon
             <p>Your calendar has been authorized. You may close this window or return to Community Manager.</p>
             <script>
               if (window.opener) {
-                window.opener.postMessage({ type: 'GOOGLE_CALENDAR_CONNECTED', data: ${JSON.stringify(doc)} }, window.location.origin);
+                window.opener.postMessage({ type: 'GOOGLE_CALENDAR_CONNECTED', data: ${JSON.stringify(safeCal(doc))} }, window.location.origin);
                 setTimeout(() => window.close(), 200);
               } else {
                 window.location.href = '/?calendarConnected=true';
@@ -1000,7 +1029,7 @@ export async function handleGoogleOAuthCallbackHandler(req: Request, res: Respon
 
     res.json({
       success: true,
-      data: doc,
+      data: safeCal(doc),
       message: 'Google Calendar connected successfully.',
       requestId: req.id,
     });
@@ -1092,7 +1121,7 @@ export async function selectUserCalendarHandler(req: Request, res: Response, nex
     if (!canAccessTenant(user, communityId)) throw new ForbiddenError('Cross-community access prohibited');
 
     const doc = await googleCalendarService.selectUserCalendar(user.userId, communityId, user.role, calendarId);
-    res.json({ success: true, data: doc, message: 'Calendar selected successfully', requestId: req.id });
+    res.json({ success: true, data: safeCal(doc), message: 'Calendar selected successfully', requestId: req.id });
   } catch (error) {
     next(error);
   }
@@ -1134,7 +1163,7 @@ export async function triggerCalendarReauthHandler(req: Request, res: Response, 
     if (!canAccessTenant(user, cid)) throw new ForbiddenError('Cross-community access prohibited', 'COMMUNITY_ACCESS_DENIED');
 
     const doc = await googleCalendarService.triggerReauthRequired(user.userId, cid, user.role, reason);
-    res.json({ success: true, data: doc, message: 'Calendar status set to REAUTH_REQUIRED', requestId: req.id });
+    res.json({ success: true, data: safeCal(doc), message: 'Calendar status set to REAUTH_REQUIRED', requestId: req.id });
   } catch (error) {
     next(error);
   }

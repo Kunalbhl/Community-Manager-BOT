@@ -1,4 +1,5 @@
-import { googleIntegrationsAvailable, GOOGLE_NOT_AVAILABLE_MESSAGE } from './availability.js';
+import { calendarAvailable, calendarIsReal, CALENDAR_NOT_CONFIGURED_MESSAGE } from './availability.js';
+import { signState, buildAuthorizeUrl, encrypt, decrypt, refreshAccessToken, calendarApi, logGoogleError, GoogleTokens } from './googleApi.js';
 import { logger } from '../../logging/logger.js';
 import { config } from '../../config/env.js';
 import {
@@ -60,7 +61,11 @@ export class GoogleCalendarService {
     role?: string;
     redirectUri?: string;
   }): { url: string; state: string; isConfigured: boolean } {
-    if (!googleIntegrationsAvailable()) return { url: '', state: '', isConfigured: false };
+    if (!calendarAvailable()) return { url: '', state: '', isConfigured: false };
+    if (calendarIsReal()) {
+      const signed = signState({ userId: params.userId, communityId: params.communityId, role: params.role || 'INTERVIEWER' });
+      return { url: buildAuthorizeUrl(signed), state: signed, isConfigured: true };
+    }
     const { userId, communityId, role = 'INTERVIEWER' } = params;
     const canonicalOrigin = 'https://community-manager-bot-720940628402.asia-southeast1.run.app';
     const redirectUri = params.redirectUri || `${canonicalOrigin}/api/v1/calendar/oauth/callback`;
@@ -103,14 +108,14 @@ export class GoogleCalendarService {
   }
 
   async getUserCalendarStatus(userId: string, communityId: string, role: string) {
-    if (!googleIntegrationsAvailable()) {
+    if (!calendarAvailable()) {
       return {
         eligible: false,
         shouldShowFirstLoginPrompt: false,
         preference: 'NEVER_CONFIGURED' as const,
         status: 'NEVER_CONFIGURED' as const,
         available: false,
-        message: GOOGLE_NOT_AVAILABLE_MESSAGE,
+        message: CALENDAR_NOT_CONFIGURED_MESSAGE,
       };
     }
     const eligible = this.isEligibleRole(role);
@@ -259,12 +264,22 @@ export class GoogleCalendarService {
     role: string,
     googleAccountId?: string,
     calendarId = 'primary',
-    timezone = 'UTC'
+    timezone = 'UTC',
+    tokens?: GoogleTokens
   ): Promise<UserCalendarConfigDocument> {
-    if (!googleIntegrationsAvailable()) throw new Error(`GOOGLE_CALENDAR_NOT_AVAILABLE: ${GOOGLE_NOT_AVAILABLE_MESSAGE}`);
+    if (!calendarAvailable()) throw new Error(`GOOGLE_CALENDAR_NOT_AVAILABLE: ${CALENDAR_NOT_CONFIGURED_MESSAGE}`);
     const now = new Date().toISOString();
     const existing = await this.getUserCalendarConfig(userId);
-    const safeAccount = googleAccountId || (userId.includes('@') ? userId : `${userId}@google.account`);
+    if (calendarIsReal() && !tokens) throw new Error('GOOGLE_SIGN_IN_REQUIRED: Connect your calendar with the Google sign-in button.');
+    const safeAccount = tokens?.email || googleAccountId || (userId.includes('@') ? userId : `${userId}@google.account`);
+    const tokenFields: any = tokens
+      ? {
+          accessToken: tokens.accessToken,
+          accessTokenExpiresAt: tokens.expiresAt,
+          ...(tokens.refreshToken ? { refreshTokenEnc: encrypt(tokens.refreshToken) } : {}),
+          lastError: null,
+        }
+      : {};
 
     const isReconnect = existing && (existing.status === 'DISCONNECTED' || existing.preference === 'SKIPPED');
     const auditAction = isReconnect ? 'CALENDAR_RECONNECTED' : 'CALENDAR_CONNECTED';
@@ -281,6 +296,7 @@ export class GoogleCalendarService {
         lastSyncAt: now,
         role: role || existing.role || 'INTERVIEWER',
         updatedAt: now,
+        ...tokenFields,
       });
     } else {
       doc = await userCalendarConfigsRepository.create({
@@ -298,7 +314,8 @@ export class GoogleCalendarService {
         role: role || 'INTERVIEWER',
         createdAt: now,
         updatedAt: now,
-      });
+        ...tokenFields,
+      } as any);
     }
 
     try {
@@ -327,8 +344,11 @@ export class GoogleCalendarService {
     if (existing) {
       doc = await userCalendarConfigsRepository.update(existing.id, {
         status: 'DISCONNECTED',
+        accessToken: null,
+        accessTokenExpiresAt: null,
+        refreshTokenEnc: null,
         updatedAt: now,
-      });
+      } as any);
     } else {
       doc = await userCalendarConfigsRepository.create({
         id: `cal_usr_${userId}`,
@@ -404,6 +424,69 @@ export class GoogleCalendarService {
     return doc;
   }
 
+  /** Returns a valid Google access token for a connected user, refreshing it when needed. */
+  async getAccessToken(cfg: UserCalendarConfigDocument): Promise<string | null> {
+    const c: any = cfg;
+    if (!c || c.status !== 'CONNECTED') return null;
+    if (c.accessToken && c.accessTokenExpiresAt && c.accessTokenExpiresAt > Date.now() + 60000) return c.accessToken;
+    if (!c.refreshTokenEnc) return null;
+    try {
+      const t = await refreshAccessToken(decrypt(c.refreshTokenEnc));
+      await userCalendarConfigsRepository.update(cfg.id, { accessToken: t.accessToken, accessTokenExpiresAt: t.expiresAt, lastSyncAt: new Date().toISOString() } as any);
+      return t.accessToken;
+    } catch (err: any) {
+      logGoogleError('token refresh', err);
+      if (err?.googleError === 'invalid_grant') {
+        await userCalendarConfigsRepository.update(cfg.id, { status: 'REAUTH_REQUIRED', lastError: 'Google access was revoked. Reconnect your calendar.', updatedAt: new Date().toISOString() } as any);
+      }
+      return null;
+    }
+  }
+
+  /** Real calendar event for a user (no-op when they have not connected Google). */
+  private async createUserEvent(userId: string, input: { summary: string; description?: string; start: Date; end: Date; reminderMinutes?: number[]; sourceUrl?: string }) {
+    const cfg = await this.getUserCalendarConfig(userId);
+    if (!cfg) return null;
+    const token = await this.getAccessToken(cfg);
+    if (!token) return null;
+    const ev = await calendarApi.insertEvent(token, cfg.calendarId || 'primary', { ...input, timeZone: cfg.timezone || 'UTC' });
+    return { ...ev, calendarId: cfg.calendarId || 'primary', ownerUserId: userId };
+  }
+
+  /**
+   * New application: put a "review this application" event (with reminders) on the calendar of every
+   * reviewer in the community who connected Google Calendar.
+   */
+  async notifyNewApplication(params: { communityId: string; applicationId: string; applicantName: string; dashboardUrl?: string }) {
+    if (!calendarIsReal()) return { created: 0 };
+    const reviewers = (await userCalendarConfigsRepository.list({
+      where: [
+        { field: 'communityId', operator: '==', value: params.communityId },
+        { field: 'status', operator: '==', value: 'CONNECTED' },
+      ],
+    })).filter((c: any) => ['OWNER', 'CONTROLLER', 'INTERVIEWER', 'RECRUITER', 'PLATFORM_OWNER'].includes(String(c.role || 'OWNER')));
+    const start = new Date(Date.now() + 15 * 60000);
+    const end = new Date(start.getTime() + 30 * 60000);
+    let created = 0;
+    for (const r of reviewers) {
+      try {
+        const ev = await this.createUserEvent(r.userId, {
+          summary: `Review application: ${params.applicantName}`,
+          description: `A new application is waiting for review in Community Manager.\n\nOpen it: ${params.dashboardUrl || ''}`,
+          start,
+          end,
+          reminderMinutes: [0, 60],
+          sourceUrl: params.dashboardUrl,
+        });
+        if (ev) created++;
+      } catch (err) {
+        logGoogleError(`new-application event for ${r.userId}`, err);
+      }
+    }
+    if (created) logger.info(`[GoogleCalendar] Added review event for application ${params.applicationId} to ${created} calendar(s).`);
+    return { created };
+  }
+
   async listUserCalendars(userId: string, communityId: string) {
     const config = await this.getUserCalendarConfig(userId);
 
@@ -415,6 +498,11 @@ export class GoogleCalendarService {
       };
     }
 
+    if (calendarIsReal()) {
+      const token = await this.getAccessToken(config);
+      const calendars = token ? await calendarApi.listCalendars(token).catch((err: any) => { logGoogleError('list calendars', err); return []; }) : [];
+      return { googleAccountId: config.googleAccountId || '', selectedCalendarId: config.calendarId || 'primary', calendars };
+    }
     return {
       googleAccountId: config.googleAccountId || '',
       selectedCalendarId: config.calendarId || 'primary',
@@ -530,7 +618,7 @@ export class GoogleCalendarService {
     workflowRequiresCalendar?: boolean;
   }): Promise<CalendarEventResult> {
     const now = new Date().toISOString();
-    if (!googleIntegrationsAvailable()) {
+    if (!calendarAvailable()) {
       return { status: 'CALENDAR_NOT_CONNECTED', message: 'Interview scheduled. Google Calendar events are not available yet.' };
     }
 
@@ -593,9 +681,30 @@ export class GoogleCalendarService {
     const startDate = new Date(params.scheduledAt);
     const endDate = new Date(startDate.getTime() + duration * 60000);
 
-    const eventId = `cal_evt_${params.interviewId}`;
     const summary = `Recruitment Interview: ${params.applicantUsername} x ${params.interviewerUsername}`;
-    const htmlLink = `https://calendar.google.com/calendar/event?eid=${eventId}`;
+    let eventId = `cal_evt_${params.interviewId}`;
+    let htmlLink = `https://calendar.google.com/calendar/event?eid=${eventId}`;
+    if (calendarIsReal()) {
+      let real: any = null;
+      try {
+        real = params.interviewerUserId
+          ? await this.createUserEvent(params.interviewerUserId, {
+              summary,
+              description: `Interview with ${params.applicantUsername}. Scheduled from Community Manager.`,
+              start: startDate,
+              end: endDate,
+              reminderMinutes: [60, 10],
+            })
+          : null;
+      } catch (err) {
+        logGoogleError('interview event', err);
+      }
+      if (!real) {
+        return { status: 'CALENDAR_NOT_CONNECTED', message: 'Interview scheduled. The interviewer has not connected Google Calendar, so no calendar event was added.' };
+      }
+      eventId = real.id;
+      htmlLink = real.htmlLink;
+    }
 
     logger.info(`[GoogleCalendar] Scheduled interview event ${eventId} for community ${params.communityId}`);
 
@@ -605,8 +714,9 @@ export class GoogleCalendarService {
       await interviewsRepository.update(params.interviewId, {
         googleCalendarEventId: eventId,
         googleCalendarEventLink: htmlLink,
+        googleCalendarOwnerUserId: params.interviewerUserId,
         updatedAt: now,
-      });
+      } as any);
     }
 
     // Record Integration Event Ledger
@@ -665,7 +775,18 @@ export class GoogleCalendarService {
     const timezone = params.timezone || 'UTC';
 
     const summary = `Recruitment Interview (Rescheduled): ${params.applicantUsername} x ${params.interviewerUsername}`;
-    const htmlLink = `https://calendar.google.com/calendar/event?eid=${params.eventId}`;
+    let htmlLink = `https://calendar.google.com/calendar/event?eid=${params.eventId}`;
+    if (calendarIsReal()) {
+      const interview: any = await interviewsRepository.getById(params.interviewId);
+      const ownerId = interview?.googleCalendarOwnerUserId || params.interviewerUserId;
+      const cfg = ownerId ? await this.getUserCalendarConfig(ownerId) : null;
+      const token = cfg ? await this.getAccessToken(cfg) : null;
+      if (!token || !cfg) {
+        return { status: 'CALENDAR_NOT_CONNECTED', message: 'Interview rescheduled. The calendar owner is not connected, so the calendar event was not changed.' };
+      }
+      const ev = await calendarApi.patchEvent(token, cfg.calendarId || 'primary', params.eventId, { summary, start: startDate, end: endDate, timeZone: timezone, reminderMinutes: [60, 10] });
+      htmlLink = ev.htmlLink;
+    }
 
     logger.info(`[GoogleCalendar] Rescheduled interview event ${params.eventId} for interview ${params.interviewId}`);
 
@@ -720,6 +841,14 @@ export class GoogleCalendarService {
 
   async cancelInterviewEvent(communityId: string, interviewId: string, eventId: string): Promise<boolean> {
     const now = new Date().toISOString();
+    if (calendarIsReal()) {
+      const interview: any = await interviewsRepository.getById(interviewId);
+      const cfg = interview?.googleCalendarOwnerUserId ? await this.getUserCalendarConfig(interview.googleCalendarOwnerUserId) : null;
+      const token = cfg ? await this.getAccessToken(cfg) : null;
+      if (token && cfg) {
+        try { await calendarApi.deleteEvent(token, cfg.calendarId || 'primary', eventId); } catch (err) { logGoogleError('cancel event', err); return false; }
+      }
+    }
     logger.info(`[GoogleCalendar] Cancelled calendar event ${eventId} for interview ${interviewId}`);
 
     await integrationEventsRepository.create({
