@@ -48,5 +48,6 @@ steps:
           | tail -n +3 | while read -r d; do gcloud artifacts docker images delete "${_IMAGE}@$$d" --delete-tags --quiet || true; done
 
 options:
+  dynamicSubstitutions: true
   logging: CLOUD_LOGGING_ONLY
 timeout: 1800s
