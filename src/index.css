@@ -108,3 +108,15 @@ html { scroll-behavior: smooth; }
 @keyframes cm-grow { from { transform: scaleY(0) } to { transform: scaleY(1) } }
 .cm-feed { animation: cm-fade .5s ease both; }
 @media (prefers-reduced-motion: reduce) { .cm-live, .cm-fade, .cm-bar, .cm-feed { animation: none; } html { scroll-behavior: auto; } }
+
+/* Tricolour mark for "Made in India" */
+.cm-flag { display: inline-flex; flex-direction: column; width: 22px; height: 15px; border-radius: 3px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,.15); }
+.cm-flag i { flex: 1; display: block; }
+.cm-flag i:nth-child(1) { background: #FF9933; }
+.cm-flag i:nth-child(2) { background: #FFFFFF; position: relative; }
+.cm-flag i:nth-child(2)::after { content: ''; position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: #000080; }
+.cm-flag i:nth-child(3) { background: #138808; }
+/* Sharper text on HD screens; scale type up on very large displays */
+.cm-site { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+@media (min-width: 1920px) { .cm-site { font-size: 18px; } }
+@media (min-width: 2560px) { html { font-size: 112.5%; } }

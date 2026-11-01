@@ -331,7 +331,7 @@ export const CommunityOverviewView: React.FC<CommunityOverviewViewProps> = ({
     return (
       <div className="space-y-6">
         <div className="h-32 bg-slate-100 rounded-2xl animate-pulse flex items-center justify-center text-slate-400 font-medium">
-          Assembling Discord Community Operations Command Center...
+          Loading your server overview…
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="h-48 bg-slate-50 border border-slate-100 rounded-xl animate-pulse" />

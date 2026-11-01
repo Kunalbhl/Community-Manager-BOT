@@ -1,72 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ArrowRight, Plus, LogIn, ClipboardList, Mic, PartyPopper, Sparkles, HeartHandshake, Radar, ShieldCheck,
   Lock, KeyRound, Users, BarChart3, Zap, Check, X, Minus, Gamepad2, Palette, GraduationCap, Trophy, Swords,
   Workflow, BellRing, CalendarDays, Gift, Brain, Bot, Layers, Menu,
 } from 'lucide-react';
 import { getAddToDiscordUrl, getDiscordLoginUrl } from '../../lib/discordUrls.js';
+import { SiteHeader, SiteFooter, WRAP, useSignedIn, MadeInIndia } from './SiteChrome.js';
 
 /* ------------------------------------------------------------------ */
 /* Public website at "/"                                               */
 /* ------------------------------------------------------------------ */
 export function SiteLanding() {
-  const [signedIn, setSignedIn] = useState(false);
-  const [menu, setMenu] = useState(false);
+  const signedIn = useSignedIn();
 
-  useEffect(() => {
-    fetch('/api/v1/auth/session', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => setSignedIn(Boolean(j?.data?.authenticated)))
-      .catch(() => setSignedIn(false));
-  }, []);
 
   const loginHref = signedIn ? '/servers' : getDiscordLoginUrl();
   const addHref = getAddToDiscordUrl();
-  const nav = [
-    ['Lifecycle', '#lifecycle'], ['Features', '#features'], ['Compare', '#compare'], ['Security', '#security'], ['FAQ', '#faq'],
-  ];
 
   return (
     <div className="cm-site cm-grain">
       {/* ---------- Nav ---------- */}
-      <header className="sticky top-0 z-40 border-b border-[var(--site-line)]/60 bg-[var(--site-night)]/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5 sm:px-8">
-          <a href="/" className="flex items-center gap-2.5">
-            <img src="/favicon.svg" alt="" className="h-8 w-8" />
-            <span className="cm-display text-[19px] font-bold">Community Manager</span>
-          </a>
-          <nav className="hidden items-center gap-7 lg:flex">
-            {nav.map(([l, h]) => (
-              <a key={h} href={h} className="text-[15px] text-[var(--site-muted)] transition hover:text-[var(--site-text)]">{l}</a>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2">
-            <a href={loginHref} className="cm-btn-ghost hidden !py-2 text-[15px] sm:inline-flex">
-              <LogIn className="h-4 w-4" aria-hidden /> {signedIn ? 'My servers' : 'Log in'}
-            </a>
-            <a href={addHref} className="cm-btn-primary !py-2 text-[15px]">
-              <Plus className="h-4 w-4" aria-hidden /> Add to Discord
-            </a>
-            <button className="grid h-10 w-10 place-items-center rounded-full border border-[var(--site-line)] lg:hidden" onClick={() => setMenu(!menu)} aria-label="Menu" aria-expanded={menu}>
-              <Menu className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-        {menu && (
-          <nav className="flex flex-col gap-1 border-t border-[var(--site-line)] px-5 py-3 lg:hidden">
-            {nav.map(([l, h]) => <a key={h} href={h} onClick={() => setMenu(false)} className="py-2 text-[var(--site-muted)]">{l}</a>)}
-            <a href={loginHref} className="py-2 font-semibold">{signedIn ? 'My servers' : 'Log in with Discord'}</a>
-          </nav>
-        )}
-      </header>
+      <SiteHeader />
 
       <main>
         {/* ---------- Hero ---------- */}
         <section className="relative overflow-hidden">
           <div className="cm-aurora" aria-hidden />
-          <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-5 pb-24 pt-16 sm:px-8 lg:grid-cols-[1fr_1.05fr] lg:pt-24">
+          <div className={`relative ${WRAP} grid items-center gap-14 pb-24 pt-16 lg:grid-cols-[1fr_1.05fr] lg:pt-24`}>
             <div>
-              <span className="cm-eyebrow"><span className="cm-live" /> Online 24/7 · Free for every server</span>
+              <div className="flex flex-wrap gap-2"><span className="cm-eyebrow"><span className="cm-live" /> Online 24/7 · Free for every server</span><span className="cm-eyebrow"><MadeInIndia /></span></div>
               <h1 className="mt-6 text-[clamp(2.8rem,6.4vw,5.2rem)] font-extrabold">
                 The command center for <span className="cm-gradient-text">serious Discord communities.</span>
               </h1>
@@ -90,7 +52,7 @@ export function SiteLanding() {
 
         {/* ---------- Problem: bot sprawl ---------- */}
         <section className="border-y border-[var(--site-line)] bg-[var(--site-deep)]">
-          <div className="mx-auto grid max-w-7xl gap-12 px-5 py-24 sm:px-8 lg:grid-cols-2 lg:items-center">
+          <div className={`${WRAP} grid gap-12 py-24 lg:grid-cols-2 lg:items-center`}>
             <div>
               <p className="cm-kicker">The problem</p>
               <h2 className="mt-3 text-[clamp(2rem,4vw,3.2rem)] font-bold">Growing communities run on duct tape.</h2>
@@ -111,26 +73,10 @@ export function SiteLanding() {
         <Lifecycle />
 
         {/* ---------- Feature modules ---------- */}
-        <section id="features" className="border-t border-[var(--site-line)] bg-[var(--site-deep)]">
-          <div className="mx-auto max-w-7xl px-5 py-24 sm:px-8">
-            <p className="cm-kicker">Everything included</p>
-            <h2 className="mt-3 max-w-3xl text-[clamp(2rem,4vw,3.2rem)] font-bold">Eight modules. One bot. Zero paywalls.</h2>
-            <div className="mt-14 grid gap-px overflow-hidden rounded-3xl border border-[var(--site-line)] bg-[var(--site-line)] sm:grid-cols-2 lg:grid-cols-4">
-              {MODULES.map((m) => (
-                <div key={m.title} className="group bg-[var(--site-night)] p-7 transition hover:bg-[var(--site-panel)]">
-                  <m.icon className="h-7 w-7 text-[var(--site-signal)] transition group-hover:scale-110" aria-hidden />
-                  <h3 className="mt-5 text-xl font-bold">{m.title}</h3>
-                  <ul className="mt-4 space-y-2 text-[15px] text-[var(--site-muted)]">
-                    {m.points.map((p) => <li key={p} className="flex gap-2"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[var(--site-rose)]" />{p}</li>)}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        <Catalog />
 
         {/* ---------- Team roles ---------- */}
-        <section className="mx-auto max-w-7xl px-5 py-24 sm:px-8">
+        <section className={`${WRAP} py-24`}>
           <div className="grid gap-12 lg:grid-cols-[1fr_1.3fr] lg:items-center">
             <div>
               <p className="cm-kicker">Built for teams</p>
@@ -157,7 +103,7 @@ export function SiteLanding() {
         {/* ---------- AI ---------- */}
         <section className="relative overflow-hidden border-y border-[var(--site-line)] bg-[var(--site-deep)]">
           <div className="cm-aurora cm-aurora-right" aria-hidden />
-          <div className="relative mx-auto grid max-w-7xl gap-12 px-5 py-24 sm:px-8 lg:grid-cols-2 lg:items-center">
+          <div className={`relative ${WRAP} grid gap-12 py-24 lg:grid-cols-2 lg:items-center`}>
             <AiMock />
             <div>
               <p className="cm-kicker">Community Brain</p>
@@ -176,7 +122,7 @@ export function SiteLanding() {
         </section>
 
         {/* ---------- Comparison ---------- */}
-        <section id="compare" className="mx-auto max-w-7xl px-5 py-24 sm:px-8">
+        <section id="compare" className={`${WRAP} py-24`}>
           <p className="cm-kicker">Why choose it</p>
           <h2 className="mt-3 max-w-3xl text-[clamp(2rem,4vw,3.2rem)] font-bold">One connected system beats five disconnected tools.</h2>
           <div className="mt-12 overflow-x-auto rounded-3xl border border-[var(--site-line)]">
@@ -206,7 +152,7 @@ export function SiteLanding() {
 
         {/* ---------- Security ---------- */}
         <section id="security" className="border-y border-[var(--site-line)] bg-[var(--site-deep)]">
-          <div className="mx-auto max-w-7xl px-5 py-24 sm:px-8">
+          <div className={`${WRAP} py-24`}>
             <div className="grid gap-12 lg:grid-cols-[1fr_1.4fr]">
               <div>
                 <p className="cm-kicker">Security</p>
@@ -230,7 +176,7 @@ export function SiteLanding() {
         </section>
 
         {/* ---------- Use cases ---------- */}
-        <section className="mx-auto max-w-7xl px-5 py-24 sm:px-8">
+        <section className={`${WRAP} py-24`}>
           <p className="cm-kicker">Made for</p>
           <h2 className="mt-3 text-[clamp(2rem,4vw,3.2rem)] font-bold">Any community that chooses its members.</h2>
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -245,13 +191,13 @@ export function SiteLanding() {
         </section>
 
         {/* ---------- SocialCord ---------- */}
-        <section className="mx-auto max-w-7xl px-5 pb-24 sm:px-8">
+        <section className={`${WRAP} pb-24`}>
           <div className="flex flex-col gap-6 rounded-3xl border border-[var(--site-line)] bg-gradient-to-r from-[var(--site-panel)] to-[var(--site-deep)] p-8 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-4">
               <BellRing className="mt-1 h-8 w-8 shrink-0 text-[var(--site-signal)]" aria-hidden />
               <div>
-                <h3 className="text-2xl font-bold">Also posting on Instagram?</h3>
-                <p className="mt-2 max-w-xl text-[var(--site-muted)]">Switch on SocialCord Notifier from your dashboard to share new posts in your channels automatically.</p>
+                <h3 className="text-2xl font-bold">Share your social media in Discord</h3>
+                <p className="mt-2 max-w-xl text-[var(--site-muted)]">SocialCord Notifier is our social media bot: new posts from your social accounts appear in your Discord channels automatically. Switch it on from your dashboard.</p>
               </div>
             </div>
             <a href={loginHref} className="cm-btn-ghost shrink-0 self-start md:self-auto">Turn it on <ArrowRight className="h-4 w-4" aria-hidden /></a>
@@ -260,7 +206,7 @@ export function SiteLanding() {
 
         {/* ---------- FAQ ---------- */}
         <section id="faq" className="border-t border-[var(--site-line)] bg-[var(--site-deep)]">
-          <div className="mx-auto grid max-w-7xl gap-12 px-5 py-24 sm:px-8 lg:grid-cols-[1fr_1.6fr]">
+          <div className={`${WRAP} grid gap-12 py-24 lg:grid-cols-[1fr_1.6fr]`}>
             <div>
               <p className="cm-kicker">Questions</p>
               <h2 className="mt-3 text-[clamp(2rem,4vw,3.2rem)] font-bold">Good to know</h2>
@@ -282,7 +228,7 @@ export function SiteLanding() {
         {/* ---------- Final CTA ---------- */}
         <section className="relative overflow-hidden">
           <div className="cm-aurora" aria-hidden />
-          <div className="relative mx-auto max-w-4xl px-5 py-28 text-center sm:px-8">
+          <div className="relative mx-auto max-w-5xl px-5 py-28 text-center sm:px-8">
             <h2 className="text-[clamp(2.4rem,5vw,4rem)] font-extrabold">Build the community <span className="cm-gradient-text">people apply to join.</span></h2>
             <p className="mx-auto mt-5 max-w-xl text-lg text-[var(--site-muted)]">Add the bot, pick your server, and run your first application today.</p>
             <div className="mt-9 flex flex-wrap justify-center gap-3">
@@ -293,19 +239,7 @@ export function SiteLanding() {
         </section>
       </main>
 
-      <footer className="border-t border-[var(--site-line)]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-5 py-10 text-[15px] text-[var(--site-muted)] sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <div className="flex items-center gap-2.5">
-            <img src="/favicon.svg" alt="" className="h-6 w-6" />
-            <span>Community Manager for Discord. Not affiliated with Discord Inc.</span>
-          </div>
-          <nav className="flex gap-6">
-            <a href="/support" className="hover:text-[var(--site-text)]">Support</a>
-            <a href="/privacy" className="hover:text-[var(--site-text)]">Privacy</a>
-            <a href="/terms" className="hover:text-[var(--site-text)]">Terms</a>
-          </nav>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
@@ -313,16 +247,20 @@ export function SiteLanding() {
 /* ------------------------------------------------------------------ */
 /* Content                                                             */
 /* ------------------------------------------------------------------ */
-const MODULES = [
-  { icon: ClipboardList, title: 'Recruitment', points: ['Custom application forms', 'Review queue with approve / reject in Discord', 'Recruiter codes and referral tracking'] },
-  { icon: Mic, title: 'Interviews', points: ['Scheduling with DM reminders', 'Voice-channel interviews', 'Optional Google Calendar sync'] },
-  { icon: PartyPopper, title: 'Onboarding', points: ['Roles given on approval', 'Welcome messages and DMs', 'Guided first steps for new members'] },
-  { icon: ShieldCheck, title: 'Moderation', points: ['Warnings, cases and blacklists', 'Auto-moderation rules', 'Full audit trail of staff actions'] },
-  { icon: CalendarDays, title: 'Events', points: ['Events with sign-ups', 'Announcements and polls', 'Reminders before start'] },
-  { icon: HeartHandshake, title: 'Engagement', points: ['Win-back campaigns', 'Rewards and recognition', 'Activity streaks'] },
-  { icon: Workflow, title: 'Automations', points: ['Triggers on joins, approvals, inactivity', 'Follow-ups that run while you sleep', 'Daily digests for reviewers'] },
-  { icon: BarChart3, title: 'Insights', points: ['Application funnel and drop-off', 'Retention by recruiter and cohort', 'AI suggestions you approve'] },
+const CATALOG: { icon: any; title: string; items: string[] }[] = [
+  { icon: ClipboardList, title: 'Recruitment', items: ['Custom application forms', '/apply inside Discord', 'Review queue', 'Approve or reject in one click', 'Escalate and flag', 'Reviewer notes', 'Applicant status checks', 'Requirement checks', 'Blacklist screening', 'Applicant portal'] },
+  { icon: Radar, title: 'Recruiters & referrals', items: ['Personal recruiter codes', 'Referral tracking', 'Recruiter benefits', 'Recruiter leaderboard', 'Recruiter portal', 'Recruiter performance records', 'Shareable portal links'] },
+  { icon: Mic, title: 'Interviews', items: ['Interview scheduling', 'DM reminders 60 and 10 min before', 'Voice-channel interviews', 'Outcomes and scorecards', 'Interview notes', 'Optional Google Calendar sync'] },
+  { icon: PartyPopper, title: 'Onboarding', items: ['Roles given on approval', 'Welcome messages', 'Welcome DMs', 'Server rules command', 'Guided setup wizard', 'Onboarding checklist'] },
+  { icon: Users, title: 'Members', items: ['Member directory sync', 'Member 360 timeline', 'Lifecycle stages', 'Member status lookups', 'Cohorts', 'Search across everything'] },
+  { icon: ShieldCheck, title: 'Moderation & safety', items: ['Warnings and cases', 'Blacklists', 'Auto-moderation rules', 'Escalation queue', 'Staff audit trail', 'Security audit log'] },
+  { icon: CalendarDays, title: 'Events & engagement', items: ['Events with sign-ups', 'Event reminders', 'Announcements', 'Polls', 'Engagement campaigns', 'Win-back campaigns', 'Rewards and recognition'] },
+  { icon: Workflow, title: 'Automation', items: ['Workflow triggers', 'Scheduled jobs', 'New-application DMs', 'Daily reviewer digests', 'Follow-ups and nudges', 'Notification routing'] },
+  { icon: BarChart3, title: 'Insights & AI', items: ['Application funnel', 'Drop-off analysis', 'Retention by cohort', 'Recruiter quality scores', 'Exportable reports', 'Community Brain suggestions', 'Lifecycle intelligence'] },
+  { icon: Layers, title: 'Team & platform', items: ['Staff roles and permissions', 'Multi-server workspaces', 'Per-user notification settings', 'Discord diagnostics', 'SocialCord social media bot', 'Support command', '24/7 hosting with failover'] },
 ];
+
+const ROADMAP = ['Support tickets', 'Levels and XP', 'Giveaways', 'Reaction and button roles', 'Member verification', 'Server activity logs', 'Starboard', 'Birthdays', 'Custom commands', 'Multi-language'];
 
 const ROLES = [
   { name: 'Owner', color: '#FF5C8A', text: 'Full control of the server, its settings and who is on staff.' },
@@ -391,7 +329,7 @@ function Lifecycle() {
   const [i, setI] = useState(0);
   const s = STAGES[i];
   return (
-    <section id="lifecycle" className="mx-auto max-w-7xl px-5 py-24 sm:px-8">
+    <section id="lifecycle" className={`${WRAP} py-24`}>
       <p className="cm-kicker">The member lifecycle</p>
       <h2 className="mt-3 max-w-3xl text-[clamp(2rem,4vw,3.2rem)] font-bold">From stranger to regular, one connected journey.</h2>
       <div className="mt-12 flex gap-2 overflow-x-auto pb-2" role="tablist">
@@ -422,10 +360,10 @@ function Lifecycle() {
 
 function CommandCenterMock() {
   const feed = [
-    { c: 'var(--site-signal)', t: <>New application from <b>aria.wav</b></>, s: 'just now' },
-    { c: 'var(--site-mint)', t: <>Approved by <b>Mod Kai</b>, roles given</>, s: '2m' },
-    { c: 'var(--site-rose)', t: <>Interview with <b>dex</b> in 10 minutes</>, s: '8m' },
-    { c: '#FFC46B', t: <><b>12 members</b> signed up for Raid Night</>, s: '21m' },
+    { c: 'var(--site-signal)', t: <>New application from <b>Rishabh</b></>, s: 'just now' },
+    { c: 'var(--site-mint)', t: <>Approved by <b>Kunal</b>, roles given</>, s: '2m' },
+    { c: 'var(--site-rose)', t: <>Interview with <b>Sufiyan</b> in 10 minutes</>, s: '8m' },
+    { c: '#FFC46B', t: <><b>12 members</b> signed up for Sunday BGMI Scrims</>, s: '21m' },
   ];
   const bars = [30, 42, 38, 55, 48, 70, 64, 82, 76, 94];
   return (
@@ -434,8 +372,8 @@ function CommandCenterMock() {
       <div className="relative overflow-hidden rounded-[26px] border border-[var(--site-line)] bg-[var(--site-panel)] shadow-[0_40px_120px_-40px_rgba(124,140,255,.6)]">
         <div className="flex items-center justify-between border-b border-[var(--site-line)] px-5 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--site-rose)] text-sm font-bold text-[#1A0610]">N</div>
-            <span className="font-semibold">Nova Guild</span>
+            <div className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--site-rose)] text-sm font-bold text-[#1A0610]">B</div>
+            <span className="font-semibold">Bharat Esports</span>
             <span className="rounded-full bg-[var(--site-mint)]/15 px-2 py-0.5 text-[12px] font-semibold text-[var(--site-mint)]">Bot online</span>
           </div>
           <span className="text-[13px] text-[var(--site-muted)]">Example</span>
@@ -506,7 +444,7 @@ function AiMock() {
         {[
           ['Retention', '6 members from the March cohort have been quiet for 10 days.', 'Send win-back DM'],
           ['Recruitment', '3 applications have waited more than 24 hours.', 'Notify reviewers'],
-          ['Recruiters', 'Code NOVA brings members who stay 2× longer.', 'View report'],
+          ['Recruiters', 'Code ASHISH brings members who stay 2× longer.', 'View report'],
         ].map(([tag, text, action]) => (
           <div key={tag} className="rounded-2xl border border-[var(--site-line)] bg-[var(--site-panel)] p-4">
             <span className="text-[12px] font-semibold uppercase tracking-wider text-[var(--site-signal)]">{tag}</span>
@@ -520,5 +458,55 @@ function AiMock() {
       </div>
       <div className="mt-4 flex items-center gap-2 text-[13px] text-[var(--site-muted)]"><Users className="h-4 w-4" aria-hidden /> Suggestions only. Your team approves every action.</div>
     </div>
+  );
+}
+
+function Catalog() {
+  const total = CATALOG.reduce((n, c) => n + c.items.length, 0);
+  const [open, setOpen] = useState(0);
+  return (
+    <section id="features" className="border-t border-[var(--site-line)] bg-[var(--site-deep)]">
+      <div className={`${WRAP} py-24`}>
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div>
+            <p className="cm-kicker">Everything included</p>
+            <h2 className="mt-3 max-w-4xl text-[clamp(2rem,4vw,3.4rem)] font-bold">{total}+ capabilities across {CATALOG.length} areas. <span className="cm-gradient-text">Zero paywalls.</span></h2>
+          </div>
+          <p className="max-w-md text-[var(--site-muted)]">Pick an area to see everything inside it. Every capability is free on every server.</p>
+        </div>
+        <div className="mt-12 grid gap-6 xl:grid-cols-[360px_1fr]">
+          <div className="flex gap-2 overflow-x-auto pb-1 xl:flex-col xl:overflow-visible">
+            {CATALOG.map((c, n) => (
+              <button key={c.title} onClick={() => setOpen(n)}
+                className={`flex shrink-0 items-center gap-3 rounded-2xl border px-5 py-3.5 text-left transition ${n === open ? 'border-[var(--site-signal)] bg-[var(--site-panel)]' : 'border-[var(--site-line)] text-[var(--site-muted)] hover:text-[var(--site-text)]'}`}>
+                <c.icon className={`h-5 w-5 ${n === open ? 'text-[var(--site-rose)]' : ''}`} aria-hidden />
+                <span className="font-semibold">{c.title}</span>
+                <span className="ml-auto hidden rounded-full bg-[var(--site-night)] px-2.5 py-0.5 text-[13px] xl:inline">{c.items.length}</span>
+              </button>
+            ))}
+          </div>
+          <div key={open} className="cm-fade rounded-3xl border border-[var(--site-line)] bg-[var(--site-night)] p-8 sm:p-10">
+            {React.createElement(CATALOG[open].icon, { className: 'h-10 w-10 text-[var(--site-signal)]', 'aria-hidden': true })}
+            <h3 className="mt-5 text-3xl font-bold">{CATALOG[open].title}</h3>
+            <ul className="mt-8 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+              {CATALOG[open].items.map((it) => (
+                <li key={it} className="flex items-center gap-3 rounded-xl border border-[var(--site-line)] bg-[var(--site-panel)]/50 px-5 py-4"><Check className="h-5 w-5 shrink-0 text-[var(--site-mint)]" aria-hidden />{it}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <div className="mt-14 rounded-3xl border border-dashed border-[var(--site-line)] p-8">
+          <div className="flex flex-wrap items-center gap-3">
+            <Zap className="h-5 w-5 text-[#FFC46B]" aria-hidden />
+            <h3 className="text-xl font-bold">Coming next</h3>
+            <span className="text-[15px] text-[var(--site-muted)]">On the roadmap, shaped by our Development Area & Feedback. Not live yet.</span>
+          </div>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {ROADMAP.map((r) => <span key={r} className="rounded-full border border-[var(--site-line)] px-4 py-2 text-[15px] text-[var(--site-muted)]">{r}</span>)}
+          </div>
+          <a href="/contact" className="mt-6 inline-flex items-center gap-2 font-semibold text-[var(--site-signal)] hover:underline">Suggest a feature <ArrowRight className="h-4 w-4" aria-hidden /></a>
+        </div>
+      </div>
+    </section>
   );
 }
