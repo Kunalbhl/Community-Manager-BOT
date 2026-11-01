@@ -410,7 +410,9 @@ export async function authCallback(req: Request, res: Response, next: NextFuncti
       });
 
       // After setting the session cookie, redirect based on context
-      const postAuthRedirect = req.query.postAuth === 'onboarding' ? '/dashboard?view=onboarding' : '/dashboard';
+      // After login, people choose which server to manage (or resume a page they were sent away from).
+      const safeReturnTo = typeof stateRecord?.returnTo === 'string' && stateRecord.returnTo.startsWith('/') && !stateRecord.returnTo.startsWith('//') ? stateRecord.returnTo : undefined;
+      const postAuthRedirect = req.query.postAuth === 'onboarding' ? '/dashboard?view=onboarding' : (safeReturnTo || '/servers');
       const redirectUrl_postAuth = postAuthRedirect;
 
       // Clear temporary OAuth state cookie
@@ -526,7 +528,7 @@ export async function authCallback(req: Request, res: Response, next: NextFuncti
 
       // Return user to onboarding if that is where they came from
       const stateStr = typeof state === 'string' ? state : '';
-      const redirectUrl = stateStr.includes(':onboarding') ? '/dashboard?view=onboarding' : '/dashboard';
+      const redirectUrl = stateStr.includes(':onboarding') ? '/dashboard?view=onboarding' : postAuthRedirect;
 
       // HTML response notifying window.opener
       return res.send(`

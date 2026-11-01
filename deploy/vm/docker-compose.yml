@@ -34,3 +34,28 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
+
+  # HTTPS front door so the website on Cloud Run can forward API calls to the active bot.
+  # Free automatic certificate for <vm-ip-with-dashes>.sslip.io.
+  caddy:
+    image: caddy:2-alpine
+    container_name: community-manager-caddy
+    restart: unless-stopped
+    depends_on: [bot]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PUBLIC_API_HOST: 137-23-46-177.sslip.io
+    command: ["sh", "-c", "caddy reverse-proxy --from \"$${PUBLIC_API_HOST}\" --to bot:3000"]
+    volumes:
+      - caddy-data:/data
+    mem_limit: 64m
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+volumes:
+  caddy-data:
