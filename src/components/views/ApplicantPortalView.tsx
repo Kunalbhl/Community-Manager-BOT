@@ -902,7 +902,7 @@ export const ApplicantPortalView: React.FC<ApplicantPortalViewProps> = ({
     
     if (status === 'JOINED') {
       if (journeyStatus) {
-        const isRolePending = journeyStatus.roleAssignmentStatus === 'PENDING' || journeyStatus.roleAssignmentStatus === 'ROLE_ASSIGNMENT_FAILED';
+        const isRolePending = journeyStatus.roleAssignmentStatus === 'ROLE_ASSIGNMENT_FAILED';
         const isRulesPending = journeyStatus.rulesAcknowledgementStatus === 'PENDING';
         
         if (isRulesPending || isRolePending) {

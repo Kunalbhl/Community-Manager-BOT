@@ -335,8 +335,8 @@ export const RecruitmentAnalyticsSection: React.FC<RecruitmentAnalyticsSectionPr
                     </div>
                     <div className="flex items-center gap-4 text-[11px] text-slate-500">
                       <span>Apps: {camp.applications}</span>
-                      <span>Joined: {camp.joined ?? (camp as any).joinCount ?? 0}</span>
-                      <span>Activated: {camp.activated ?? (camp as any).activationCount ?? 0}</span>
+                      <span>Joined: {typeof camp.joinRate === 'number' ? `${camp.joinRate}%` : 'N/A'}</span>
+                      <span>Activated: {typeof camp.activationRate === 'number' ? `${camp.activationRate}%` : 'N/A'}</span>
                       <span>Retained 30d: {camp.retentionRate30d !== 'INSUFFICIENT_DATA' && camp.retentionRate30d !== undefined ? `${camp.retentionRate30d}%` : 'N/A'}</span>
                     </div>
                   </div>

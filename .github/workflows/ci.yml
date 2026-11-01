@@ -26,13 +26,13 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Type check (report only; legacy errors are being fixed)
+      - name: Type check (app code)
         shell: bash
         run: |
           npx tsc --noEmit -p . > tsc.log 2>&1 || true
-          n=$(grep -cE '^(server|src|shared|server\.ts).*error TS' tsc.log || true)
-          grep -E '^(server|src|shared|server\.ts).*error TS' tsc.log || true
-          echo "::warning title=TypeScript::$n type errors in app code (not blocking yet)"
+          if grep -E '^(server|src|shared|server\.ts).*error TS' tsc.log; then
+            echo "::error::TypeScript errors in app code"; exit 1
+          fi
       - name: Database layer (real Postgres)
         env:
           TEST_DATABASE_URL: postgresql://cm:cm@localhost:5432/cm_test

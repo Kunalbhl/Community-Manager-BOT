@@ -241,34 +241,29 @@ export const RetentionIntelligenceSection: React.FC<RetentionIntelligenceSection
           <div className="space-y-3">
             {alerts.map((alert, idx) => (
               <div
-                key={idx}
+                key={alert.id || idx}
                 className={`rounded-lg border p-4 text-xs ${
-                  alert.severity === 'HIGH'
-                    ? 'border-rose-200 bg-rose-50/50'
-                    : 'border-amber-200 bg-amber-50/50'
+                  alert.severity === 'CRITICAL' ? 'border-rose-200 bg-rose-50/50' : 'border-amber-200 bg-amber-50/50'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-bold text-slate-900">{alert.message}</span>
+                  <span className="font-bold text-slate-900">
+                    {String(alert.alertType).replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase())}
+                    {alert.affectedCohortOrSource ? ` (${alert.affectedCohortOrSource})` : ''}
+                  </span>
                   <span
                     className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                      alert.severity === 'HIGH' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                      alert.severity === 'CRITICAL' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
                     }`}
                   >
-                    {alert.severity} SEVERITY
+                    {alert.severity}
                   </span>
                 </div>
                 <p className="text-slate-600 mb-2">{alert.evidence}</p>
-                {alert.actionableRecommendations && alert.actionableRecommendations.length > 0 && (
-                  <div className="border-t border-slate-200/60 pt-2 mt-2">
-                    <span className="text-[11px] font-semibold text-slate-700 block mb-1">
-                      Recommended Investigations:
-                    </span>
-                    <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-slate-600">
-                      {alert.actionableRecommendations.map((rec, rIdx) => (
-                        <li key={rIdx}>{rec}</li>
-                      ))}
-                    </ul>
+                {alert.recommendedAction && (
+                  <div className="border-t border-slate-200/60 pt-2 mt-2 text-[11px] text-slate-600">
+                    <span className="font-semibold text-slate-700">Recommended: </span>
+                    {alert.recommendedAction}
                   </div>
                 )}
               </div>
@@ -294,29 +289,28 @@ export const RetentionIntelligenceSection: React.FC<RetentionIntelligenceSection
           ) : (
             <div className="space-y-3 text-xs">
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Total Checklists Assigned:</span>
-                <span className="font-bold text-slate-800">{onboarding.totalAssigned}</span>
+                <span className="text-slate-500">Checklists assigned:</span>
+                <span className="font-bold text-slate-800">{onboarding.totalChecklists}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Completed Checklists:</span>
-                <span className="font-bold text-emerald-600">
-                  {onboarding.completed} ({typeof onboarding.completionRate === 'number' ? `${onboarding.completionRate}%` : 'N/A'})
-                </span>
+                <span className="text-slate-500">Completion rate:</span>
+                <span className="font-bold text-emerald-600">{typeof onboarding.overallCompletionRate === 'number' ? `${onboarding.overallCompletionRate}%` : 'Not enough data'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Average Completion Time:</span>
-                <span className="font-mono text-slate-700">
-                  {onboarding.avgCompletionHours ? `${onboarding.avgCompletionHours}h` : 'N/A'}
+                <span className="text-slate-500">Average completion time:</span>
+                <span className="text-slate-700">
+                  {typeof onboarding.averageCompletionTimeHours === 'number' ? `${onboarding.averageCompletionTimeHours}h` : 'Not enough data'}
                 </span>
               </div>
-              {onboarding.primaryDropOffStep && (
+              {onboarding.highFrictionStep && (
                 <div className="py-1">
-                  <span className="text-slate-500 block mb-1">Primary Drop-off Step:</span>
+                  <span className="text-slate-500 block mb-1">Step where most people stop:</span>
                   <span className="font-medium text-rose-700 bg-rose-50 px-2 py-0.5 rounded">
-                    {onboarding.primaryDropOffStep}
+                    {onboarding.highFrictionStep.title} ({onboarding.highFrictionStep.dropoffRate}% stop here)
                   </span>
                 </div>
               )}
+              {onboarding.successfulPattern && <p className="text-[11px] text-slate-500">{onboarding.successfulPattern}</p>}
             </div>
           )}
         </div>
@@ -336,47 +330,35 @@ export const RetentionIntelligenceSection: React.FC<RetentionIntelligenceSection
           ) : (
             <div className="space-y-3 text-xs">
               <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-2.5">
-                <span className="font-semibold text-slate-900 block mb-1">Moderation Crossover</span>
-                <p className="text-slate-600 text-[11px]">
-                  Members with moderation warnings within first 14 days retain 30-day activity at{' '}
-                  <span className="font-bold text-slate-800">
-                    {typeof crossovers.moderation.warnedRetentionRate30d === 'number'
-                      ? `${crossovers.moderation.warnedRetentionRate30d}%`
-                      : 'N/A'}
-                  </span>{' '}
-                  vs{' '}
-                  <span className="font-bold text-slate-800">
-                    {typeof crossovers.moderation.unwarnedRetentionRate30d === 'number'
-                      ? `${crossovers.moderation.unwarnedRetentionRate30d}%`
-                      : 'N/A'}
-                  </span>{' '}
-                  for unwarned members.
-                </p>
+                <span className="font-semibold text-slate-900 block mb-1">Moderation by member source</span>
+                {crossovers.moderation.sourceCorrelations.length === 0 ? (
+                  <p className="text-slate-500 text-[11px]">Not enough data yet.</p>
+                ) : (
+                  <ul className="space-y-1 text-[11px] text-slate-600">
+                    {crossovers.moderation.sourceCorrelations.slice(0, 4).map((c) => (
+                      <li key={c.source}><span className="font-semibold text-slate-800">{c.source}</span>: {c.warningCount} warnings, {c.incidentCount} incidents across {c.memberCount} members</li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-2.5">
-                <span className="font-semibold text-slate-900 block mb-1">Event Attendance Crossover</span>
-                <p className="text-slate-600 text-[11px]">
-                  Attending an event during onboarding correlates with a{' '}
-                  <span className="font-bold text-emerald-600">
-                    {typeof crossovers.events.attendanceLiftPercent === 'number'
-                      ? `+${crossovers.events.attendanceLiftPercent}%`
-                      : 'N/A'}
-                  </span>{' '}
-                  increase in 30-day retention.
-                </p>
+                <span className="font-semibold text-slate-900 block mb-1">Event attendance by member source</span>
+                {crossovers.events.sourceBreakdown.length === 0 ? (
+                  <p className="text-slate-500 text-[11px]">Not enough data yet.</p>
+                ) : (
+                  <ul className="space-y-1 text-[11px] text-slate-600">
+                    {crossovers.events.sourceBreakdown.slice(0, 4).map((e) => (
+                      <li key={e.source}><span className="font-semibold text-slate-800">{e.source}</span>: {e.attendedCount}/{e.registeredCount} attended ({typeof e.attendanceRate === 'number' ? `${e.attendanceRate}%` : 'Not enough data'})</li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-2.5">
-                <span className="font-semibold text-slate-900 block mb-1">Automation Workflow Crossover</span>
+                <span className="font-semibold text-slate-900 block mb-1">Automation success</span>
                 <p className="text-slate-600 text-[11px]">
-                  Members receiving automated onboarding nudges completed checklists at{' '}
-                  <span className="font-bold text-indigo-600">
-                    {typeof crossovers.automation.nudgeEffectivenessPercent === 'number'
-                      ? `${crossovers.automation.nudgeEffectivenessPercent}%`
-                      : 'N/A'}
-                  </span>{' '}
-                  completion rate.
+                  Onboarding {typeof crossovers.automation.onboardingAutomationSuccessRate === 'number' ? `${crossovers.automation.onboardingAutomationSuccessRate}%` : 'Not enough data'}, recruitment {typeof crossovers.automation.recruitmentAutomationSuccessRate === 'number' ? `${crossovers.automation.recruitmentAutomationSuccessRate}%` : 'Not enough data'}, reminders {typeof crossovers.automation.reminderSuccessRate === 'number' ? `${crossovers.automation.reminderSuccessRate}%` : 'Not enough data'}.
                 </p>
               </div>
             </div>

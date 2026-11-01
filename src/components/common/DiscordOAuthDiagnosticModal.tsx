@@ -175,7 +175,7 @@ export const DiscordOAuthDiagnosticModal: React.FC<DiscordOAuthDiagnosticModalPr
       isOpen={isOpen}
       onClose={onClose}
       title="Discord OAuth Flow Diagnostics"
-      maxWidth="max-w-4xl"
+      size="xl"
     >
       <div className="space-y-6 text-slate-800">
         {/* TOP STATUS BAR */}

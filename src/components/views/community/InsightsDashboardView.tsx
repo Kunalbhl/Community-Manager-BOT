@@ -98,7 +98,7 @@ export const InsightsDashboardView: React.FC<InsightsDashboardViewProps> = ({
       currentValue,
       previousValue,
       delta,
-      domain: activeTab,
+      domain: activeTab as any,
       dateRange: rangeType,
       customStart: rangeType === 'CUSTOM' ? customStart : undefined,
       customEnd: rangeType === 'CUSTOM' ? customEnd : undefined,

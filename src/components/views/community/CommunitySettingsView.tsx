@@ -1259,7 +1259,7 @@ export const CommunitySettingsView: React.FC<CommunitySettingsViewProps> = ({ co
 
             {/* Quota Consumption Meters */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {Object.entries(settings.plansUsage.quotas).map(([metricKey, quota]: [string, { used: number; limit: number; remaining?: number }]) => {
+              {(Object.entries(settings.plansUsage.quotas) as Array<[string, any]>).map(([metricKey, quota]) => {
                 const pct = Math.min(100, Math.round((quota.used / Math.max(1, quota.limit)) * 100));
                 return (
                   <div key={metricKey} className="rounded-lg border border-slate-200 bg-slate-50 p-4">

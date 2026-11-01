@@ -32,8 +32,8 @@ export const AiContextBanner: React.FC<AiContextBannerProps> = ({
   loadingContext,
   onRefreshContext,
 }) => {
-  const isDiscordConnected = context?.connectionStatus?.discordConnected ?? false;
-  const dataCoverage = context?.dataCoverage || 'NO_DATA';
+  const isDiscordConnected = context?.tenant?.botConnected ?? false;
+  const dataCoverage = context?.dataCoverage?.coverageStatus || 'NO_DATA';
 
   const getQuotaBadge = (state?: AiQuotaState) => {
     switch (state) {
@@ -41,7 +41,7 @@ export const AiContextBanner: React.FC<AiContextBannerProps> = ({
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            Quota Available ({quota?.remaining?.requests ?? 0} left)
+            Quota Available ({quota?.remaining ?? 0} left)
           </span>
         );
       case 'LIMIT_REACHED':
@@ -93,7 +93,7 @@ export const AiContextBanner: React.FC<AiContextBannerProps> = ({
         <div className="flex items-center gap-2">
           <Database className="w-4 h-4 text-zinc-500" />
           <span className="font-medium text-zinc-900 truncate max-w-[160px] sm:max-w-xs">
-            {context?.communityName || communityId}
+            {context?.tenant?.communityName || communityId}
           </span>
         </div>
 
@@ -127,7 +127,7 @@ export const AiContextBanner: React.FC<AiContextBannerProps> = ({
         </div>
 
         {/* Quota Badge */}
-        {quota && <div className="hidden lg:block">{getQuotaBadge(quota.state)}</div>}
+        {quota && <div className="hidden lg:block">{getQuotaBadge(quota.remaining <= 0 ? 'LIMIT_REACHED' : 'AVAILABLE')}</div>}
       </div>
 
       <div className="flex items-center gap-2.5">

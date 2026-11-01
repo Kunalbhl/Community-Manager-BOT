@@ -38,7 +38,7 @@ export const WelcomeOnboardingView: React.FC<WelcomeOnboardingViewProps> = ({ co
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'settings' | 'preview' | 'audits' | 'wizard' | 'connection'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'preview' | 'audits' | 'wizard' | 'connection' | 'integrations'>('settings');
 
   // Form State
   const [personalMsg, setPersonalMsg] = useState('');
