@@ -60,6 +60,8 @@ import { TermsOfServiceView } from './components/views/public/TermsOfServiceView
 import { SupportView } from './components/views/public/SupportView.js';
 import { PublicLandingView } from './components/views/public/PublicLandingView.js';
 import { MultiServerSelectorView } from './components/common/MultiServerSelectorView.js';
+import { SiteLanding } from './components/site/SiteLanding.js';
+import { ServerPickerPage } from './components/site/ServerPickerPage.js';
 
 import { PortalMode, PlatformSection, CommunitySection } from './types/ui.js';
 import { UserRole, Permission } from '../shared/types/rbac.js';
@@ -131,16 +133,12 @@ export default function App() {
   if (currentPath === '/support') {
     return <SupportView onBack={() => { window.location.href = '/'; }} />;
   }
-  if (currentPath === '/landing' || currentPath === '/login') {
-    return (
-      <PublicLandingView
-        onLogin={() => { window.location.href = '/'; }}
-        onAddDiscord={() => { window.location.href = '/'; }}
-        onNavigateToSupport={() => { window.location.href = '/support'; }}
-        onNavigateToPrivacy={() => { window.location.href = '/privacy'; }}
-        onNavigateToTerms={() => { window.location.href = '/terms'; }}
-      />
-    );
+  // Public website and server picker (the dashboard lives at /dashboard).
+  if (currentPath === '' || currentPath === '/' || currentPath === '/landing' || currentPath === '/login') {
+    return <SiteLanding />;
+  }
+  if (currentPath === '/servers') {
+    return <ServerPickerPage />;
   }
 
   // Navigation & Scope State
@@ -244,7 +242,9 @@ export default function App() {
   }, []);
 
   // Onboarding State
-  const [showOnboardingFlow, setShowOnboardingFlow] = useState<boolean>(false);
+  const [showOnboardingFlow, setShowOnboardingFlow] = useState<boolean>(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'onboarding'
+  );
   const [onboardingRequired, setOnboardingRequired] = useState<boolean>(false);
   const [showCalendarSetupModal, setShowCalendarSetupModal] = useState<boolean>(false);
 
@@ -323,6 +323,12 @@ export default function App() {
         const json = await res.json();
         if (json.success && json.data) {
           setIsAuthenticated(Boolean(json.data.authenticated));
+          // Signed-out visitors on the admin dashboard belong on the website (applicants use ?view=apply).
+          const params = new URLSearchParams(window.location.search);
+          if (!json.data.authenticated && window.location.pathname.startsWith('/dashboard') && params.get('view') !== 'apply') {
+            window.location.href = '/';
+            return;
+          }
           if (json.data.user) {
             setCurrentUser(json.data.user);
             setCurrentRole(json.data.user.role || 'APPLICANT');
@@ -375,10 +381,10 @@ export default function App() {
       });
       setIsAuthenticated(false);
       setCurrentUser(null);
-      fetchSession();
     } catch (err) {
       console.error('Failed to logout', err);
     }
+    window.location.href = '/';
   };
 
   const handleRoleChange = (newRole: UserRole) => {

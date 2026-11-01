@@ -15,6 +15,7 @@ import { discordService } from './server/integrations/discord/discord.service.js
 import { DEFAULT_ROLE_PERMISSIONS } from './shared/types/rbac.js';
 import { ProductionRuntimeActivationService } from './server/services/productionRuntimeActivation.service.js';
 import { startLeadership, stopLeadership, getLeadershipStatus } from './server/runtime/leadership.js';
+import { leaderProxy } from './server/runtime/leaderProxy.js';
 import { EngagementSchedulerService } from './server/services/engagement.service.js';
 
 // A 24/7 bot must never die from one stray error: log it and keep running.
@@ -154,6 +155,9 @@ async function startServer() {
   app.get('/health/leader', (_req: Request, res: Response) => {
     res.json({ ...getLeadershipStatus(), discord: discordService.getDiagnostics?.() });
   });
+
+  // Standby instances forward API calls to the active bot (must run before body parsing).
+  app.use('/api', leaderProxy());
 
   // Body parsing & rate limiting
   app.use(express.json({ limit: '1mb' }));
