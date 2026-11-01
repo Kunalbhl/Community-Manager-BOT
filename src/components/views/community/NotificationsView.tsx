@@ -104,6 +104,17 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
 
   // Preferences State
   const [preferences, setPreferences] = useState<UserNotificationPreference | null>(null);
+
+  // Delivery choices are stored per category on the server (categories[CAT].channels).
+  const hasChannel = (cat: string, channel: string): boolean =>
+    Boolean((preferences?.categories as any)?.[cat]?.channels?.includes(channel));
+  const withChannel = (prev: UserNotificationPreference | null, cat: string, channel: string, on: boolean) => {
+    if (!prev) return prev;
+    const current = (prev.categories as any)?.[cat] || { enabled: true, channels: [] };
+    const channels = new Set<string>(current.channels || []);
+    if (on) channels.add(channel); else channels.delete(channel);
+    return { ...prev, categories: { ...(prev.categories as any), [cat]: { ...current, channels: Array.from(channels) } } } as UserNotificationPreference;
+  };
   const [savingPreferences, setSavingPreferences] = useState<boolean>(false);
   const [preferencesSavedMessage, setPreferencesSavedMessage] = useState<string | null>(null);
 
@@ -843,10 +854,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.inApp !== false}
+                        checked={hasChannel('RECRUITMENT', 'IN_APP')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, inApp: e.target.checked } } : prev
+                            withChannel(prev, 'RECRUITMENT', 'IN_APP', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"
@@ -855,10 +866,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.discordDm !== false}
+                        checked={hasChannel('RECRUITMENT', 'DISCORD')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, discordDm: e.target.checked } } : prev
+                            withChannel(prev, 'RECRUITMENT', 'DISCORD', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"
@@ -867,10 +878,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.discordChannel !== false}
+                        checked={hasChannel('RECRUITMENT', 'DISCORD')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, discordChannel: e.target.checked } } : prev
+                            withChannel(prev, 'RECRUITMENT', 'DISCORD', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"
@@ -879,10 +890,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.email === true}
+                        checked={hasChannel('RECRUITMENT', 'EMAIL')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, email: e.target.checked } } : prev
+                            withChannel(prev, 'RECRUITMENT', 'EMAIL', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"
@@ -904,10 +915,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.inApp !== false}
+                        checked={hasChannel('MODERATION', 'IN_APP')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, inApp: e.target.checked } } : prev
+                            withChannel(prev, 'MODERATION', 'IN_APP', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"
@@ -916,10 +927,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.discordDm !== false}
+                        checked={hasChannel('MODERATION', 'DISCORD')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, discordDm: e.target.checked } } : prev
+                            withChannel(prev, 'MODERATION', 'DISCORD', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"
@@ -928,10 +939,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.discordChannel !== false}
+                        checked={hasChannel('MODERATION', 'DISCORD')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, discordChannel: e.target.checked } } : prev
+                            withChannel(prev, 'MODERATION', 'DISCORD', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"
@@ -940,10 +951,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.email === true}
+                        checked={hasChannel('MODERATION', 'EMAIL')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, email: e.target.checked } } : prev
+                            withChannel(prev, 'MODERATION', 'EMAIL', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"
@@ -965,10 +976,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.inApp !== false}
+                        checked={hasChannel('EVENTS', 'IN_APP')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, inApp: e.target.checked } } : prev
+                            withChannel(prev, 'EVENTS', 'IN_APP', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"
@@ -977,10 +988,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.discordDm !== false}
+                        checked={hasChannel('EVENTS', 'DISCORD')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, discordDm: e.target.checked } } : prev
+                            withChannel(prev, 'EVENTS', 'DISCORD', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"
@@ -989,10 +1000,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.discordChannel !== false}
+                        checked={hasChannel('EVENTS', 'DISCORD')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, discordChannel: e.target.checked } } : prev
+                            withChannel(prev, 'EVENTS', 'DISCORD', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"
@@ -1001,10 +1012,10 @@ export const NotificationsView: React.FC<NotificationsViewProps> = ({
                     <td className="px-3 py-3 text-center">
                       <input
                         type="checkbox"
-                        checked={preferences?.channels?.email === true}
+                        checked={hasChannel('EVENTS', 'EMAIL')}
                         onChange={(e) =>
                           setPreferences((prev) =>
-                            prev ? { ...prev, channels: { ...prev.channels, email: e.target.checked } } : prev
+                            withChannel(prev, 'EVENTS', 'EMAIL', e.target.checked)
                           )
                         }
                         className="h-4 w-4 text-indigo-600 rounded"

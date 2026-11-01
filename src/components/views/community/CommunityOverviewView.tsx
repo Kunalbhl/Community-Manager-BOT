@@ -690,8 +690,8 @@ export const CommunityOverviewView: React.FC<CommunityOverviewViewProps> = ({
                           className="rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
                         >
                           {typeof rec.suggestedAction === 'object' && rec.suggestedAction !== null
-                            ? rec.suggestedAction.actionType
-                            : rec.suggestedAction}
+                            ? (rec.suggestedAction as any).actionType
+                            : String(rec.suggestedAction)}
                         </button>
                       )}
                     </div>

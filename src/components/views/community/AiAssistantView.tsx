@@ -402,8 +402,8 @@ export const AiAssistantView: React.FC<AiAssistantViewProps> = ({
     }
   };
 
-  const isQuotaReached = quota?.state === 'LIMIT_REACHED';
-  const isRateLimited = quota?.state === 'RATE_LIMITED';
+  const isQuotaReached = Boolean(quota && quota.remaining <= 0);
+  const isRateLimited = false; // rate limits are reported per request by the API
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] bg-white overflow-hidden">

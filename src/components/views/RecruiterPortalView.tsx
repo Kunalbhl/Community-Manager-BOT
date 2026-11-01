@@ -121,7 +121,7 @@ export const RecruiterPortalView: React.FC<RecruiterPortalViewProps> = ({
   };
 
   const totalReferrals = referrals.length;
-  const successfulReferrals = referrals.filter((r) => r.status === 'SUCCESSFUL').length;
+  const successfulReferrals = referrals.filter((r) => r.status === 'CONVERTED').length;
   const pendingReferrals = referrals.filter((r) => r.status === 'PENDING').length;
 
   if (!communityId || communityId === 'undefined' || communityId === 'null') {
@@ -356,15 +356,15 @@ export const RecruiterPortalView: React.FC<RecruiterPortalViewProps> = ({
                 <div key={ref.id} className="py-2.5 flex items-center justify-between">
                   <div>
                     <div className="font-semibold text-slate-800">
-                      Applicant: {ref.applicantUserId}
+                      Applicant: {ref.referredUserId || 'Not used yet'}
                     </div>
-                    <div className="text-slate-400">Code: {ref.recruiterCode}</div>
+                    <div className="text-slate-400">Code: {ref.code}</div>
                   </div>
                   <span
                     className={`rounded px-2 py-0.5 font-medium ${
-                      ref.status === 'SUCCESSFUL'
+                      ref.status === 'CONVERTED'
                         ? 'bg-emerald-50 text-emerald-700'
-                        : ref.status === 'REJECTED'
+                        : ref.status === 'REVOKED' || ref.status === 'EXPIRED'
                         ? 'bg-rose-50 text-rose-700'
                         : 'bg-amber-50 text-amber-700'
                     }`}

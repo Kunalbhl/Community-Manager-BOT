@@ -256,9 +256,9 @@ export const AiConversationSidebar: React.FC<AiConversationSidebarProps> = ({
                     </div>
                   )}
 
-                  {!isEditing && !isConfirmingDelete && conv.messageCount > 0 && (
+                  {!isEditing && !isConfirmingDelete && (conv.metadata?.totalMessages ?? conv.messages?.length ?? 0) > 0 && (
                     <span className="group-hover:hidden text-[10px] text-zinc-600 bg-zinc-200 px-1.5 py-0.2 rounded font-mono">
-                      {conv.messageCount}
+                      {conv.metadata?.totalMessages ?? conv.messages?.length ?? 0}
                     </span>
                   )}
                 </div>

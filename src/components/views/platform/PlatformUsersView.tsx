@@ -137,9 +137,6 @@ export const PlatformUsersView: React.FC<PlatformUsersViewProps> = ({ platformKe
                         </div>
                         <div>
                           <div>{u.username}</div>
-                          {u.discriminator && u.discriminator !== '0' && (
-                            <div className="text-xs text-slate-400">#{u.discriminator}</div>
-                          )}
                         </div>
                       </div>
                     </td>
@@ -150,7 +147,7 @@ export const PlatformUsersView: React.FC<PlatformUsersViewProps> = ({ platformKe
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">
-                      {u.communities ? u.communities.length : 0}
+                      {u.communitiesUsed ? u.communitiesUsed.length : 0}
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-600">{u.applicationCount || 0}</td>
                     <td className="px-4 py-3 text-xs text-slate-500">

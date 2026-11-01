@@ -562,7 +562,7 @@ export default function App() {
       case 'recruiter-records':
         return <RecruiterRecordsView communityId={selectedCommunity} />;
       case 'pricing-trust':
-        return <PublicPricingTrustView communityId={selectedCommunity} currentPlan="FREE" canEdit={hasPermission(currentRole, 'settings.manage')} />;
+        return <PublicPricingTrustView communityId={selectedCommunity} currentPlan="FREE" canEdit={hasPermission({ userId: (currentUser as any)?.userId || currentUser?.id || '', isPlatformOwner: currentUser?.isPlatformOwner, role: currentRole, customPermissions: currentPermissions.length ? currentPermissions : undefined } as any, 'settings.manage')} />;
       case 'lifecycle-intelligence':
         return (
           <LifecycleIntelligenceView
@@ -588,7 +588,7 @@ export default function App() {
         return (
           <PlatformOverviewView
             platformKey={platformKey}
-            onNavigate={(s) => setActivePlatformSection(s)}
+            onNavigate={(s) => setActivePlatformSection(s as PlatformSection)}
           />
         );
       case 'servers':
@@ -609,7 +609,7 @@ export default function App() {
         return (
           <PlatformOverviewView
             platformKey={platformKey}
-            onNavigate={(s) => setActivePlatformSection(s)}
+            onNavigate={(s) => setActivePlatformSection(s as PlatformSection)}
           />
         );
     }

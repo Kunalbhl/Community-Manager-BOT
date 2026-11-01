@@ -47,17 +47,15 @@ export const AiActionLifecycleModal: React.FC<AiActionLifecycleModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          actionPlanId: preview.actionPlanId,
-          actionType: preview.actionType,
-          targetModule: preview.targetModule,
-          parameters: preview.parameters,
-          humanConsent: true,
+          actionId: preview.actionId,
+          confirmationToken: preview.confirmationToken,
+          confirmed: true,
         }),
       });
 
       const json = await res.json();
       if (res.ok && json.success) {
-        setConfirmationToken(json.confirmationToken || 'confirmed_token');
+        setConfirmationToken(json.action?.confirmationToken || preview.confirmationToken || null);
       } else {
         setError(json.error?.message || json.message || 'Failed to confirm action');
       }
@@ -77,11 +75,9 @@ export const AiActionLifecycleModal: React.FC<AiActionLifecycleModalProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          confirmationToken: confirmationToken || 'token',
-          actionType: preview.actionType,
-          targetModule: preview.targetModule,
-          parameters: preview.parameters,
-          targetResource: preview.targetResource,
+          actionId: preview.actionId,
+          confirmationToken: confirmationToken || preview.confirmationToken,
+          idempotencyKey: `${preview.actionId}_exec`,
         }),
       });
 
@@ -143,11 +139,11 @@ export const AiActionLifecycleModal: React.FC<AiActionLifecycleModalProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-zinc-900">{preview.actionType}</span>
               <span className="text-[11px] px-2 py-0.5 rounded bg-zinc-200 text-zinc-700 font-medium">
-                {preview.targetModule}
+                {preview.target?.module}
               </span>
             </div>
 
-            <p className="text-xs text-zinc-700 leading-normal">{preview.summary || preview.impactAnalysis}</p>
+            <p className="text-xs text-zinc-700 leading-normal">{preview.action}</p>
 
             {preview.targetResource && (
               <div className="text-[11px] text-zinc-500">
@@ -160,7 +156,7 @@ export const AiActionLifecycleModal: React.FC<AiActionLifecycleModalProps> = ({
           <div className="space-y-1.5">
             <div className="text-xs font-semibold text-zinc-800">Execution Parameters</div>
             <div className="p-3 bg-zinc-900 text-zinc-100 rounded-lg font-mono text-xs overflow-x-auto">
-              <pre>{JSON.stringify(preview.parameters, null, 2)}</pre>
+              <pre>{JSON.stringify(preview.exactChanges, null, 2)}</pre>
             </div>
           </div>
 
@@ -170,10 +166,10 @@ export const AiActionLifecycleModal: React.FC<AiActionLifecycleModalProps> = ({
               <span className="text-zinc-600">Reversibility</span>
               <span
                 className={`font-semibold ${
-                  preview.isReversible ? 'text-emerald-700' : 'text-amber-700'
+                  !preview.safetyStatus?.isDestructive ? 'text-emerald-700' : 'text-amber-700'
                 }`}
               >
-                {preview.isReversible ? 'Reversible' : 'Irreversible'}
+                {!preview.safetyStatus?.isDestructive ? 'Not destructive' : 'Destructive'}
               </span>
             </div>
 
