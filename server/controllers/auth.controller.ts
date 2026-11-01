@@ -118,7 +118,7 @@ export async function authLogin(req: Request, res: Response, next: NextFunction)
     res.cookie('oauth_state', stateWithHint, {
       httpOnly: true,
       secure: isProdOrPreview,
-      sameSite: isProdOrPreview ? 'none' : 'lax',
+      sameSite: 'lax',
       maxAge: 300000,
       path: '/',
     });
@@ -404,7 +404,7 @@ export async function authCallback(req: Request, res: Response, next: NextFuncti
       res.cookie('discord_session_token', sessionToken, {
         httpOnly: true,
         secure: isProdOrPreview,
-        sameSite: isProdOrPreview ? 'none' : 'lax',
+        sameSite: 'lax',
         maxAge: 30 * 24 * 60 * 60 * 1000,
         path: '/',
       });
@@ -416,7 +416,7 @@ export async function authCallback(req: Request, res: Response, next: NextFuncti
       const redirectUrl_postAuth = postAuthRedirect;
 
       // Clear temporary OAuth state cookie
-      res.clearCookie('oauth_state', { path: '/', sameSite: isProdOrPreview ? 'none' : 'lax', secure: isProdOrPreview });
+      res.clearCookie('oauth_state', { path: '/', sameSite: 'lax', secure: isProdOrPreview });
 
       // 5d. Enforce dynamic ownership & admin role transfer checks across user's Discord guilds
       for (const g of userGuilds) {
@@ -604,8 +604,8 @@ export async function authLogout(req: Request, res: Response, next: NextFunction
     }
 
     const isProdOrPreview = config.NODE_ENV === 'production' || config.NODE_ENV === 'staging' || config.APP_RUNTIME_MODE === 'REAL_DISCORD_PREVIEW' || config.APP_RUNTIME_MODE === 'PRODUCTION';
-    res.clearCookie('discord_session_token', { path: '/', sameSite: isProdOrPreview ? 'none' : 'lax', secure: isProdOrPreview });
-    res.clearCookie('oauth_state', { path: '/', sameSite: isProdOrPreview ? 'none' : 'lax', secure: isProdOrPreview });
+    res.clearCookie('discord_session_token', { path: '/', sameSite: 'lax', secure: isProdOrPreview });
+    res.clearCookie('oauth_state', { path: '/', sameSite: 'lax', secure: isProdOrPreview });
 
     res.json({
       success: true,
