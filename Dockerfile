@@ -4,6 +4,9 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --no-audit --no-fund
 COPY . .
+# Public Discord client ID baked into the website at build time (not a secret).
+ARG VITE_DISCORD_CLIENT_ID=1547515985416822884
+ENV VITE_DISCORD_CLIENT_ID=$VITE_DISCORD_CLIENT_ID
 RUN npm run build
 
 FROM node:22-alpine
