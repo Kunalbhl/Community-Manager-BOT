@@ -209,6 +209,7 @@ import {
   getPlatformAiUsage,
 } from '../controllers/platform.controller.js';
 import { recruiterRecordsController } from '../controllers/recruiterRecords.controller.js';
+import { getPublicContact, postPublicContact } from '../controllers/publicContact.controller.js';
 import { getSocialCordStatus, setSocialCordEnabled } from '../controllers/socialcord.controller.js';
 import { requirePermission, requirePlatformOwner, requireTenantAccess, requirePermissionOrApplicant } from '../middleware/auth.js';
 import { AiCommunityManagerController } from '../controllers/aiCommunityManager.controller.js';
@@ -313,6 +314,10 @@ router.patch('/workspaces/:id/members/:targetUserId', WorkspaceController.update
 router.delete('/workspaces/:id/members/:targetUserId', WorkspaceController.removeMember);
 router.post('/workspaces/:id/transfer-ownership', WorkspaceController.transferOwnership);
 router.post('/workspaces/:id/deletion', WorkspaceController.protectedDeletionWorkflow);
+
+// Public contact page (no login)
+router.get('/public/contact', getPublicContact);
+router.post('/public/contact', postPublicContact);
 
 // 1. Health checks (public)
 router.get('/health', getHealth);

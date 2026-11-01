@@ -52,7 +52,7 @@ export function ServerPickerPage() {
 
   return (
     <div className="cm-site">
-      <header className="mx-auto flex max-w-4xl items-center justify-between px-5 py-5 sm:px-8">
+      <header className="mx-auto flex max-w-[1400px] items-center justify-between px-5 py-5 sm:px-8">
         <a href="/" className="flex items-center gap-2.5">
           <img src="/favicon.svg" alt="" className="h-8 w-8" />
           <span className="cm-display text-xl font-bold">Community Manager</span>
@@ -64,7 +64,7 @@ export function ServerPickerPage() {
         )}
       </header>
 
-      <main className="mx-auto max-w-4xl px-5 pb-20 pt-6 sm:px-8">
+      <main className="mx-auto max-w-[1400px] px-5 pb-20 pt-6 sm:px-8">
         <h1 className="text-[clamp(2.2rem,5vw,3.2rem)] font-extrabold">Choose a server</h1>
         <p className="mt-3 text-[var(--site-muted)]">
           These are the servers where you are an owner or admin.
@@ -106,9 +106,9 @@ export function ServerPickerPage() {
 
         {state === 'ready' && servers.length > 0 && (
           <>
-            <ul className="mt-10 divide-y divide-[var(--site-line)] overflow-hidden rounded-2xl border border-[var(--site-line)] bg-[var(--site-panel)]">
+            <ul className="mt-10 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
               {servers.map((s) => (
-                <li key={s.guildId} className="flex flex-wrap items-center gap-4 px-5 py-4 sm:flex-nowrap">
+                <li key={s.guildId} className="flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--site-line)] bg-[var(--site-panel)] px-5 py-5 transition hover:border-[var(--site-signal)] sm:flex-nowrap">
                   <ServerIcon server={s} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-lg font-semibold">{s.name}</div>

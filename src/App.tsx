@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Header } from './components/layout/Header.js';
 import { Sidebar } from './components/layout/Sidebar.js';
 import { NotificationDrawer } from './components/layout/NotificationDrawer.js';
+import { ContactPage } from './components/site/ContactPage.js';
+import { DiscordRedirect } from './components/site/DiscordRedirect.js';
 import { AccessDeniedView } from './components/views/AccessDeniedView.js';
 import { ApplicantPortalView } from './components/views/ApplicantPortalView.js';
 import { RecruiterPortalView } from './components/views/RecruiterPortalView.js';
@@ -139,6 +141,12 @@ export default function App() {
   }
   if (currentPath === '/servers') {
     return <ServerPickerPage />;
+  }
+  if (currentPath === '/contact' || currentPath === '/contact-us') {
+    return <ContactPage />;
+  }
+  if (currentPath === '/discord' || currentPath === '/feedback') {
+    return <DiscordRedirect />;
   }
 
   // Navigation & Scope State
@@ -691,7 +699,7 @@ export default function App() {
 
         {/* Dynamic Content View */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-7xl">
+          <div className="mx-auto w-full max-w-[1920px]">
             {showWorkspaceSettings && portalMode === 'COMMUNITY_DASHBOARD' ? (
               <WorkspaceSettingsView
                 workspaceId={selectedWorkspaceId}
