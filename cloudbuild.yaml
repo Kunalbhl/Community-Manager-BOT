@@ -1,5 +1,5 @@
 # Auto-deploy of the website (Cloud Run) on every push to GitHub main.
-# Triggered by a Cloud Build trigger; keeps the same service and URL:
+# Started by .github/workflows/deploy-website.yml; keeps the same service and URL:
 #   https://community-manager-bot-720940628402.asia-southeast1.run.app
 #
 # Uses --update-* flags (never --set-*), so settings added by hand or by AI Studio are kept.
