@@ -165,6 +165,7 @@ export default function App() {
     role?: UserRole;
   } | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [sessionLoaded, setSessionLoaded] = useState<boolean>(false);
   const [showOAuthDiagnostics, setShowOAuthDiagnostics] = useState<boolean>(false);
 
   const [aiInitialAction, setAiInitialAction] = useState<any>(null);
@@ -362,6 +363,8 @@ export default function App() {
       }
     } catch (err) {
       console.error('Session retrieval failed', err);
+    } finally {
+      setSessionLoaded(true);
     }
   }, [selectedCommunity, isPlatformVerified, platformKey]);
 
@@ -417,6 +420,16 @@ export default function App() {
     (currentRole !== 'APPLICANT' && (!requiredPermission || currentPermissions.includes(requiredPermission)));
 
   const renderCommunityContent = () => {
+    if (!sessionLoaded) {
+      return (
+        <div className="flex min-h-[50vh] items-center justify-center" role="status" aria-live="polite">
+          <div className="flex items-center gap-3 text-slate-500">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+            Loading your server…
+          </div>
+        </div>
+      );
+    }
     if (!isCommunityAuthorized) {
       return (
         <AccessDeniedView
