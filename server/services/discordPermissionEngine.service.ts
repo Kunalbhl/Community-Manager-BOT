@@ -49,6 +49,21 @@ export const AUTHORITATIVE_BOT_PERMISSIONS = [
   PermissionFlagsBits.ReadMessageHistory,
   PermissionFlagsBits.ManageRoles,
   PermissionFlagsBits.UseApplicationCommands,
+  // Tickets, application chats, voice rooms, Secure Setup
+  PermissionFlagsBits.ManageChannels,
+  PermissionFlagsBits.CreateInstantInvite,
+  PermissionFlagsBits.AddReactions,
+  PermissionFlagsBits.Connect,
+  PermissionFlagsBits.MoveMembers,
+  PermissionFlagsBits.ManageThreads,
+  PermissionFlagsBits.CreatePublicThreads,
+  PermissionFlagsBits.CreatePrivateThreads,
+  PermissionFlagsBits.SendMessagesInThreads,
+  // Moderation: warnings ladder, bulk tools
+  PermissionFlagsBits.KickMembers,
+  PermissionFlagsBits.BanMembers,
+  PermissionFlagsBits.ModerateMembers,
+  PermissionFlagsBits.ManageNicknames,
 ] as const;
 
 export function buildAuthoritativeInstallPermissions(): bigint {
