@@ -156,9 +156,27 @@ export default function App() {
   // Navigation & Scope State
   const [portalMode, setPortalMode] = useState<PortalMode>('COMMUNITY_DASHBOARD');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
-  const [activeCommunitySection, setActiveCommunitySection] = useState<CommunitySection>(
+  const [activeCommunitySection, setSectionRaw] = useState<CommunitySection>(
     () => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('application') ? 'applications' : 'dashboard') as CommunitySection
   );
+  // Page history so every page can go back to where you came from.
+  const sectionHistory = React.useRef<CommunitySection[]>([]);
+  const [, setHistoryTick] = useState(0);
+  const setActiveCommunitySection = React.useCallback((next: CommunitySection | ((p: CommunitySection) => CommunitySection)) => {
+    setSectionRaw((prev) => {
+      const value = typeof next === 'function' ? (next as any)(prev) : next;
+      const h = sectionHistory.current;
+      if (value !== prev && h[h.length - 1] !== prev) h.push(prev);
+      if (h.length > 30) h.shift();
+      return value;
+    });
+    setHistoryTick((t) => t + 1);
+  }, []);
+  const goBackSection = () => {
+    const prev = sectionHistory.current.pop();
+    if (prev) { setSectionRaw(prev); setHistoryTick((t) => t + 1); }
+  };
+
   const [activePlatformSection, setActivePlatformSection] = useState<PlatformSection>('overview');
 
   // Tenant / Community & Workspace Context
@@ -432,6 +450,17 @@ export default function App() {
     currentRole === 'PLATFORM_OWNER' ||
     currentRole === 'OWNER' ||
     (currentRole !== 'APPLICANT' && (!requiredPermission || currentPermissions.includes(requiredPermission)));
+
+  // First visits: open the setup guide until the required basics are done (once per server per session).
+  React.useEffect(() => {
+    if (!selectedCommunity || !isAuthenticated) return;
+    const key = `cm_guide_auto_${selectedCommunity}`;
+    try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch { /* ignore */ }
+    fetch(`/api/v1/communities/${encodeURIComponent(selectedCommunity)}/setup-guide`, { credentials: 'include', headers: { 'x-community-id': selectedCommunity } })
+      .then((r) => r.json())
+      .then((j) => { if (j?.success && j.data.requiredLeft > 0) setSectionRaw((cur) => (cur === 'dashboard' ? 'setup-guide' : cur)); })
+      .catch(() => undefined);
+  }, [selectedCommunity, isAuthenticated]);
 
   const renderCommunityContent = () => {
     if (!sessionLoaded) {
@@ -715,6 +744,11 @@ export default function App() {
         {/* Dynamic Content View */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <div className="mx-auto w-full max-w-[1920px]">
+            {portalMode === 'COMMUNITY_DASHBOARD' && sectionHistory.current.length > 0 && (
+              <button onClick={goBackSection} className="mb-4 inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-slate-500 transition hover:bg-white hover:text-indigo-700">
+                <span aria-hidden>←</span> Back
+              </button>
+            )}
             {showWorkspaceSettings && portalMode === 'COMMUNITY_DASHBOARD' ? (
               <WorkspaceSettingsView
                 workspaceId={selectedWorkspaceId}

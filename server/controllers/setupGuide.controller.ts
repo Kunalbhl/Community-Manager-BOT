@@ -10,7 +10,7 @@ import { getGate } from '../services/recruitment/secureGate.service.js';
 import { communityQuestionsService } from '../services/communityQuestions.service.js';
 import { autoModerationRulesRepository } from '../repositories/index.js';
 
-interface Step { label: string; done: boolean; section: string; tab?: string; hint?: string }
+interface Step { label: string; done: boolean; section: string; tab?: string; hint?: string; required?: boolean }
 interface Module { key: string; title: string; description: string; steps: Step[] }
 
 export async function setupGuideHandler(req: Request, res: Response) {
@@ -31,24 +31,24 @@ export async function setupGuideHandler(req: Request, res: Response) {
       {
         key: 'server', title: 'Server connection', description: 'The bot is in your server with the permissions it needs.',
         steps: [
-          { label: 'Bot is online in this server', done: Boolean(guild), section: 'home' },
-          { label: 'Manage Roles and Manage Channels', done: perm(PermissionFlagsBits.ManageRoles) && perm(PermissionFlagsBits.ManageChannels), section: 'home', hint: 'Server Settings → Roles → Community Manager' },
+          { required: true, label: 'Bot is online in this server', done: Boolean(guild), section: 'home' },
+          { required: true, label: 'Manage Roles and Manage Channels', done: perm(PermissionFlagsBits.ManageRoles) && perm(PermissionFlagsBits.ManageChannels), section: 'home', hint: 'Server Settings → Roles → Community Manager' },
           { label: 'Moderation permissions (timeout, kick, ban)', done: perm(PermissionFlagsBits.ModerateMembers) && perm(PermissionFlagsBits.KickMembers) && perm(PermissionFlagsBits.BanMembers), section: 'home' },
-          { label: 'Workspace channels ready (applications, logs)', done: Boolean(r.reviewChannelId && r.logChannelId), section: 'server-tools', tab: 'recruit', hint: 'Press “Auto-configure workspace”.' },
+          { required: true, label: 'Workspace channels ready (applications, logs)', done: Boolean(r.reviewChannelId && r.logChannelId), section: 'server-tools', tab: 'recruit', hint: 'Press “Auto-configure workspace”.' },
         ],
       },
       {
         key: 'secure', title: 'Secure Setup', description: 'Newcomers only see your public channels until they are approved.',
         steps: [
-          { label: 'Lock the server for newcomers', done: Boolean(gate.memberRoleId && gate.publicChannelIds?.length && gate.job?.status !== 'FAILED'), section: 'server-tools', tab: 'recruit' },
-          { label: 'Confirm Discord’s Apply to Join is off', done: gate.verified, section: 'server-tools', tab: 'recruit' },
+          { required: true, label: 'Lock the server for newcomers', done: Boolean(gate.memberRoleId && gate.publicChannelIds?.length && gate.job?.status !== 'FAILED'), section: 'server-tools', tab: 'recruit' },
+          { required: true, label: 'Confirm Discord’s Apply to Join is off', done: gate.verified, section: 'server-tools', tab: 'recruit' },
         ],
       },
       {
         key: 'recruitment', title: 'Recruitment', description: 'People apply in Discord, get a private application chat, and staff decide.',
         steps: [
           { label: 'Rules & guidelines written', done: rules.length > 0, section: 'recruitment', hint: 'Shown to applicants before the quiz.' },
-          { label: 'Application questions', done: qs.length > 0, section: 'recruitment' },
+          { required: true, label: 'Application questions', done: qs.length > 0, section: 'recruitment' },
           { label: 'Rules quiz (4-answer questions)', done: r.screening.questions.length > 0, section: 'server-tools', tab: 'recruit' },
           { label: 'Messages to applicants', done: true, section: 'server-tools', tab: 'recruit' },
           { label: 'Reviewer ranks for escalation', done: t.reviewRooms.tiers.some((x) => x.roleIds.length), section: 'server-tools', tab: 'rooms' },
@@ -94,7 +94,7 @@ export async function setupGuideHandler(req: Request, res: Response) {
       },
     ];
     const all = modules.flatMap((m) => m.steps);
-    res.json({ success: true, data: { modules, done: all.filter((s) => s.done).length, total: all.length } });
+    res.json({ success: true, data: { modules, done: all.filter((s) => s.done).length, total: all.length, requiredLeft: all.filter((s) => s.required && !s.done).length } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: { message: err?.message } });
   }
