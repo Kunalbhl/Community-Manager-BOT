@@ -10,6 +10,7 @@ import { referralLifecycleService } from '../../../services/referralLifecycle.se
 import { applicationWorkflowService } from '../../../services/applicationWorkflow.service.js';
 import { applicantRestrictionService } from '../../../services/applicantRestriction.service.js';
 import { autoModerationService } from '../../../services/moderation.service.js';
+import { attachFeatureHandlers, onFeatureMessage } from '../featureEvents.js';
 import { channelAccessService } from '../../../services/channelAccess.service.js';
 import { discordGuildLinkService } from '../../../services/discordGuildLink.service.js';
 import { handleCommandInteraction } from '../commands/index.js';
@@ -20,6 +21,7 @@ import { guardInteraction, replyWithError } from '../interactionGuard.js';
  * Registers all real Discord Gateway event listeners onto the Discord.js client.
  */
 export function attachGatewayEventHandlers(client: Client): void {
+  attachFeatureHandlers(client);
   // 1. READY Event (Startup synchronization)
   client.on(Events.ClientReady, async (readyClient) => {
     logger.info(`[DiscordGateway] Bot connected and ready as ${readyClient.user.tag}`);
@@ -301,6 +303,9 @@ export function attachGatewayEventHandlers(client: Client): void {
     } catch (err: any) {
       logger.warn(`[AutoMod] evaluation failed: ${err?.message}`);
     }
+
+    // Levels / XP and custom commands (never blocks the rest).
+    await onFeatureMessage(message).catch(() => undefined);
 
     // Strict channel allowlist verification
     const allowCheck = await channelAccessService.isChannelAllowedForProcessing(communityId, message.channel.id);

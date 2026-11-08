@@ -126,7 +126,7 @@ export class RealDiscordProvider implements DiscordProvider {
 
         this.client = new Client({
           intents: [...AUTHORITATIVE_GATEWAY_INTENTS],
-          partials: [Partials.Channel, Partials.Message, Partials.User],
+          partials: [Partials.Channel, Partials.Message, Partials.User, Partials.Reaction, Partials.GuildMember],
         });
 
         // Attach all real Gateway event listeners

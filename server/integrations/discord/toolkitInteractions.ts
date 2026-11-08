@@ -7,6 +7,7 @@ import { ticketService } from '../../services/toolkit/tickets.service.js';
 import { reviewRooms, reviewRoomsRepository } from '../../services/toolkit/reviewRooms.service.js';
 import { communityForGuild, getToolkit } from '../../services/toolkit/toolkitConfig.js';
 import { warnAutocomplete } from './commands/toolkit.command.js';
+import { verification, buttonRoles, giveaways } from '../../services/features/community.service.js';
 
 export async function handleToolkitInteraction(interaction: any): Promise<boolean> {
   if (interaction.isAutocomplete?.()) {
@@ -61,6 +62,36 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
   if (area === 'ticket' && action === 'closeform' && interaction.isModalSubmit()) {
     await interaction.reply({ content: '🔒 Closing this ticket. The channel will be deleted in a few seconds.' });
     await ticketService.close(arg, { id: interaction.user.id, username: interaction.user.username }, interaction.fields.getTextInputValue('reason'), interaction.guild);
+    return true;
+  }
+
+  // ---------- verification ----------
+  if (area === 'verify' && action === 'start') {
+    const communityId = await communityForGuild(interaction.guildId);
+    const r = await verification.start(communityId, interaction.member);
+    if (r.modal) await interaction.showModal(r.modal);
+    else await interaction.reply({ content: r.text, ephemeral: true });
+    return true;
+  }
+  if (area === 'verify' && action === 'answer' && interaction.isModalSubmit()) {
+    const communityId = await communityForGuild(interaction.guildId);
+    await interaction.reply({ content: await verification.answer(communityId, interaction.member, interaction.fields.getTextInputValue('answer')), ephemeral: true });
+    return true;
+  }
+
+  // ---------- button roles: cm:br:<panelId>:<roleId> ----------
+  if (area === 'br') {
+    await interaction.deferReply({ ephemeral: true });
+    await interaction.editReply({ content: await buttonRoles.press(action, arg, interaction.member), allowedMentions: { parse: [] } });
+    return true;
+  }
+
+  // ---------- giveaways ----------
+  if (area === 'gw' && action === 'enter') {
+    await interaction.deferReply({ ephemeral: true });
+    await interaction.editReply({ content: await giveaways.enter(arg, interaction.member), allowedMentions: { parse: [] } });
+    const g = await (await import('../../services/features/community.service.js')).giveawaysRepository.getById(arg).catch(() => null);
+    if (g) await interaction.message?.edit(giveaways.view(g)).catch(() => undefined);
     return true;
   }
 

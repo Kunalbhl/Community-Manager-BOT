@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   ArrowRight, Plus, LogIn, ClipboardList, Mic, PartyPopper, Sparkles, HeartHandshake, Radar, ShieldCheck,
   Lock, KeyRound, Users, BarChart3, Zap, Check, X, Minus, Gamepad2, Palette, GraduationCap, Trophy, Swords,
-  Workflow, BellRing, Ticket, CalendarDays, Gift, Brain, Bot, Layers, Menu,
+  Workflow, BellRing, Ticket, TrendingUp, MousePointerClick, CalendarDays, Gift, Brain, Bot, Layers, Menu,
 } from 'lucide-react';
 import { getAddToDiscordUrl, getDiscordLoginUrl } from '../../lib/discordUrls.js';
 import { SiteHeader, SiteFooter, WRAP, useSignedIn, MadeInIndia } from './SiteChrome.js';
@@ -258,11 +258,13 @@ const CATALOG: { icon: any; title: string; items: string[] }[] = [
   { icon: Workflow, title: 'Automation', items: ['Workflow triggers', 'Scheduled jobs', 'New-application DMs', 'Daily reviewer digests', 'Follow-ups and nudges', 'Notification routing'] },
   { icon: BarChart3, title: 'Insights & AI', items: ['Application funnel', 'Drop-off analysis', 'Retention by cohort', 'Recruiter quality scores', 'Exportable reports', 'Community Brain suggestions', 'Lifecycle intelligence'] },
   { icon: Ticket, title: 'Tickets', items: ['Ticket panel with types', '/ticket command', 'Private ticket channels', 'Staff teams per type', 'Claim and close', 'Transcripts and log channel'] },
+  { icon: TrendingUp, title: 'Levels & fun', items: ['Levels and XP', 'Level reward roles', '/rank and /leaderboard', 'Giveaways with entry requirements', 'Starboard highlights', 'Birthday celebrations', 'Custom text commands'] },
+  { icon: MousePointerClick, title: 'Roles & entry', items: ['Button self-roles', 'Pick-one or pick-any panels', 'Verification gate', 'Quick-sum check against bots', 'Server activity logs', 'Deleted and edited message logs'] },
   { icon: Zap, title: 'Bulk tools', items: ['Bulk role give / remove', 'Bulk DMs', 'Message many channels', 'Bulk message delete', 'Bulk nickname reset', 'Bulk kick with confirmation', 'Live progress'] },
   { icon: Layers, title: 'Team & platform', items: ['Staff roles and permissions', 'Multi-server workspaces', 'Per-user notification settings', 'Discord diagnostics', 'SocialCord: The Social Media Alert Bot', 'Support command', '24/7 hosting with failover'] },
 ];
 
-const ROADMAP = ['Levels and XP', 'Giveaways', 'Reaction and button roles', 'Member verification', 'Server activity logs', 'Starboard', 'Birthdays', 'Custom commands', 'Multi-language'];
+const ROADMAP = ['Multi-language', 'Scheduled messages', 'Server backups', 'Import settings from other bots'];
 
 const ROLES = [
   { name: 'Owner', color: '#FF5C8A', text: 'Full control of the server, its settings and who is on staff.' },

@@ -100,6 +100,15 @@ export const warningPolicy = {
       await user?.send(lines.join('\n')).catch(() => undefined);
     }
 
+    import('../features/community.service.js').then(async ({ serverLogs }) => {
+      const g = await guildFor(params.communityId);
+      if (g) await serverLogs.send(params.communityId, g, 'moderation', '⚠️ Member warned', `<@${params.discordUserId}> · ${reason.label} (+${reason.points})`, [
+        { name: 'Moderator', value: `<@${params.moderatorId}>`, inline: true },
+        { name: 'Points', value: `${before} → ${after}`, inline: true },
+        ...(actionResult ? [{ name: 'Automatic action', value: String(actionResult) }] : []),
+        ...(params.note ? [{ name: 'Note', value: params.note }] : []),
+      ]);
+    }).catch(() => undefined);
     return { reason, pointsBefore: before, pointsAfter: after, threshold: crossed, actionResult };
   },
 

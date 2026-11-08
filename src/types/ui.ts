@@ -36,6 +36,7 @@ export type PrimaryModuleSection =
 export type CommunitySection =
   | PrimaryModuleSection
   | 'server-tools'
+  | 'community-features'
   | 'overview'
   | 'dashboard'
   | 'applications'
