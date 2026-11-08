@@ -104,6 +104,8 @@ export const secureGate = {
       verified: false, job: { status: 'RUNNING', step: 'Giving the Member role to current members', done: 0, total: 0, at: new Date().toISOString() },
     });
 
+    const errors = new Set<string>();
+    const note = (where: string) => (err: any) => { if (errors.size < 4) errors.add(`${where}: ${err?.message || err}`); };
     void (async () => {
       try {
         // 1. Every current human member gets the Member role (nobody loses access).
@@ -111,7 +113,7 @@ export const secureGate = {
         const todo = Array.from(members.values()).filter((m: any) => !m.user.bot && !m.roles.cache.has(memberRole.id));
         let done = 0;
         for (const m of todo as any[]) {
-          await m.roles.add(memberRole.id, 'Secure Setup: existing member keeps access').catch(() => undefined);
+          await m.roles.add(memberRole.id, 'Secure Setup: existing member keeps access').catch(note(`role for ${m.user?.username}`));
           done++;
           if (done % 10 === 0) await saveGate(communityId, { job: { status: 'RUNNING', step: 'Giving the Member role to current members', done, total: todo.length, at: new Date().toISOString() } });
         }
@@ -123,14 +125,14 @@ export const secureGate = {
           i++;
           const isPublic = publicIds.includes(c.id);
           if (isPublic) {
-            await c.permissionOverwrites.edit(everyone, { ViewChannel: true }, { reason: 'Secure Setup: public channel' }).catch(() => undefined);
+            await c.permissionOverwrites.edit(everyone, { ViewChannel: true }, { reason: 'Secure Setup: public channel' }).catch(note(`#${c.name}`));
             continue;
           }
           // Children of a public category stay hidden unless they are public themselves.
           if (c.permissionsFor(everyone)?.has(PermissionFlagsBits.ViewChannel) || c.type === ChannelType.GuildCategory) {
             const memberCanSee = c.permissionsFor(memberRole)?.has(PermissionFlagsBits.ViewChannel);
-            await c.permissionOverwrites.edit(everyone, { ViewChannel: false }, { reason: 'Secure Setup: hidden from newcomers' }).catch(() => undefined);
-            if (memberCanSee !== false) await c.permissionOverwrites.edit(memberRole, { ViewChannel: true }, { reason: 'Secure Setup: members keep access' }).catch(() => undefined);
+            await c.permissionOverwrites.edit(everyone, { ViewChannel: false }, { reason: 'Secure Setup: hidden from newcomers' }).catch(note(`#${c.name}`));
+            if (memberCanSee !== false) await c.permissionOverwrites.edit(memberRole, { ViewChannel: true }, { reason: 'Secure Setup: members keep access' }).catch(note(`#${c.name} (member)`));
           }
           if (i % 10 === 0) await saveGate(communityId, { job: { status: 'RUNNING', step: 'Locking channels', done: i, total: channels.length, at: new Date().toISOString() } });
         }
@@ -139,7 +141,7 @@ export const secureGate = {
 
         const leaks = newcomerVisible(guild).filter((c) => !publicIds.includes(c.id));
         await saveGate(communityId, {
-          job: { status: leaks.length ? 'FAILED' : 'DONE', step: leaks.length ? `${leaks.length} channel(s) are still visible to newcomers` : 'Server locked', done: channels.length, total: channels.length, at: new Date().toISOString(), error: leaks.length ? leaks.map((l) => l.name).join(', ') : undefined },
+          job: { status: leaks.length ? 'FAILED' : 'DONE', step: leaks.length ? `${leaks.length} channel(s) are still visible to newcomers` : 'Server locked', done: channels.length, total: channels.length, at: new Date().toISOString(), error: leaks.length ? `${errors.size ? `Discord said: ${[...errors].join(' | ')}. ` : ''}Still visible: ${leaks.map((l) => l.name).join(', ')}` : undefined },
           lastCheck: { at: new Date().toISOString(), leaks: leaks.map((l) => ({ id: l.id, name: l.name })) },
         });
       } catch (err: any) {
