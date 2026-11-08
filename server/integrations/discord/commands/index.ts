@@ -14,6 +14,7 @@ import { userStatusCommand } from './userStatus.command.js';
 import { communityManagerPortalCommand } from './portal.command.js';
 import { approveCommand, rejectCommand, escalateCommand } from './reviewDecision.command.js';
 import { ticketCommand, warnCommand, warningsCommand } from './toolkit.command.js';
+import { applyCommand } from './apply.command.js';
 import { rankCommand, leaderboardCommand, birthdayCommand, giveawayCommand } from './features.command.js';
 import { communitiesRepository } from '../../../repositories/index.js';
 import { resolveUserCommunityRole } from '../../../services/authorization.service.js';
@@ -42,6 +43,7 @@ export const discordCommands: SlashCommandDefinition[] = [
   ticketCommand,                // /ticket
   warnCommand,                  // /warn
   warningsCommand,              // /warnings
+  applyCommand,                 // /apply
   rankCommand,                  // /rank
   leaderboardCommand,           // /leaderboard
   birthdayCommand,              // /birthday

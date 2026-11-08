@@ -312,6 +312,11 @@ export class ApplicationWorkflowService {
       updatedAt: now,
     });
 
+    // Post to the staff review channel and send the applicant the "received" message.
+    import('./recruitment/discordRecruitment.service.js')
+      .then(({ discordRecruitment }) => discordRecruitment.onSubmitted(createdApp.id))
+      .catch((err) => logger.warn(`[Recruitment] onSubmitted failed: ${err?.message}`));
+
     // Private review room in Discord (when enabled in Recruitment > Review rooms).
     import('./toolkit/reviewRooms.service.js')
       .then(({ reviewRooms }) => reviewRooms.openForApplication(createdApp.id))
@@ -419,7 +424,7 @@ export class ApplicationWorkflowService {
       recipientUserId: createdApp.applicantUserId,
       recipientDiscordId: applicantDiscordUserId,
       type: 'APPLICATION_RECEIVED',
-      channel: 'DISCORD_DM',
+      channel: 'IN_APP',
       title: 'Application Received by {{recruiterName}}',
       body: 'Hi {{applicantName}},\n\n{{recruiterName}} has received your recruitment application (ID: {{applicationId}}).\nStatus: SUBMITTED.',
       templateVariables: {
@@ -525,6 +530,13 @@ export class ApplicationWorkflowService {
       requestId,
     });
 
+    // Update the Discord review post, message the applicant with the server's own text, announce.
+    if (status === 'APPROVED' || status === 'REJECTED') {
+      import('./recruitment/discordRecruitment.service.js')
+        .then(({ discordRecruitment }) => discordRecruitment.onDecided(applicationId, status, input.actorDiscordUserId || String(actorUserId || '').replace(/^usr_/, ''), rejectionReason))
+        .catch((err) => logger.warn(`[Recruitment] onDecided failed: ${err?.message}`));
+    }
+
     // Send notifications
     if (status === 'APPROVED') {
       await notificationService.send({
@@ -532,7 +544,7 @@ export class ApplicationWorkflowService {
         recipientUserId: app.applicantUserId,
         recipientDiscordId: app.applicantDiscordUserId || app.applicantDiscordId,
         type: 'APPLICATION_APPROVED',
-        channel: 'DISCORD_DM',
+        channel: 'IN_APP',
         title: 'Application Approved! (Join Pending)',
         body: 'Hi {{applicantName}},\n\nYour application has been approved by {{recruiterName}}! Please join our Discord server to complete your onboarding verification.',
         templateVariables: {
@@ -547,7 +559,7 @@ export class ApplicationWorkflowService {
         recipientUserId: app.applicantUserId,
         recipientDiscordId: app.applicantDiscordUserId || app.applicantDiscordId,
         type: 'APPLICATION_REJECTED',
-        channel: 'DISCORD_DM',
+        channel: 'IN_APP',
         title: 'Application Status Update',
         body: `Hi {{applicantName}},\n\nThank you for applying. At this time, your application was not approved.\nReason: ${rejectionReason || 'Criteria not met.'}`,
         templateVariables: {

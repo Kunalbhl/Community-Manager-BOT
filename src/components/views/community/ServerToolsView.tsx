@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Ticket, ShieldAlert, UserCheck, Mic, Layers, Plus, Trash2, Save, RefreshCw, Send, X, CheckCircle2, AlertTriangle, ArrowUp,
+  ClipboardList, Ticket, ShieldAlert, UserCheck, Mic, Layers, Plus, Trash2, Save, RefreshCw, Send, X, CheckCircle2, AlertTriangle, ArrowUp,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -8,7 +8,7 @@ import {
 /* ------------------------------------------------------------------ */
 export interface Opt { id: string; name: string; color?: string }
 export interface Resources { connected: boolean; roles: Opt[]; textChannels: Opt[]; categories: Opt[] }
-type Tab = 'tickets' | 'warnings' | 'roles' | 'rooms' | 'bulk';
+type Tab = 'recruit' | 'tickets' | 'warnings' | 'roles' | 'rooms' | 'bulk';
 
 function useApi(communityId: string) {
   const base = `/api/v1/communities/${encodeURIComponent(communityId)}/toolkit`;
@@ -22,6 +22,7 @@ function useApi(communityId: string) {
 }
 
 const TABS: { id: Tab; label: string; icon: any; hint: string }[] = [
+  { id: 'recruit', label: 'Recruitment in Discord', icon: ClipboardList, hint: 'People apply inside Discord; staff review in a channel with Approve / Reject buttons; applicants get your messages.' },
   { id: 'tickets', label: 'Tickets', icon: Ticket, hint: 'Members open private tickets by type; staff claim and close them.' },
   { id: 'warnings', label: 'Warning system', icon: ShieldAlert, hint: 'Each reason gives points. Reaching a points level triggers an action automatically.' },
   { id: 'roles', label: 'Role rules', icon: UserCheck, hint: 'Which roles an approved applicant gets, and when.' },
@@ -34,7 +35,7 @@ const TABS: { id: Tab; label: string; icon: any; hint: string }[] = [
 /* ------------------------------------------------------------------ */
 export function ServerToolsView({ communityId }: { communityId: string }) {
   const api = useApi(communityId);
-  const [tab, setTab] = useState<Tab>('tickets');
+  const [tab, setTab] = useState<Tab>('recruit');
   const [config, setConfig] = useState<any>(null);
   const [res, setRes] = useState<Resources | null>(null);
   const [error, setError] = useState('');
@@ -79,11 +80,12 @@ export function ServerToolsView({ communityId }: { communityId: string }) {
 
       {config && res && (
         <>
+          {tab === 'recruit' && <RecruitTab api={api} cfg={config.recruitment} res={res} onSave={(v) => save('recruitment', v)} />}
           {tab === 'tickets' && <TicketsTab api={api} cfg={config.tickets} res={res} onSave={(v) => save('tickets', v)} />}
-          {tab === 'warnings' && <WarningsTab api={api} cfg={config.warnings} onSave={(v) => save('warnings', v)} />}
+          {tab === 'warnings' && <WarningsTab communityId={communityId} api={api} cfg={config.warnings} onSave={(v) => save('warnings', v)} />}
           {tab === 'roles' && <RoleRulesTab cfg={config.roleRules} res={res} onSave={(v) => save('roleRules', v)} />}
           {tab === 'rooms' && <ReviewRoomsTab api={api} cfg={config.reviewRooms} res={res} onSave={(v) => save('reviewRooms', v)} />}
-          {tab === 'bulk' && <BulkTab api={api} res={res} />}
+          {tab === 'bulk' && <BulkTab communityId={communityId} api={api} res={res} />}
         </>
       )}
     </div>
@@ -252,8 +254,9 @@ function TicketsTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Resour
 /* ------------------------------------------------------------------ */
 /* Warnings                                                            */
 /* ------------------------------------------------------------------ */
-function WarningsTab({ api, cfg, onSave }: { api: any; cfg: any; onSave: (v: any) => Promise<void> }) {
+function WarningsTab({ api, cfg, onSave, communityId }: { api: any; cfg: any; onSave: (v: any) => Promise<void>; communityId: string }) {
   const [c, setC] = useState(cfg);
+  const [member, setMember] = useState<MemberOpt | null>(null);
   const [list, setList] = useState<any[] | null>(null);
   const [form, setForm] = useState({ discordUserId: '', reasonKey: cfg.reasons[0]?.key || '', note: '' });
   const [result, setResult] = useState('');
@@ -318,7 +321,7 @@ function WarningsTab({ api, cfg, onSave }: { api: any; cfg: any; onSave: (v: any
       <div className="space-y-6">
         <Card title="Warn a member">
           <div className="space-y-3">
-            <input className={input} placeholder="Discord user ID" value={form.discordUserId} onChange={(e) => setForm({ ...form, discordUserId: e.target.value.trim() })} />
+            <MemberPick communityId={communityId} value={member} onChange={(m) => { setMember(m); setForm({ ...form, discordUserId: m?.id || '' }); }} />
             <select className={input} value={form.reasonKey} onChange={(e) => setForm({ ...form, reasonKey: e.target.value })}>
               {c.reasons.map((r: any) => <option key={r.key || r.label} value={r.key}>{r.label} ({r.points} pts)</option>)}
             </select>
@@ -339,7 +342,7 @@ function WarningsTab({ api, cfg, onSave }: { api: any; cfg: any; onSave: (v: any
             <ul className="divide-y divide-slate-100">
               {list.slice(0, 30).map((s) => (
                 <li key={s.id} className="flex items-start justify-between gap-3 py-3 text-sm">
-                  <div><div className="font-semibold text-slate-900">{s.reasonLabel} · {s.points} pts</div><div className="text-xs text-slate-500">&lt;@{s.discordUserId}&gt; · {fmtDate(s.createdAt)}{s.revoked ? ' · revoked' : ''}</div></div>
+                  <div><div className="font-semibold text-slate-900">{s.reasonLabel} · {s.points} pts</div><div className="text-xs text-slate-500">{s.memberName || s.discordUserId}{s.moderatorName ? ` · by ${s.moderatorName}` : ''} · {fmtDate(s.createdAt)}{s.revoked ? ' · revoked' : ''}</div></div>
                   {!s.revoked && <button className="text-xs font-semibold text-slate-500 hover:text-rose-600" onClick={async () => { await api(`/warnings/${s.id}/revoke`, 'POST').catch(() => undefined); loadList(); }}>Revoke</button>}
                 </li>
               ))}
@@ -470,7 +473,9 @@ const ACTIONS: { id: string; label: string; desc: string; audience: boolean }[] 
   { id: 'KICK_MEMBERS', label: 'Kick members', desc: 'Remove matching members from the server.', audience: true },
 ];
 
-function BulkTab({ api, res }: { api: any; res: Resources }) {
+function BulkTab({ api, res, communityId }: { api: any; res: Resources; communityId: string }) {
+  const [picked, setPicked] = useState<MemberOpt[]>([]);
+  const [fromMember, setFromMember] = useState<MemberOpt | null>(null);
   const [action, setAction] = useState('ADD_ROLE');
   const [aud, setAud] = useState<any>({ mode: 'ALL', days: 7, includeBots: false });
   const [p, setP] = useState<any>({ roleId: '', message: '', channelIds: [], count: 50, fromUserId: '', confirm: '' });
@@ -503,7 +508,7 @@ function BulkTab({ api, res }: { api: any; res: Resources }) {
           {(action === 'CHANNEL_MESSAGE' || action === 'PURGE_MESSAGES') && <div className="text-sm font-medium text-slate-700 lg:col-span-2">Channels<div className="mt-1"><MultiPick options={res.textChannels} value={p.channelIds} onChange={(v) => setP({ ...p, channelIds: v })} placeholder="Add a channel" prefix="#" /></div></div>}
           {action === 'PURGE_MESSAGES' && (<>
             <label className="text-sm font-medium text-slate-700">Messages per channel (max 100)<input type="number" min={1} max={100} className={`${input} mt-1`} value={p.count} onChange={(e) => setP({ ...p, count: Number(e.target.value) })} /></label>
-            <label className="text-sm font-medium text-slate-700">Only from user ID (optional)<input className={`${input} mt-1`} value={p.fromUserId} onChange={(e) => setP({ ...p, fromUserId: e.target.value.trim() })} /></label>
+            <div className="text-sm font-medium text-slate-700">Only from member (optional)<div className="mt-1"><MemberPick communityId={communityId} value={fromMember} onChange={(m) => { setFromMember(m); setP({ ...p, fromUserId: m?.id || '' }); }} /></div></div>
           </>)}
         </div>
 
@@ -513,11 +518,11 @@ function BulkTab({ api, res }: { api: any; res: Resources }) {
             <div className="mt-3 grid gap-3 lg:grid-cols-3">
               <select className={input} value={aud.mode} onChange={(e) => { setAud({ ...aud, mode: e.target.value }); setPreview(null); }}>
                 <option value="ALL">All members</option><option value="HAS_ROLE">Members with a role</option><option value="MISSING_ROLE">Members without a role</option>
-                <option value="JOINED_WITHIN_DAYS">Joined in the last N days</option><option value="JOINED_BEFORE_DAYS">Joined more than N days ago</option><option value="USER_IDS">Specific user IDs</option>
+                <option value="JOINED_WITHIN_DAYS">Joined in the last N days</option><option value="JOINED_BEFORE_DAYS">Joined more than N days ago</option><option value="USER_IDS">Specific members</option>
               </select>
               {(aud.mode === 'HAS_ROLE' || aud.mode === 'MISSING_ROLE') && <Pick options={res.roles} value={aud.roleId} onChange={(v) => { setAud({ ...aud, roleId: v }); setPreview(null); }} placeholder="Choose a role" />}
               {(aud.mode === 'JOINED_WITHIN_DAYS' || aud.mode === 'JOINED_BEFORE_DAYS') && <input type="number" min={1} className={input} value={aud.days} onChange={(e) => { setAud({ ...aud, days: Number(e.target.value) }); setPreview(null); }} />}
-              {aud.mode === 'USER_IDS' && <textarea rows={2} className={`${input} lg:col-span-2`} placeholder="One ID per line or comma" value={(aud.userIds || []).join('\n')} onChange={(e) => { setAud({ ...aud, userIds: e.target.value.split(/[\s,]+/).filter(Boolean) }); setPreview(null); }} />}
+              {aud.mode === 'USER_IDS' && <div className="lg:col-span-2"><MembersPick communityId={communityId} value={picked} onChange={(v) => { setPicked(v); setAud({ ...aud, userIds: v.map((m) => m.id) }); setPreview(null); }} /></div>}
               <Toggle on={aud.includeBots} onChange={(v) => { setAud({ ...aud, includeBots: v }); setPreview(null); }} label="Include bots" />
             </div>
             <button className={`${ghost} mt-3`} onClick={async () => { setMsg(''); try { setPreview(await api('/bulk/preview', 'POST', { audience: aud })); } catch (e: any) { setMsg(e.message); } }}><RefreshCw className="h-4 w-4" /> Count matching members</button>
@@ -557,6 +562,145 @@ function BulkTab({ api, res }: { api: any; res: Resources }) {
           </ul>
         )}
       </Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Member picker: search the Discord server by name                    */
+/* ------------------------------------------------------------------ */
+export interface MemberOpt { id: string; name: string; username: string; avatar?: string }
+
+export function MemberPick({ communityId, value, onChange, placeholder = 'Search members by name' }: { communityId: string; value: MemberOpt | null; onChange: (m: MemberOpt | null) => void; placeholder?: string }) {
+  const [q, setQ] = useState('');
+  const [list, setList] = useState<MemberOpt[]>([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => {
+      fetch(`/api/v1/communities/${encodeURIComponent(communityId)}/discord/member-search?q=${encodeURIComponent(q)}`, { credentials: 'include', headers: { 'x-community-id': communityId } })
+        .then((r) => r.json()).then((j) => setList(j.success ? j.data : [])).catch(() => setList([]));
+    }, 250);
+    return () => clearTimeout(t);
+  }, [q, open, communityId]);
+
+  if (value) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2">
+        {value.avatar && <img src={value.avatar} alt="" className="h-6 w-6 rounded-full" />}
+        <span className="text-sm font-semibold text-slate-900">{value.name}</span>
+        <span className="text-xs text-slate-500">@{value.username}</span>
+        <button type="button" className="ml-auto text-slate-400 hover:text-rose-600" onClick={() => onChange(null)} aria-label="Clear"><X className="h-4 w-4" /></button>
+      </div>
+    );
+  }
+  return (
+    <div className="relative">
+      <input className={input} value={q} placeholder={placeholder} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 200)} onChange={(e) => setQ(e.target.value)} />
+      {open && (
+        <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+          {!list.length && <li className="px-3 py-2 text-sm text-slate-400">{q ? 'No members found' : 'Type a name…'}</li>}
+          {list.map((m) => (
+            <li key={m.id}>
+              <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-indigo-50" onMouseDown={() => { onChange(m); setQ(''); }}>
+                {m.avatar && <img src={m.avatar} alt="" className="h-6 w-6 rounded-full" />}
+                <span className="font-semibold text-slate-900">{m.name}</span><span className="text-xs text-slate-500">@{m.username}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Several members (chips). */
+export function MembersPick({ communityId, value, onChange }: { communityId: string; value: MemberOpt[]; onChange: (v: MemberOpt[]) => void }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {value.map((m) => (
+          <span key={m.id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+            {m.name}<button type="button" onClick={() => onChange(value.filter((x) => x.id !== m.id))} aria-label="Remove"><X className="h-3 w-3" /></button>
+          </span>
+        ))}
+        {!value.length && <span className="text-xs text-slate-400">No members picked</span>}
+      </div>
+      <MemberPick communityId={communityId} value={null} onChange={(m) => m && !value.some((x) => x.id === m.id) && onChange([...value, m])} placeholder="Search and add members" />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Recruitment in Discord                                              */
+/* ------------------------------------------------------------------ */
+function RecruitTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Resources; onSave: (v: any) => Promise<void> }) {
+  const [c, setC] = useState(cfg);
+  const [panelCh, setPanelCh] = useState('');
+  const [msg, setMsg] = useState('');
+  const setM = (k: string, v: string) => setC({ ...c, messages: { ...c.messages, [k]: v } });
+  const steps = [
+    ['Apply', 'Members press Apply (or type /apply) and answer your questions in Discord.'],
+    ['Review', 'The application is posted in your review channel with every answer and Approve / Reject buttons.'],
+    ['Decide', 'Decide in Discord or the dashboard. The post updates, the applicant gets your message and role rules run.'],
+  ];
+  return (
+    <div className="space-y-6">
+      <ol className="grid gap-3 md:grid-cols-3">
+        {steps.map(([t, d], i) => (
+          <li key={t} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="text-2xl font-extrabold text-indigo-600">{i + 1}</div><div className="mt-1 font-bold text-slate-900">{t}</div><div className="text-sm text-slate-500">{d}</div></li>
+        ))}
+      </ol>
+
+      <div className="grid gap-6 2xl:grid-cols-2">
+        <Card title="Where things happen">
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-6">
+              <Toggle on={c.applyEnabled} onChange={(v) => setC({ ...c, applyEnabled: v })} label="Applications open" />
+              <Toggle on={c.askRecruiterCode} onChange={(v) => setC({ ...c, askRecruiterCode: v })} label="Ask for a recruiter code" />
+              <Toggle on={c.dmOnReceived} onChange={(v) => setC({ ...c, dmOnReceived: v })} label="DM applicant when received" />
+            </div>
+            <label className="block text-sm font-medium text-slate-700">Staff review channel<div className="mt-1"><Pick options={res.textChannels} value={c.reviewChannelId} onChange={(v) => setC({ ...c, reviewChannelId: v })} placeholder="Choose a staff-only channel" /></div></label>
+            <div className="text-sm font-medium text-slate-700">Ping these roles for each new application<div className="mt-1"><MultiPick options={res.roles} value={c.pingRoleIds} onChange={(v) => setC({ ...c, pingRoleIds: v })} placeholder="Add a role" prefix="@" /></div></div>
+            <div className="text-sm font-medium text-slate-700">Roles allowed to Approve / Reject in Discord<div className="mt-1"><MultiPick options={res.roles} value={c.reviewerRoleIds} onChange={(v) => setC({ ...c, reviewerRoleIds: v })} placeholder="Add a role" prefix="@" /></div><p className="mt-1 text-xs font-normal text-slate-500">Members with Manage Server can always decide.</p></div>
+            <label className="block text-sm font-medium text-slate-700">Welcome announcement channel (optional)<div className="mt-1"><Pick options={res.textChannels} value={c.announceChannelId} onChange={(v) => setC({ ...c, announceChannelId: v })} placeholder="Don’t announce" /></div></label>
+          </div>
+        </Card>
+
+        <Card title="Your messages" desc="Variables: {applicant}, {mention}, {server}, {reviewer}, {reason}.">
+          <div className="space-y-4">
+            {[['received', 'Application received (DM)'], ['approved', 'Approved (DM)'], ['rejected', 'Rejected (DM)'], ['announce', 'Welcome announcement']].map(([k, l]) => (
+              <label key={k} className="block text-sm font-medium text-slate-700">{l}<textarea rows={3} className={`${input} mt-1`} value={c.messages[k]} onChange={(e) => setM(k, e.target.value)} /></label>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 2xl:grid-cols-2">
+        <Card title="Apply panel" desc="Post it in a public channel like #apply or #join-us.">
+          <div className="space-y-4">
+            <label className="block text-sm font-medium text-slate-700">Title<input className={`${input} mt-1`} value={c.messages.panelTitle} onChange={(e) => setM('panelTitle', e.target.value)} /></label>
+            <label className="block text-sm font-medium text-slate-700">Text<textarea rows={3} className={`${input} mt-1`} value={c.messages.panelText} onChange={(e) => setM('panelText', e.target.value)} /></label>
+            <div className="rounded-xl border-l-4 border-indigo-500 bg-slate-50 p-4">
+              <div className="font-bold text-slate-900">{c.messages.panelTitle}</div>
+              <div className="mt-1 whitespace-pre-line text-sm text-slate-600">{c.messages.panelText.replace(/\*\*/g, '')}</div>
+              <span className="mt-3 inline-block rounded bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white">📋 Apply</span>
+            </div>
+          </div>
+        </Card>
+        <Card title="Save and publish">
+          <SaveBar onSave={() => onSave(c)} />
+          <div className="mt-6 flex flex-wrap gap-3 border-t border-slate-100 pt-5">
+            <div className="min-w-[240px] flex-1"><Pick options={res.textChannels} value={panelCh} onChange={setPanelCh} placeholder="Channel for the Apply panel" /></div>
+            <button className={btn} disabled={!panelCh} onClick={async () => {
+              setMsg('');
+              try { await onSave(c); await api('/recruitment/panel', 'POST', { channelId: panelCh }); setMsg('Saved and Apply panel posted.'); } catch (e: any) { setMsg(e.message); }
+            }}><Send className="h-4 w-4" /> Save & post panel</button>
+          </div>
+          {msg && <p className="mt-3 text-sm text-slate-600">{msg}</p>}
+          <p className="mt-4 text-xs text-slate-500">Questions come from Recruitment → Questions. Role rules (Server tools → Role rules) decide which roles approved applicants get.</p>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -50,6 +50,7 @@ import {
   Cell,
 } from 'recharts';
 
+import { MemberPick } from './ServerToolsView.js';
 import { ApplicationDocument } from '../../../../shared/types/models.js';
 import { UserRole } from '../../../../shared/types/rbac.js';
 import { LoadingSkeleton } from '../../common/LoadingSkeleton.js';
@@ -248,6 +249,13 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
       ]);
 
       setApplications(Array.isArray(appsData) ? appsData : []);
+      // Opened from a Discord "Open in dashboard" button: select that application.
+      const wanted = new URLSearchParams(window.location.search).get('application');
+      if (wanted && Array.isArray(appsData)) {
+        const hit = appsData.find((a: any) => a.id === wanted);
+        if (hit) setSelectedApp(hit);
+        window.history.replaceState(null, '', window.location.pathname);
+      }
       setRecruiterCodes(Array.isArray(codesData) ? codesData : []);
       setInterviews(Array.isArray(interviewsData) ? interviewsData : []);
       setRecruiterBenefits(Array.isArray(benefitsData) ? benefitsData : []);
@@ -939,9 +947,9 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
           const sla = getSlaStatus(app);
           if (!sla.overdue) return false;
         } else if (activeSegment === 'top_tier') {
-          if ((app.recruitmentScore || 70) < 80) return false;
+          if ((app.recruitmentScore ?? 0) < 80) return false;
         } else if (activeSegment === 'caution') {
-          if ((app.recruitmentScore || 70) >= 50 && !(app.tags || []).includes('Caution')) return false;
+          if ((app.recruitmentScore ?? 100) >= 50 && !(app.tags || []).includes('Caution')) return false;
         }
       }
 
@@ -1459,8 +1467,8 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                         { id: null, label: 'All Candidates', count: applications.length },
                         { id: 'unassigned', label: 'Unassigned Review', count: applications.filter(a => !a.assignedReviewerId).length },
                         { id: 'sla_overdue', label: 'Urgent SLAs Breached', count: applications.filter(a => getSlaStatus(a).overdue).length },
-                        { id: 'top_tier', label: 'Top Tier (80+ Score)', count: applications.filter(a => (a.recruitmentScore || 70) >= 80).length },
-                        { id: 'caution', label: 'Caution Lists', count: applications.filter(a => (a.recruitmentScore || 70) < 50 || (a.tags || []).includes('Caution')).length },
+                        { id: 'top_tier', label: 'Top Tier (80+ Score)', count: applications.filter(a => (a.recruitmentScore ?? 0) >= 80).length },
+                        { id: 'caution', label: 'Caution Lists', count: applications.filter(a => (a.recruitmentScore ?? 100) < 50 || (a.tags || []).includes('Caution')).length },
                       ].map((seg) => (
                         <button
                           key={seg.id || 'all'}
@@ -1685,17 +1693,18 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                                       <div>
                                         <div>{app.applicantUsername}</div>
                                         <div className="text-[10px] text-slate-400 font-mono">FILE: {app.id.slice(-8)}</div>
+                                        {(app as any).discordReviewUrl && <a href={(app as any).discordReviewUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[11px] font-semibold text-indigo-600 hover:underline">Open in Discord ↗</a>}
                                       </div>
                                     </div>
                                   </td>
                                   <td className="px-6 py-4">
                                     <div className="flex items-center gap-2">
                                       <span className={`inline-flex items-center justify-center h-7 w-7 rounded-full text-[11px] font-black ${
-                                        (app.recruitmentScore || 70) >= 80 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                                        (app.recruitmentScore || 70) >= 60 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                        (app.recruitmentScore ?? -1) >= 80 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                        (app.recruitmentScore ?? -1) >= 60 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                                         'bg-rose-50 text-rose-700 border border-rose-200'
                                       }`}>
-                                        {app.recruitmentScore || 70}
+                                        {app.recruitmentScore ?? '—'}
                                       </span>
                                       <span className="text-[10px] text-slate-400 font-bold font-sans">/ 100</span>
                                     </div>
@@ -2546,12 +2555,12 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                       <h3 className="text-sm font-black text-slate-800">Recruitment Score</h3>
                     </div>
                     <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                      (selectedApp.recruitmentScore || 70) >= 80 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                      (selectedApp.recruitmentScore || 70) >= 60 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                      (selectedApp.recruitmentScore ?? -1) >= 80 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                      (selectedApp.recruitmentScore ?? -1) >= 60 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                       'bg-rose-50 text-rose-700 border border-rose-200'
                     }`}>
-                      {(selectedApp.recruitmentScore || 70) >= 80 ? 'Excellent' :
-                       (selectedApp.recruitmentScore || 70) >= 60 ? 'Strong Fit' : 'Requires Review'}
+                      {(selectedApp.recruitmentScore ?? -1) >= 80 ? 'Excellent' :
+                       (selectedApp.recruitmentScore ?? -1) >= 60 ? 'Strong Fit' : selectedApp.recruitmentScore == null ? 'Not scored' : 'Requires Review'}
                     </span>
                   </div>
 
@@ -2571,17 +2580,17 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                           cx="40"
                           cy="40"
                           r="34"
-                          className={(selectedApp.recruitmentScore || 70) >= 80 ? 'text-emerald-500' : (selectedApp.recruitmentScore || 70) >= 60 ? 'text-amber-500' : 'text-rose-500'}
+                          className={(selectedApp.recruitmentScore ?? -1) >= 80 ? 'text-emerald-500' : (selectedApp.recruitmentScore ?? -1) >= 60 ? 'text-amber-500' : 'text-rose-500'}
                           strokeWidth="6"
                           strokeDasharray={2 * Math.PI * 34}
-                          strokeDashoffset={2 * Math.PI * 34 * (1 - (selectedApp.recruitmentScore || 70) / 100)}
+                          strokeDashoffset={2 * Math.PI * 34 * (1 - (selectedApp.recruitmentScore ?? 0) / 100)}
                           strokeLinecap="round"
                           stroke="currentColor"
                           fill="transparent"
                         />
                       </svg>
                       <span className="text-xl font-black text-slate-800">
-                        {selectedApp.recruitmentScore || 70}
+                        {selectedApp.recruitmentScore ?? '—'}
                       </span>
                     </div>
 
@@ -2901,27 +2910,11 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
 
             <form onSubmit={handleSubmitApplication} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-black uppercase text-slate-500">Applicant Discord Username</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. StarGamer_99"
-                  value={applicantUsername}
-                  onChange={(e) => setApplicantUsername(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 p-2.5 text-xs font-medium"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black uppercase text-slate-500">Discord User ID</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 94820193810291"
-                  value={applicantDiscordId}
-                  onChange={(e) => setApplicantDiscordId(e.target.value)}
-                  className="mt-1 w-full font-mono rounded-lg border border-slate-300 p-2.5 text-xs"
-                />
+                <label className="block text-[10px] font-black uppercase text-slate-500">Applicant (search your server)</label>
+                <div className="mt-1">
+                  <MemberPick communityId={communityId} value={applicantDiscordId ? { id: applicantDiscordId, name: applicantUsername, username: applicantUsername } : null}
+                    onChange={(m) => { setApplicantDiscordId(m?.id || ''); setApplicantUsername(m?.username || ''); }} />
+                </div>
               </div>
 
               <div>
