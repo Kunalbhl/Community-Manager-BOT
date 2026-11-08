@@ -46,7 +46,18 @@ export interface RecruitmentDiscordConfig {
   dmOnReceived: boolean;
   announceChannelId?: string;
   messages: { received: string; approved: string; rejected: string; announce: string; panelTitle: string; panelText: string };
+  /** Rules screening inside the private application chat. */
+  screening: {
+    mode: 'AUTO' | 'MANUAL';
+    consentText: string;
+    questions: ScreeningQuizQuestion[];
+    onFail: 'GUIDE_AND_CONTINUE' | 'GUIDE_AND_HOLD';
+  };
+  /** Interview inside the private application chat. */
+  interview: { mode: 'AUTO' | 'MANUAL' };
 }
+
+export interface ScreeningQuizQuestion { id: string; question: string; options: string[]; correct: number; explain: string }
 
 export const DEFAULT_RECRUITMENT_MESSAGES = {
   received: '📥 Hi {applicant}, we received your application to **{server}**. Our team will review it soon and you will hear from us here.',
@@ -95,8 +106,12 @@ export function defaultToolkit(communityId: string): ToolkitConfig {
       ],
     },
     roleRules: { enabled: true, rules: [] },
-    reviewRooms: { enabled: false, applicantCanSee: true, tiers: [{ name: 'Recruiters', roleIds: [] }, { name: 'Senior staff', roleIds: [] }, { name: 'Leadership', roleIds: [] }], deleteAfterHours: 24 },
-    recruitment: { applyEnabled: true, askRecruiterCode: true, pingRoleIds: [], reviewerRoleIds: [], dmOnReceived: true, messages: { ...DEFAULT_RECRUITMENT_MESSAGES } },
+    reviewRooms: { enabled: true, applicantCanSee: true, tiers: [{ name: 'Recruiters', roleIds: [] }, { name: 'Senior staff', roleIds: [] }, { name: 'Leadership', roleIds: [] }], deleteAfterHours: 24 },
+    recruitment: {
+      applyEnabled: true, askRecruiterCode: true, pingRoleIds: [], reviewerRoleIds: [], dmOnReceived: true, messages: { ...DEFAULT_RECRUITMENT_MESSAGES },
+      screening: { mode: 'AUTO', onFail: 'GUIDE_AND_CONTINUE', questions: [], consentText: 'Before we continue, please read our rules and guide below carefully. Press **I have read and agree** when you are done.' },
+      interview: { mode: 'MANUAL' },
+    },
     updatedAt: new Date().toISOString(),
   };
 }
@@ -112,7 +127,7 @@ export async function getToolkit(communityId: string): Promise<ToolkitConfig> {
     warnings: { ...d.warnings, ...(saved.warnings || {}) },
     roleRules: { ...d.roleRules, ...(saved.roleRules || {}) },
     reviewRooms: { ...d.reviewRooms, ...(saved.reviewRooms || {}) },
-    recruitment: { ...d.recruitment, ...((saved as any).recruitment || {}), messages: { ...d.recruitment.messages, ...((saved as any).recruitment?.messages || {}) } },
+    recruitment: { ...d.recruitment, ...((saved as any).recruitment || {}), messages: { ...d.recruitment.messages, ...((saved as any).recruitment?.messages || {}) }, screening: { ...d.recruitment.screening, ...((saved as any).recruitment?.screening || {}) }, interview: { ...d.recruitment.interview, ...((saved as any).recruitment?.interview || {}) } },
   };
 }
 

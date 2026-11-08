@@ -99,6 +99,16 @@ export async function saveToolkitSectionHandler(req: Request, res: Response) {
         reviewChannelId: isSnowflake(b.reviewChannelId) ? b.reviewChannelId : undefined,
         announceChannelId: isSnowflake(b.announceChannelId) ? b.announceChannelId : undefined,
         pingRoleIds: ids(b.pingRoleIds), reviewerRoleIds: ids(b.reviewerRoleIds),
+        screening: {
+          mode: b.screening?.mode === 'MANUAL' ? 'MANUAL' : 'AUTO',
+          onFail: b.screening?.onFail === 'GUIDE_AND_HOLD' ? 'GUIDE_AND_HOLD' : 'GUIDE_AND_CONTINUE',
+          consentText: str(b.screening?.consentText, 2000) || cur.screening.consentText,
+          questions: (Array.isArray(b.screening?.questions) ? b.screening.questions : []).slice(0, 25).map((q: any) => {
+            const options = (Array.isArray(q.options) ? q.options : []).slice(0, 4).map((o: any) => str(o, 80));
+            return { id: key(q.id || q.question), question: str(q.question, 250), options, correct: int(q.correct, 0, 3, 0), explain: str(q.explain, 500) };
+          }).filter((q: any) => q.question && q.options.length === 4 && q.options.every(Boolean)),
+        },
+        interview: { mode: b.interview?.mode === 'AUTO' ? 'AUTO' : 'MANUAL' },
         messages: {
           received: str(m.received, 1500) || cur.messages.received, approved: str(m.approved, 1500) || cur.messages.approved,
           rejected: str(m.rejected, 1500) || cur.messages.rejected, announce: str(m.announce, 1000) || cur.messages.announce,
@@ -252,5 +262,35 @@ export async function searchMembersHandler(req: Request, res: Response) {
     ok(res, members.filter((m: any) => !m.user.bot || req.query.bots === '1').map((m: any) => ({
       id: m.id, name: m.displayName, username: m.user.username, avatar: m.user.displayAvatarURL({ size: 64 }),
     })));
+  } catch (err) { fail(res, err, 500); }
+}
+
+/** Draft rules-quiz questions from the server's rules and guide (Community Brain). Not saved until the owner saves. */
+export async function draftQuizHandler(req: Request, res: Response) {
+  try {
+    const { communityQuestionsService } = await import('../services/communityQuestions.service.js');
+    const rules = (await communityQuestionsService.listGuidelines(req.params.communityId)).filter((g: any) => g.enabled !== false);
+    if (!rules.length) throw new Error('Add your rules and guide first (Recruitment → Rules & guidelines), then try again.');
+    const { GeminiAIProvider } = await import('../services/ai/geminiProvider.js');
+    const ai = new GeminiAIProvider();
+    if (!ai.isConfigured()) throw new Error('Community Brain (AI) is not configured.');
+    const count = int(req.body?.count, 3, 15, 6);
+    const prompt = `Write ${count} multiple-choice questions that check whether a new applicant has read and understood these Discord community rules. Each question must have exactly 4 short options, one correct. Add a one-sentence friendly explanation of the rule. Reply with JSON only: [{"question":"","options":["","","",""],"correct":0,"explain":""}]\n\nRULES:\n${rules.map((g: any) => `- ${g.title}: ${g.description}`).join('\n').slice(0, 8000)}`;
+    const out = await ai.generateText(prompt, { temperature: 0.4, maxTokens: 2000 });
+    const json = String(out.text || '').replace(/^[^\[]*/, '').replace(/[^\]]*$/, '');
+    const arr = JSON.parse(json);
+    const questions = (Array.isArray(arr) ? arr : []).slice(0, count).map((q: any, i: number) => ({
+      id: `ai${Date.now().toString(36)}${i}`, question: str(q.question, 250), options: (q.options || []).slice(0, 4).map((o: any) => str(o, 80)), correct: int(q.correct, 0, 3, 0), explain: str(q.explain, 500),
+    })).filter((q: any) => q.question && q.options.length === 4);
+    if (!questions.length) throw new Error('Could not draft questions this time. Please try again.');
+    ok(res, questions);
+  } catch (err) { fail(res, err); }
+}
+
+export async function screeningThresholdHandler(req: Request, res: Response) {
+  try {
+    const { settingsService } = await import('../services/settings.service.js');
+    const s: any = await settingsService.getConsolidatedSettings(req.params.communityId);
+    ok(res, { threshold: Number(s?.recruitment?.screeningThreshold ?? 75) });
   } catch (err) { fail(res, err, 500); }
 }

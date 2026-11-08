@@ -23,6 +23,29 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
   if (!id.startsWith('cm:')) return false;
   const [, area, action, arg] = id.split(':');
 
+  // ---------- guided application chat ----------
+  if (area === 'noop') { await interaction.deferUpdate().catch(() => undefined); return true; }
+  if (area === 'flow') {
+    const { applicationFlow } = await import('../../services/recruitment/applicationFlow.service.js');
+    if (action === 'consent') { await applicationFlow.consent(interaction, arg); return true; }
+    if (action === 'ans') { await applicationFlow.answer(interaction, arg, id.split(':')[4] || ''); return true; }
+    if (action === 'understood') { await applicationFlow.understood(interaction, arg); return true; }
+    // Staff-only controls.
+    const roomDoc: any = await reviewRoomsRepository.getById(arg).catch(() => null);
+    if (!roomDoc) { await interaction.reply({ content: 'Application chat not found.', ephemeral: true }); return true; }
+    if (!(await applicationFlow.isStaff(roomDoc.communityId, interaction.member))) { await interaction.reply({ content: '⛔ Staff only.', ephemeral: true }); return true; }
+    await interaction.deferReply({ ephemeral: true });
+    try {
+      if (action === 'quiz') { await applicationFlow.startQuiz(arg, interaction.user.id); await interaction.editReply('📝 Rules quiz sent to the applicant.'); }
+      else if (action === 'istart') { await applicationFlow.startInterview(arg, interaction.member); await interaction.editReply('🎤 Interview started. I am recording the transcript.'); }
+      else if (action === 'iend') { await applicationFlow.endInterview(arg, interaction.member); await interaction.editReply('🎤 Interview ended. Summary posted in this thread.'); }
+      else await interaction.editReply('Unknown action.');
+    } catch (err: any) {
+      await interaction.editReply(`⚠️ ${err?.message || err}`);
+    }
+    return true;
+  }
+
   // ---------- recruitment: apply ----------
   if (area === 'apply') {
     if (action === 'start') { await discordRecruitment.start(interaction); return true; }

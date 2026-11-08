@@ -384,6 +384,8 @@ router.post(`${tk}/tickets/:ticketId/close`, requireTenantAccess(), requirePermi
 router.get(`${tk}/warnings`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listWarningsHandler);
 router.post(`${tk}/warnings`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.issueWarningHandler);
 router.post(`${tk}/warnings/:strikeId/revoke`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.revokeWarningHandler);
+router.post(`${tk}/recruitment/draft-quiz`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.draftQuizHandler);
+router.get(`${tk}/recruitment/threshold`, requireTenantAccess(), requirePermission('community.view'), Toolkit.screeningThresholdHandler);
 router.post(`${tk}/recruitment/panel`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.postApplyPanelHandler);
 router.get('/communities/:communityId/discord/member-search', requireTenantAccess(), requirePermission('community.view'), Toolkit.searchMembersHandler);
 router.get(`${tk}/review-rooms`, requireTenantAccess(), requirePermission('applications.view'), Toolkit.listReviewRoomsHandler);
