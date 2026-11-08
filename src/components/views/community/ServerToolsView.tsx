@@ -1,4 +1,5 @@
 import { takeOpenTab } from './SetupGuideView.js';
+import { TemplateField, RECRUIT_VARS } from '../../common/TemplateField.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ClipboardList, Ticket, ShieldAlert, UserCheck, Mic, Layers, Plus, Trash2, Save, RefreshCw, Send, X, CheckCircle2, AlertTriangle, ArrowUp,
@@ -749,10 +750,10 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
           </div>
         </Card>
 
-        <Card title="Your messages" desc="Variables: {applicant}, {mention}, {server}, {reviewer}, {reason}.">
+        <Card title="Your messages" desc="Click a variable to insert it. The preview shows exactly what applicants receive.">
           <div className="space-y-4">
             {[['received', 'Application received (DM)'], ['approved', 'Approved (DM)'], ['rejected', 'Rejected (DM)'], ['announce', 'Welcome announcement']].map(([k, l]) => (
-              <label key={k} className="block text-sm font-medium text-slate-700">{l}<textarea rows={3} className={`${input} mt-1`} value={c.messages[k]} onChange={(e) => setM(k, e.target.value)} /></label>
+              <TemplateField key={k} label={l} value={c.messages[k]} onChange={(v) => setM(k, v)} vars={RECRUIT_VARS.filter((v) => k === 'rejected' || v.token !== 'reason')} />
             ))}
           </div>
         </Card>

@@ -630,7 +630,22 @@ export async function authLogout(req: Request, res: Response, next: NextFunction
   }
 }
 
-export function getAuthSession(req: Request, res: Response) {
+const profileCache = new Map<string, { at: number; p: any }>();
+async function discordProfile(userId: string) {
+  const id = String(userId || '').replace(/^usr_/, '');
+  if (!/^\d{15,21}$/.test(id)) return null;
+  const hit = profileCache.get(id);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.p;
+  try {
+    const { discordService } = await import('../integrations/discord/discord.service.js');
+    const u: any = await (discordService as any).client?.users?.fetch(id);
+    const p = u ? { username: u.globalName || u.username, discordUsername: u.username, avatarUrl: u.displayAvatarURL({ size: 128 }) } : null;
+    profileCache.set(id, { at: Date.now(), p });
+    return p;
+  } catch { return null; }
+}
+
+export async function getAuthSession(req: Request, res: Response) {
   const user = req.user || {
     userId: 'usr_guest',
     role: 'APPLICANT',
@@ -644,11 +659,13 @@ export function getAuthSession(req: Request, res: Response) {
       !req.user.userId.startsWith('usr_simulated_')
   );
 
+  const profile = isAuthenticated ? await discordProfile(String((user as any).discordUserId || user.userId)) : null;
   res.json({
     success: true,
     data: {
       user: {
         ...user,
+        ...(profile || {}),
         isPlatformOwner: isPlatformOwner(req.user),
       },
       runtimeMode: config.APP_RUNTIME_MODE,

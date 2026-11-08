@@ -37,6 +37,7 @@ export type CommunitySection =
   | PrimaryModuleSection
   | 'server-tools'
   | 'setup-guide'
+  | 'team-access'
   | 'community-features'
   | 'overview'
   | 'dashboard'
