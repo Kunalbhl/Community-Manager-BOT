@@ -30,34 +30,6 @@ export async function getUserGuilds(req: Request, res: Response, next: NextFunct
     const token = getCookie(req, 'discord_session_token') || (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : undefined);
 
     if (!token) {
-      if (config.APP_RUNTIME_MODE === 'DEVELOPMENT_SIMULATION' && config.DEV_SIMULATION_ENABLED) {
-        // Safe development simulation fallback
-        const devToken = 'dev_access_token';
-        const guilds = await discordAuthService.getDiscordUserGuilds(devToken);
-        const adminGuilds = discordAuthService.filterAdminGuilds(guilds);
-        const allComms = await communitiesRepository.list();
-        const mappedGuilds = adminGuilds.map((g) => {
-          const community = allComms.find(
-            (c) => c.guildId === g.id || c.discordGuildId === g.id || c.id === `comm_${g.id}`
-          );
-          return {
-            guildId: g.id,
-            name: g.name,
-            icon: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : undefined,
-            communityId: community?.id || `comm_${g.id}`,
-            botStatus: 'CONNECTED',
-            connectionStatus: 'CONNECTED',
-            setupStatus: (community?.setupStatus === 'COMPLETED' || !community) ? 'READY' : 'SETUP_REQUIRED',
-          };
-        });
-        res.json({
-          success: true,
-          data: mappedGuilds,
-          count: mappedGuilds.length,
-          requestId: req.id,
-        });
-        return;
-      }
       res.status(401).json({
         success: false,
         error: {

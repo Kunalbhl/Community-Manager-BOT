@@ -72,8 +72,7 @@ export function resolveEffectiveCommunityRole(
 
   if (
     community.ownerUserId === discordUserId ||
-    community.verifiedOwnerDiscordUserId === discordUserId ||
-    (config.APP_RUNTIME_MODE === 'DEVELOPMENT_SIMULATION' && config.DEV_SIMULATION_ENABLED && process.env.DEV_SIMULATION_ENABLED !== 'false' && (discordUserId === 'usr_owner_dev' || discordUserId === 'usr_dev' || discordUserId.startsWith('usr_owner')))
+    community.verifiedOwnerDiscordUserId === discordUserId
   ) {
     return 'OWNER';
   }
@@ -132,54 +131,6 @@ export async function resolveUserCommunityRole(
     community = null;
   }
 
-  const isDefaultOrAppGuild = communityId && (
-    communityId === 'comm_default' ||
-    communityId === `comm_${config.DISCORD_CLIENT_ID}` ||
-    communityId === `comm_1547515985416822884` ||
-    (config.DISCORD_CLIENT_ID && communityId === `comm_${config.DISCORD_CLIENT_ID}`)
-  );
-
-  const canAutoSeed =
-    (config.NODE_ENV !== 'production' &&
-    (config as any).COMMUNITY_DEV_SEEDING_ENABLED !== false &&
-    config.APP_RUNTIME_MODE === 'DEVELOPMENT_SIMULATION' &&
-    config.DEV_SIMULATION_ENABLED &&
-    process.env.DEV_SIMULATION_ENABLED !== 'false') ||
-    isDefaultOrAppGuild;
-
-  if (!community && canAutoSeed) {
-    const targetGuildId = communityId.startsWith('comm_') ? communityId.replace('comm_', '') : communityId;
-    const nowStr = new Date().toISOString();
-    const communityName = isDefaultOrAppGuild ? 'Official Community Guild' : 'Development Community Guild';
-    try {
-      community = await communitiesRepository.create({
-        id: communityId,
-        name: communityName,
-        guildId: targetGuildId,
-        discordGuildId: targetGuildId,
-        ownerUserId: discordUserId || config.PLATFORM_OWNER_USER_ID || 'usr_owner_dev',
-        isActive: true,
-        setupStatus: 'COMPLETED',
-        createdAt: nowStr,
-        updatedAt: nowStr,
-      } as any);
-
-      const accessId = `${communityId}_${discordUserId}`;
-      await communityMemberAccessRepository.create({
-        id: accessId,
-        communityId,
-        discordUserId,
-        role: 'OWNER',
-        permissions: [...ALL_COMMUNITY_PERMISSIONS],
-        source: 'DISCORD_GUILD_OWNER',
-        createdAt: nowStr,
-        updatedAt: nowStr,
-      });
-    } catch {
-      community = await communitiesRepository.getById(communityId);
-    }
-  }
-
   if (!community) {
     return {
       role: 'APPLICANT',
@@ -200,13 +151,10 @@ export async function resolveUserCommunityRole(
     };
   }
 
-  const isSimulationAllowed = config.APP_RUNTIME_MODE === 'DEVELOPMENT_SIMULATION' && config.DEV_SIMULATION_ENABLED && process.env.DEV_SIMULATION_ENABLED !== 'false';
 
   // Enforce dynamic ownership transfer checks from active Discord session if any
   const session = await discordAuthService.getSession(discordUserId);
-  let isGuildOwner =
-    community.ownerUserId === discordUserId ||
-    (isSimulationAllowed && (discordUserId === 'usr_owner_dev' || discordUserId === 'usr_dev' || discordUserId.startsWith('usr_owner')));
+  let isGuildOwner = community.ownerUserId === discordUserId;
 
   if (session && session.guilds) {
     const targetGuildId = community.guildId || community.discordGuildId || (community.id.startsWith('comm_') ? community.id.replace('comm_', '') : community.id);
@@ -365,29 +313,8 @@ export async function resolveUserCommunityRole(
     };
   }
 
-  // Development or default simulated identities fallback (strictly gated by DEV_SIMULATION_ENABLED in non-production environments)
-  if (isSimulationAllowed) {
-    if (discordUserId === 'usr_owner_1' || discordUserId === 'usr_dev' || discordUserId === 'usr_owner' || discordUserId === 'usr_controller' || discordUserId.startsWith('usr_owner')) {
-      return {
-        role: 'OWNER',
-        effectiveRole: 'OWNER',
-        permissions: [...ALL_COMMUNITY_PERMISSIONS],
-        source: 'SIMULATED_OWNER_FALLBACK',
-      };
-    }
-
-    if (discordUserId === 'usr_recruiter' || discordUserId.includes('recruiter')) {
-      return {
-        role: 'RECRUITER',
-        effectiveRole: 'RECRUITER',
-        permissions: [...DEFAULT_ROLE_PERMISSIONS['RECRUITER']],
-        source: 'SIMULATED_RECRUITER_FALLBACK',
-      };
-    }
-  }
-
   // Fallback default: MEMBER if in Discord server / active member, else APPLICANT
-  const isDiscordServerUser = discordMember || (discordUserId.startsWith('discord_user') && !discordUserId.includes('applicant'));
+  const isDiscordServerUser = Boolean(discordMember);
   if (isDiscordServerUser) {
     return {
       role: 'MEMBER',
@@ -488,11 +415,6 @@ export async function resolveAuthorizedCommunityContext(
     throw new UnauthorizedError('Authentication required', 'AUTHENTICATION_REQUIRED');
   }
 
-  const isSimulationAllowed = config.APP_RUNTIME_MODE === 'DEVELOPMENT_SIMULATION' && config.DEV_SIMULATION_ENABLED && process.env.DEV_SIMULATION_ENABLED !== 'false';
-  const simulatedUserIds = ['usr_owner_1', 'usr_dev', 'usr_recruiter', 'usr_owner_dev'];
-  if (simulatedUserIds.includes(userId) && !isSimulationAllowed) {
-    throw new ForbiddenError('Simulated identity usage is prohibited in this environment', 'COMMUNITY_ACCESS_DENIED');
-  }
 
   if (!communityId) {
     throw new BadRequestError('Community context is required', 'COMMUNITY_CONTEXT_REQUIRED');
@@ -505,37 +427,6 @@ export async function resolveAuthorizedCommunityContext(
     community = allComms.find(
       (c) => c.guildId === targetGuildId || c.discordGuildId === targetGuildId
     ) || null;
-  }
-
-  const isDefaultOrAppGuild = communityId && (
-    communityId === 'comm_default' ||
-    communityId === `comm_${config.DISCORD_CLIENT_ID}` ||
-    communityId === `comm_1547515985416822884` ||
-    (config.DISCORD_CLIENT_ID && communityId === `comm_${config.DISCORD_CLIENT_ID}`)
-  );
-
-  if (!community && (
-    (config.APP_RUNTIME_MODE === 'DEVELOPMENT_SIMULATION' && config.DEV_SIMULATION_ENABLED && process.env.DEV_SIMULATION_ENABLED !== 'false') ||
-    isDefaultOrAppGuild
-  )) {
-    const targetGuildId = communityId.startsWith('comm_') ? communityId.replace('comm_', '') : communityId;
-    const nowStr = new Date().toISOString();
-    const communityName = isDefaultOrAppGuild ? 'Official Community Guild' : 'Development Community Guild';
-    try {
-      community = await communitiesRepository.create({
-        id: communityId,
-        name: communityName,
-        guildId: targetGuildId,
-        discordGuildId: targetGuildId,
-        ownerUserId: userId || config.PLATFORM_OWNER_USER_ID || 'usr_owner_dev',
-        isActive: true,
-        setupStatus: 'COMPLETED',
-        createdAt: nowStr,
-        updatedAt: nowStr,
-      } as any);
-    } catch {
-      community = await communitiesRepository.getById(communityId);
-    }
   }
 
   if (!community) {
@@ -560,16 +451,12 @@ export async function resolveAuthorizedCommunityContext(
     const isOwner =
       community.ownerUserId === userId ||
       community.verifiedOwnerDiscordUserId === userId ||
-      access.role === 'OWNER' ||
-      (isSimulationAllowed && (userId === 'usr_owner_dev' || userId.startsWith('usr_owner')));
-
-    const knownSimulatedDevPersonas = ['usr_owner_dev', 'usr_dev', 'usr_recruiter', 'usr_interviewer', 'usr_member_dev', 'usr_owner_1', 'usr_admin_1'];
-    const isSimulationPersona = isSimulationAllowed && knownSimulatedDevPersonas.includes(userId);
+      access.role === 'OWNER';
     const accessId = `${communityId}_${userId}`;
     const memberAccess = await communityMemberAccessRepository.getById(accessId);
     const discordMember = await discordMembersRepository.getById(`${communityId}_${userId}`);
 
-    if (!isOwner && !isSimulationPersona && !memberAccess && !discordMember) {
+    if (!isOwner && !memberAccess && !discordMember) {
       throw new ForbiddenError('Access denied: User is not associated with this community', 'COMMUNITY_ACCESS_DENIED');
     }
   }

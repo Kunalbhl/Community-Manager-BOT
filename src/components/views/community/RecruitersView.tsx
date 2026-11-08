@@ -804,7 +804,7 @@ export const RecruitersView: React.FC<RecruitersViewProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-base font-bold text-slate-900">Recruiter Performance Leaderboard</h3>
-              <p className="text-xs text-slate-500">Live evidence-based metrics ranked dynamically. No simulated stats.</p>
+              <p className="text-xs text-slate-500">Live evidence-based metrics ranked dynamically.</p>
             </div>
 
             <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs">

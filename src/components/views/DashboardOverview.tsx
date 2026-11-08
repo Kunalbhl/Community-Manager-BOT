@@ -315,7 +315,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           <h2 className="text-sm font-bold text-slate-900">Least-Privilege RBAC Matrix</h2>
         </div>
         <p className="text-xs text-slate-500 mb-4">
-          You are currently viewing this interface with simulated role:{' '}
+          Your role in this server:{' '}
           <strong className="text-slate-800">{currentRole}</strong>. The sidebar and API endpoints enforce granular permissions independently on both client and server.
         </p>
 

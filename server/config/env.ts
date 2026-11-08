@@ -104,27 +104,10 @@ export function loadConfig(): AppConfig {
 
   const hasCredentials = Boolean(process.env.DISCORD_BOT_TOKEN && process.env.DISCORD_CLIENT_SECRET);
 
-  if (rawRuntimeMode === 'development' || rawRuntimeMode === 'DEVELOPMENT_SIMULATION') {
-    resolvedRuntimeMode = 'DEVELOPMENT_SIMULATION';
-  } else if (rawRuntimeMode === 'real-preview' || rawRuntimeMode === 'REAL_DISCORD_PREVIEW') {
-    resolvedRuntimeMode = 'REAL_DISCORD_PREVIEW';
-  } else if (rawRuntimeMode === 'production' || rawRuntimeMode === 'PRODUCTION') {
-    resolvedRuntimeMode = 'PRODUCTION';
-  } else {
-    // Default fallback:
-    if (isProdOrStaging) {
-      if (isSandbox && !hasCredentials && rawRuntimeMode !== 'PRODUCTION' && rawRuntimeMode !== 'production') {
-        resolvedRuntimeMode = 'DEVELOPMENT_SIMULATION';
-      } else {
-        resolvedRuntimeMode = 'PRODUCTION';
-      }
-    } else {
-      resolvedRuntimeMode = 'DEVELOPMENT_SIMULATION';
-    }
-  }
-
-  // Force simulation completely disabled in REAL_DISCORD_PREVIEW and PRODUCTION
-  const devSimulationEnabled = resolvedRuntimeMode === 'DEVELOPMENT_SIMULATION' && process.env.DEV_SIMULATION_ENABLED !== 'false';
+  // Production only. Simulation / demo mode has been removed; preview is allowed only when asked for explicitly.
+  if (rawRuntimeMode === 'real-preview' || rawRuntimeMode === 'REAL_DISCORD_PREVIEW') resolvedRuntimeMode = 'REAL_DISCORD_PREVIEW';
+  void isSandbox; void hasCredentials; void isProdOrStaging;
+  const devSimulationEnabled = false;
 
   const aiApiKey = process.env.AI_API_KEY || process.env.GEMINI_API_KEY || undefined;
   const parsedPort = Number(process.env.PORT || 3000);

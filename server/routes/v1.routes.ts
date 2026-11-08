@@ -63,7 +63,6 @@ import {
   saveDraftApplication,
   getCandidateInterviews,
   submitAdditionalInfo,
-  simulateDiscordJoin,
   verifyDiscordJoin,
 } from '../controllers/applications.controller.js';
 import {
@@ -549,16 +548,6 @@ router.get('/applications/drafts/find', getDraftApplication);
 router.post('/applications/drafts/save', saveDraftApplication);
 router.get('/applications/:id/interviews', getCandidateInterviews);
 router.post('/applications/:id/additional-info', submitAdditionalInfo);
-if (config.APP_RUNTIME_MODE === 'DEVELOPMENT_SIMULATION') {
-  router.post('/applications/:id/simulate-join', simulateDiscordJoin);
-} else {
-  router.post('/applications/:id/simulate-join', (req, res) => {
-    res.status(403).json({
-      error: 'FORBIDDEN: Simulation endpoints are disabled in production runtime modes.',
-      code: 'SIMULATION_DISABLED',
-    });
-  });
-}
 router.post('/applications/:id/verify-join', verifyDiscordJoin);
 
 // 4.1. Interview routes

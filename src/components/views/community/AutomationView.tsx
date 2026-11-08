@@ -709,7 +709,7 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ communityId }) =
                           onClick={() => handleTestWorkflow(wf)}
                           disabled={isTesting && testingWorkflowId === wf.id}
                           className="flex items-center gap-1 rounded border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-700 hover:bg-indigo-100 transition"
-                          title="Run simulated trigger event"
+                          title="Test this automation"
                         >
                           <Play className="h-3 w-3 fill-current" />
                           {isTesting && testingWorkflowId === wf.id ? 'Testing...' : 'Test Run'}
