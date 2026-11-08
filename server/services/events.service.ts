@@ -371,19 +371,13 @@ export class EventService {
     // Auto-create standard reminders: 24h, 1h, 15m
     await eventReminderService.scheduleReminders(communityId, published);
 
-    // Publish notification to configured channel if available
-    if (published.channelId) {
+    // Announce in Discord with Register buttons (members sign up right there; no dashboard needed).
+    if (published.channelId && published.visibility !== 'PRIVATE') {
       try {
-        await EngagementDeliveryService.deliverMessage({
-          communityId,
-          actorUserId,
-          actorRole,
-          targetChannelId: published.channelId,
-          content: `📢 **New Community Event Scheduled!**\n**${published.title}**\n📅 Start: ${new Date(published.startAt).toLocaleString()}\n📍 Location/Channel: <#${published.channelId}>\n${published.description}`,
-          featureKey: 'EVENTS',
-        });
+        const { eventPosts } = await import('./eventPosts.service.js');
+        await eventPosts.post(communityId, published as any);
       } catch (delivErr: any) {
-        logger.warn(`[EventService] Notice publish delivery skipped: ${delivErr.message}`);
+        logger.warn(`[EventService] Discord event post skipped: ${delivErr.message}`);
       }
     }
 

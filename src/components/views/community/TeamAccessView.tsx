@@ -95,7 +95,7 @@ function RoleCard({ r, people, canEdit, api, act }: any) {
         </div>
         {canEdit && (
           <div className="mt-2 flex gap-2">
-            <div className="flex-1"><RoleSelect value="" placeholder="Add a Discord role" onChange={(v) => v && act(() => api('/link-role', 'POST', { role: r.role, discordRoleIds: [...r.discordRoles.filter((x: any) => !x.auto).map((x: any) => x.id), v] }), 'Role linked.')} /></div>
+            <div className="flex-1"><RoleSelect value="" placeholder="Add a Discord role" exclude={r.discordRoles.map((x: any) => x.id)} onChange={(v) => v && act(() => api('/link-role', 'POST', { role: r.role, discordRoleIds: [...r.discordRoles.filter((x: any) => !x.auto).map((x: any) => x.id), v] }), 'Role linked.')} /></div>
             {!r.fixed && !r.discordRoles.length && <button className={ghost} onClick={() => act(() => api('/link-role', 'POST', { role: r.role, discordRoleIds: [], create: true }), `Created @${r.label} in Discord and linked it.`)}><Plus className="h-4 w-4" /> Create</button>}
           </div>
         )}

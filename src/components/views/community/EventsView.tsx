@@ -406,11 +406,16 @@ export const EventsView: React.FC<EventsViewProps> = ({ communityId }) => {
                   onChange={e => setVisibility(e.target.value as any)}
                   className="rounded border border-slate-300 px-2 py-1 text-xs"
                 >
-                  <option value="COMMUNITY">Community</option>
-                  <option value="PUBLIC">Public</option>
-                  <option value="PRIVATE">Private</option>
+                  <option value="COMMUNITY">Members only</option>
+                  <option value="PUBLIC">Everyone in the server</option>
+                  <option value="PRIVATE">Private (staff add people)</option>
                 </select>
               </div>
+              <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-slate-600">
+                {visibility === 'PRIVATE'
+                  ? 'Not announced in Discord. Add people from the event’s attendee list.'
+                  : 'When you publish, the bot posts this event in the chosen channel with Register and Can’t go buttons. People sign up right in Discord and get reminders 24h, 1h and 15 min before.'}
+              </p>
 
               <button
                 id="btn-create-event-submit"
