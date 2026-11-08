@@ -43,7 +43,8 @@ export async function getToolkitHandler(req: Request, res: Response) {
   try {
     const { communityId } = req.params;
     const [config, resources] = await Promise.all([getToolkit(communityId), guildResources(communityId)]);
-    ok(res, { config, resources });
+    const safe = { ...config, recruitment: { ...config.recruitment, sheetToken: undefined } };
+    ok(res, { config: safe, resources });
   } catch (err) { fail(res, err, 500); }
 }
 
@@ -99,6 +100,9 @@ export async function saveToolkitSectionHandler(req: Request, res: Response) {
         reviewChannelId: isSnowflake(b.reviewChannelId) ? b.reviewChannelId : undefined,
         announceChannelId: isSnowflake(b.announceChannelId) ? b.announceChannelId : undefined,
         pingRoleIds: ids(b.pingRoleIds), reviewerRoleIds: ids(b.reviewerRoleIds),
+        logChannelId: isSnowflake(b.logChannelId) ? b.logChannelId : undefined,
+        notifyRecruiter: b.notifyRecruiter !== false,
+        sheetWebhookUrl: cur.sheetWebhookUrl, sheetToken: cur.sheetToken, sheetLastSync: cur.sheetLastSync,
         screening: {
           mode: b.screening?.mode === 'MANUAL' ? 'MANUAL' : 'AUTO',
           onFail: b.screening?.onFail === 'GUIDE_AND_HOLD' ? 'GUIDE_AND_HOLD' : 'GUIDE_AND_CONTINUE',
@@ -293,4 +297,68 @@ export async function screeningThresholdHandler(req: Request, res: Response) {
     const s: any = await settingsService.getConsolidatedSettings(req.params.communityId);
     ok(res, { threshold: Number(s?.recruitment?.screeningThreshold ?? 75) });
   } catch (err) { fail(res, err, 500); }
+}
+
+// ---------- Secure Setup ----------
+export async function gateStatusHandler(req: Request, res: Response) {
+  try {
+    const { secureGate } = await import('../services/recruitment/secureGate.service.js');
+    const s: any = await secureGate.status(req.params.communityId);
+    const { snapshot, ...gate } = s.gate || {};
+    ok(res, { ...s, gate: { ...gate, hasSnapshot: Boolean(snapshot?.length) } });
+  } catch (err) { fail(res, err, 500); }
+}
+export async function gateLockHandler(req: Request, res: Response) {
+  try {
+    const { secureGate } = await import('../services/recruitment/secureGate.service.js');
+    const b = req.body || {};
+    await secureGate.lock(req.params.communityId, { memberRoleId: isSnowflake(b.memberRoleId) ? b.memberRoleId : undefined, createMemberRole: Boolean(b.createMemberRole), publicChannelIds: ids(b.publicChannelIds, 10), actorId: actor(req) });
+    await auditService.log({ communityId: req.params.communityId, actorUserId: actor(req), actorRole: 'OWNER', action: 'SECURE_SETUP_LOCK' as any, targetType: 'guild', targetId: req.params.communityId }).catch(() => undefined);
+    ok(res, { started: true });
+  } catch (err) { fail(res, err); }
+}
+export async function gateUndoHandler(req: Request, res: Response) {
+  try {
+    const { secureGate } = await import('../services/recruitment/secureGate.service.js');
+    const n = await secureGate.undo(req.params.communityId);
+    await auditService.log({ communityId: req.params.communityId, actorUserId: actor(req), actorRole: 'OWNER', action: 'SECURE_SETUP_UNDO' as any, targetType: 'guild', targetId: req.params.communityId }).catch(() => undefined);
+    ok(res, { restored: n });
+  } catch (err) { fail(res, err); }
+}
+export async function gateConfirmHandler(req: Request, res: Response) {
+  try {
+    if (String(req.body?.confirmText || '').trim().toUpperCase() !== 'LOCKED') throw new Error('Type LOCKED to confirm.');
+    const { secureGate } = await import('../services/recruitment/secureGate.service.js');
+    await secureGate.confirm(req.params.communityId, actor(req), Boolean(req.body?.nativeApplyOff));
+    ok(res, { verified: true });
+  } catch (err) { fail(res, err); }
+}
+
+// ---------- Google Sheets ----------
+export async function sheetScriptHandler(req: Request, res: Response) {
+  try {
+    const { sheetsSync, newSheetToken } = await import('../services/recruitment/sheetsSync.service.js');
+    const t = await getToolkit(req.params.communityId);
+    let token = t.recruitment.sheetToken;
+    if (!token) { token = newSheetToken(); await saveToolkit(req.params.communityId, { recruitment: { ...t.recruitment, sheetToken: token } }); }
+    ok(res, { script: sheetsSync.script(token), url: t.recruitment.sheetWebhookUrl || '', lastSync: t.recruitment.sheetLastSync || null });
+  } catch (err) { fail(res, err, 500); }
+}
+export async function sheetConnectHandler(req: Request, res: Response) {
+  try {
+    const { sheetsSync, isSheetUrl } = await import('../services/recruitment/sheetsSync.service.js');
+    const url = String(req.body?.url || '').trim();
+    if (url && !isSheetUrl(url)) throw new Error('Paste the Web app URL from Apps Script. It looks like https://script.google.com/macros/s/…/exec');
+    const t = await getToolkit(req.params.communityId);
+    await saveToolkit(req.params.communityId, { recruitment: { ...t.recruitment, sheetWebhookUrl: url || undefined } });
+    if (!url) return ok(res, { connected: false });
+    const rows = await sheetsSync.resync(req.params.communityId);
+    ok(res, { connected: true, rows });
+  } catch (err) { fail(res, err); }
+}
+export async function sheetResyncHandler(req: Request, res: Response) {
+  try {
+    const { sheetsSync } = await import('../services/recruitment/sheetsSync.service.js');
+    ok(res, { rows: await sheetsSync.resync(req.params.communityId) });
+  } catch (err) { fail(res, err); }
 }
