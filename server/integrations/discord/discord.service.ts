@@ -159,6 +159,15 @@ export class RealDiscordProvider implements DiscordProvider {
           logger.warn(`[DiscordGateway] ${this.disconnectReason}`);
         });
 
+        // A resumed session is fully connected again (discord.js does not re-fire shardReady on resume).
+        this.client.on('shardResume', (shardId, replayed) => {
+          this.state = 'CONNECTED';
+          this.lastHeartbeatAt = new Date().toISOString();
+          this.disconnectReason = undefined;
+          this.reconnectAttempts = 0;
+          logger.info(`[DiscordGateway] Shard ${shardId} resumed (${replayed} events replayed).`);
+        });
+
         this.client.on('shardReconnecting', (shardId) => {
           this.state = 'RECONNECTING';
           logger.info(`[DiscordGateway] Shard ${shardId} reconnecting...`);
@@ -180,6 +189,12 @@ export class RealDiscordProvider implements DiscordProvider {
         this.heartbeatInterval = setInterval(() => {
           if (this.client?.isReady()) {
             this.lastHeartbeatAt = new Date().toISOString();
+            // Self-heal: gateway is up (status 0 = READY) but a missed lifecycle event left the flag behind.
+            if (this.state !== 'CONNECTED' && (this.client as any).ws?.status === 0) {
+              this.state = 'CONNECTED';
+              this.disconnectReason = undefined;
+              logger.info('[DiscordGateway] Gateway is ready again; status restored to CONNECTED.');
+            }
             return;
           }
           // Watchdog: if the gateway has been down for 10 minutes, rebuild the client from scratch.
