@@ -310,6 +310,30 @@ export const postgresStore = {
     return row ? { holder: row.holder, priority: row.priority, expiresAt: new Date(row.expires_at).toISOString() } : null;
   },
 
+  /** Old local-dev demo data (seeded communities and fake personas). Read-only listing. */
+  async findDemoRecords(): Promise<{ collection: string; id: string }[]> {
+    await ensureSchema();
+    const r = await getPool().query(`
+      WITH demo_comms AS (
+        SELECT id FROM ${T_DOCS} WHERE collection = 'communities'
+          AND (id = 'comm_default' OR id LIKE 'comm\\_dev\\_%' OR data->>'ownerUserId' = 'usr_owner_dev' OR data->>'guildId' = 'dev_guild_local')
+      )
+      SELECT collection, id FROM ${T_DOCS}
+      WHERE (collection = 'communities' AND id IN (SELECT id FROM demo_comms))
+         OR data->>'communityId' IN (SELECT id FROM demo_comms)
+         OR data->>'discordUserId' = ANY($1) OR data->>'userId' = ANY($1) OR data->>'ownerUserId' = ANY($1)
+         OR (collection = 'users' AND id = ANY($1))
+      ORDER BY collection, id`, [['usr_owner_dev', 'usr_controller', 'usr_interviewer', 'usr_recruiter', 'usr_member', 'usr_applicant']]);
+    return r.rows;
+  },
+
+  async deleteMany(rows: { collection: string; id: string }[]): Promise<number> {
+    await ensureSchema();
+    let n = 0;
+    for (const x of rows) n += (await getPool().query(`DELETE FROM ${T_DOCS} WHERE collection = $1 AND id = $2`, [x.collection, x.id])).rowCount || 0;
+    return n;
+  },
+
   async close(): Promise<void> {
     if (pool) await pool.end();
     pool = null;
