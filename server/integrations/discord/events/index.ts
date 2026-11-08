@@ -91,6 +91,9 @@ export function attachGatewayEventHandlers(client: Client): void {
       import('../../../services/toolkit/reviewRooms.service.js')
         .then(({ reviewRooms }) => reviewRooms.onApplicantJoined(communityId, member.id))
         .catch(() => undefined);
+      import('../../../services/recruitment/secureGate.service.js')
+        .then(({ secureGate }) => secureGate.onJoin(communityId, member))
+        .catch(() => undefined);
     } catch (err) {
       logger.error(`[DiscordGateway] Error confirming member join referral:`, undefined, { error: (err as Error).message });
     }

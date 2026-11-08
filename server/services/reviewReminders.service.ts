@@ -140,6 +140,7 @@ export function startReminderScheduler() {
       if (ticks % 10 === 1) await moderationSchedulerService.processScheduledPass(); // expire warnings, blacklists, restrictions
       const { reviewRooms } = await import('./toolkit/reviewRooms.service.js');
       await reviewRooms.housekeeping(); // empty voice rooms + expired review rooms
+      if (ticks % 30 === 2) { const { secureGate } = await import('./recruitment/secureGate.service.js'); await secureGate.recheckAll().catch(() => undefined); }
       const { giveaways, birthdays } = await import('./features/community.service.js');
       await giveaways.tick(); // end giveaways whose time is up
       if (ticks % 5 === 1) {

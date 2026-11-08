@@ -652,6 +652,7 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
   ];
   return (
     <div className="space-y-6">
+      <SecureSetupCard api={api} res={res} />
       <ol className="grid gap-3 md:grid-cols-3">
         {steps.map(([t, d], i) => (
           <li key={t} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="text-2xl font-extrabold text-indigo-600">{i + 1}</div><div className="mt-1 font-bold text-slate-900">{t}</div><div className="text-sm text-slate-500">{d}</div></li>
@@ -741,6 +742,8 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
             <label className="block text-sm font-medium text-slate-700">Staff review channel<div className="mt-1"><Pick options={res.textChannels} value={c.reviewChannelId} onChange={(v) => setC({ ...c, reviewChannelId: v })} placeholder="Choose a staff-only channel" /></div></label>
             <div className="text-sm font-medium text-slate-700">Ping these roles for each new application<div className="mt-1"><MultiPick options={res.roles} value={c.pingRoleIds} onChange={(v) => setC({ ...c, pingRoleIds: v })} placeholder="Add a role" prefix="@" /></div></div>
             <div className="text-sm font-medium text-slate-700">Roles allowed to Approve / Reject in Discord<div className="mt-1"><MultiPick options={res.roles} value={c.reviewerRoleIds} onChange={(v) => setC({ ...c, reviewerRoleIds: v })} placeholder="Add a role" prefix="@" /></div><p className="mt-1 text-xs font-normal text-slate-500">Members with Manage Server can always decide.</p></div>
+            <label className="block text-sm font-medium text-slate-700">Recruitment log channel (every application, score, decision and recruiter credit)<div className="mt-1"><Pick options={res.textChannels} value={c.logChannelId} onChange={(v) => setC({ ...c, logChannelId: v })} placeholder="Choose a staff channel" /></div></label>
+            <Toggle on={c.notifyRecruiter !== false} onChange={(v) => setC({ ...c, notifyRecruiter: v })} label="DM the recruiter when their code is used and when it is decided" />
             <label className="block text-sm font-medium text-slate-700">Welcome announcement channel (optional)<div className="mt-1"><Pick options={res.textChannels} value={c.announceChannelId} onChange={(v) => setC({ ...c, announceChannelId: v })} placeholder="Don’t announce" /></div></label>
           </div>
         </Card>
@@ -753,6 +756,8 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
           </div>
         </Card>
       </div>
+
+      <SheetsCard api={api} />
 
       <div className="grid gap-6 2xl:grid-cols-2">
         <Card title="Apply panel" desc="Post it in a public channel like #apply or #join-us.">
@@ -780,5 +785,139 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
         </Card>
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Secure Setup                                                        */
+/* ------------------------------------------------------------------ */
+function SecureSetupCard({ api, res }: { api: any; res: Resources }) {
+  const [s, setS] = useState<any>(null);
+  const [memberRoleId, setMemberRoleId] = useState('');
+  const [publicIds, setPublicIds] = useState<string[]>([]);
+  const [applyOff, setApplyOff] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [msg, setMsg] = useState('');
+  const load = useCallback(async () => {
+    try {
+      const d = await api('/gate');
+      setS(d);
+      if (d.gate?.memberRoleId) setMemberRoleId((v) => v || d.gate.memberRoleId);
+      if (d.gate?.publicChannelIds?.length) setPublicIds((v) => (v.length ? v : d.gate.publicChannelIds));
+    } catch (e: any) { setMsg(e.message); }
+  }, [api]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (s?.gate?.job?.status !== 'RUNNING') return; const t = setInterval(load, 3000); return () => clearInterval(t); }, [s?.gate?.job?.status, load]);
+  if (!s) return <div className="h-40 animate-pulse rounded-2xl bg-slate-100" />;
+  const g = s.gate || {};
+  const job = g.job;
+  const verified = g.verified;
+  const run = async (fn: () => Promise<any>, ok: string) => { setMsg(''); try { await fn(); setMsg(ok); await load(); } catch (e: any) { setMsg(e.message); } };
+
+  return (
+    <section className={`rounded-2xl border-2 p-6 shadow-sm ${verified ? 'border-emerald-300 bg-emerald-50/40' : 'border-amber-300 bg-amber-50/40'}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">{verified ? '🔒 Secure Setup complete' : '🔓 Secure Setup required before recruitment'}</h2>
+          <p className="mt-1 max-w-3xl text-sm text-slate-600">
+            {verified
+              ? `Newcomers only see your public channels until they are approved. Checked ${g.lastCheck ? new Date(g.lastCheck.at).toLocaleString() : 'recently'}. The lock is plain Discord permissions, so it stays closed even if the bot is offline.`
+              : 'Discord does not let bots control its own “Apply to Join”, so Community Manager locks your server instead: newcomers see only the channels you choose until they are approved. Recruitment, the Apply panel and application chats stay off until this is done.'}
+          </p>
+        </div>
+        <button className={ghost} onClick={load}><RefreshCw className="h-4 w-4" /> Re-check</button>
+      </div>
+
+      {!!s.problems?.length && <div className="mt-4"><Banner tone="error">{s.problems.map((p: string) => <div key={p}>{p.replace(/\*\*/g, '')}</div>)}</Banner></div>}
+
+      <div className="mt-5 grid gap-4 xl:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="text-sm font-bold text-slate-900">1 · What a new joiner can see now</div>
+          <p className="mt-1 text-xs text-slate-500">{s.visible?.length || 0} channel(s) visible to someone who just joined.</p>
+          <ul className="mt-3 max-h-48 space-y-1 overflow-auto text-sm">
+            {(s.visible || []).map((c: any) => (
+              <li key={c.id} className={`flex items-center justify-between rounded px-2 py-1 ${g.publicChannelIds?.includes(c.id) ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
+                <span>#{c.name}</span><span className="text-xs">{g.publicChannelIds?.includes(c.id) ? 'public' : 'exposed'}</span>
+              </li>
+            ))}
+            {!s.visible?.length && <li className="text-slate-500">Nothing is visible to newcomers.</li>}
+          </ul>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="text-sm font-bold text-slate-900">2 · Lock the server</div>
+          <div className="mt-3 space-y-3 text-sm">
+            <label className="block font-medium text-slate-700">Member role (approved members)
+              <select className={`${input} mt-1`} value={memberRoleId} onChange={(e) => setMemberRoleId(e.target.value)}>
+                <option value="">Create a new “Member” role</option>
+                {res.roles.map((r) => <option key={r.id} value={r.id}>@{r.name}</option>)}
+              </select>
+            </label>
+            <div className="font-medium text-slate-700">Public channels (welcome, rules, apply)<div className="mt-1"><MultiPick options={res.textChannels} value={publicIds} onChange={setPublicIds} placeholder="Add a public channel" prefix="#" /></div></div>
+            <p className="text-xs text-slate-500">All {s.memberCount ?? ''} current members get the Member role first, so nobody loses access. Your current permissions are saved and can be restored with Undo.</p>
+            <div className="flex flex-wrap gap-2">
+              <button className={btn} disabled={job?.status === 'RUNNING' || !publicIds.length} onClick={() => run(() => api('/gate/lock', 'POST', { memberRoleId: memberRoleId || undefined, createMemberRole: !memberRoleId, publicChannelIds: publicIds }), 'Locking started…')}>🔒 Lock the server</button>
+              {g.hasSnapshot && <button className={ghost} disabled={job?.status === 'RUNNING'} onClick={() => window.confirm('Restore every channel permission to how it was before Secure Setup? Recruitment will be switched off.') && run(() => api('/gate/undo', 'POST'), 'Permissions restored.')}>↩ Undo</button>}
+            </div>
+            {job && (
+              <div className="rounded-lg bg-slate-50 p-3 text-xs">
+                <div className="flex justify-between font-semibold"><span>{job.step}</span><span>{job.status}</span></div>
+                {job.total > 0 && <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full bg-indigo-600" style={{ width: `${Math.round((job.done / job.total) * 100)}%` }} /></div>}
+                {job.error && <div className="mt-1 text-rose-600">{job.error}</div>}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="text-sm font-bold text-slate-900">3 · Confirm</div>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-slate-600">
+            <li>In Discord: <b>Server Settings → Access</b>.</li>
+            <li>Set the server so people can <b>join without applying</b> (turn off “Apply to Join”).</li>
+            <li>Save, then confirm here.</li>
+          </ol>
+          <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={applyOff} onChange={(e) => setApplyOff(e.target.checked)} className="mt-1" /> I have turned off Discord’s Apply to Join</label>
+          <input className={`${input} mt-3`} placeholder="Type LOCKED to confirm" value={typed} onChange={(e) => setTyped(e.target.value)} />
+          <button className={`${btn} mt-3`} disabled={!applyOff || typed.trim().toUpperCase() !== 'LOCKED' || job?.status === 'RUNNING'} onClick={() => run(() => api('/gate/confirm', 'POST', { nativeApplyOff: applyOff, confirmText: typed }), 'Secure Setup complete. Recruitment can start.')}>✅ Confirm and enable recruitment</button>
+        </div>
+      </div>
+      {msg && <p className="mt-4 text-sm font-medium text-slate-700">{msg}</p>}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Google Sheets                                                       */
+/* ------------------------------------------------------------------ */
+function SheetsCard({ api }: { api: any }) {
+  const [d, setD] = useState<any>(null);
+  const [url, setUrl] = useState('');
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api('/sheets').then((x: any) => { setD(x); setUrl(x.url || ''); }).catch((e: any) => setMsg(e.message)); }, [api]);
+  const steps = [
+    'Create a Google Sheet (sheets.new).',
+    'Open Extensions → Apps Script, delete what is there, paste the script below and save.',
+    'Click Deploy → New deployment → type “Web app”. Execute as: Me. Who has access: Anyone. Deploy and allow access.',
+    'Copy the Web app URL and paste it here.',
+  ];
+  return (
+    <Card title="📊 Google Sheets (live record)" desc="One row per applicant: every question as a column, plus status, screening score, recruiter code, interview summary and Discord link. Updated on every change."
+      right={d?.lastSync && <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${d.lastSync.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{d.lastSync.ok ? 'Synced' : 'Sync failed'} · {new Date(d.lastSync.at).toLocaleString()}</span>}>
+      <ol className="list-decimal space-y-1 pl-5 text-sm text-slate-600">{steps.map((x) => <li key={x}>{x}</li>)}</ol>
+      {d?.script && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between"><span className="text-xs font-semibold text-slate-500">Script (contains your private token, keep it to yourself)</span>
+            <button className="text-xs font-semibold text-indigo-600 hover:underline" onClick={() => { navigator.clipboard?.writeText(d.script); setMsg('Script copied.'); }}>Copy script</button></div>
+          <pre className="mt-1 max-h-40 overflow-auto rounded-lg bg-slate-900 p-3 text-[11px] text-slate-100">{d.script}</pre>
+        </div>
+      )}
+      <div className="mt-4 flex flex-wrap gap-3">
+        <input className={`${input} min-w-[280px] flex-1`} placeholder="https://script.google.com/macros/s/…/exec" value={url} onChange={(e) => setUrl(e.target.value)} />
+        <button className={btn} disabled={busy} onClick={async () => { setBusy(true); setMsg(''); try { const r = await api('/sheets/connect', 'POST', { url }); setMsg(r.connected ? `Connected. ${r.rows} application(s) written to your sheet.` : 'Disconnected.'); } catch (e: any) { setMsg(e.message); } setBusy(false); }}>Connect & sync</button>
+        {d?.url && <button className={ghost} disabled={busy} onClick={async () => { setBusy(true); setMsg(''); try { const r = await api('/sheets/resync', 'POST'); setMsg(`Synced ${r.rows} application(s).`); } catch (e: any) { setMsg(e.message); } setBusy(false); }}><RefreshCw className="h-4 w-4" /> Sync now</button>}
+      </div>
+      {msg && <p className="mt-3 text-sm text-slate-600">{msg}</p>}
+    </Card>
   );
 }

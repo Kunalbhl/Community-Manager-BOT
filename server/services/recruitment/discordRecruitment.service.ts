@@ -80,6 +80,8 @@ export const discordRecruitment = {
   },
 
   async postPanel(communityId: string, channel: any) {
+    const { secureGate } = await import('./secureGate.service.js');
+    if (!(await secureGate.isVerified(communityId))) throw new Error('Finish Secure Setup first (Server tools → Recruitment in Discord). Recruitment stays off until your server is locked for newcomers.');
     const cfg = (await getToolkit(communityId)).recruitment;
     if (!(await questionsFor(communityId)).length) throw new Error('Add your application questions first (Recruitment → Questions).');
     await channel.send(this.panel(cfg));
@@ -90,6 +92,9 @@ export const discordRecruitment = {
     const communityId = await communityForGuild(interaction.guildId);
     const cfg = (await getToolkit(communityId)).recruitment;
     if (!cfg.applyEnabled) return interaction.reply({ content: 'Applications are closed in this server right now.', ephemeral: true });
+    const { gateRepository } = await import('./secureGate.service.js');
+    const gate = await gateRepository.getById(communityId).catch(() => null);
+    if (!gate?.verified) return interaction.reply({ content: '🔒 Applications open once the server owner finishes Secure Setup.', ephemeral: true });
     const [qs, active] = await Promise.all([questionsFor(communityId), applicationsRepository.list({ where: [{ field: 'communityId', operator: '==', value: communityId }, { field: 'applicantDiscordUserId', operator: '==', value: interaction.user.id }] } as any).catch(() => [])]);
     if (!qs.length) return interaction.reply({ content: '⚠️ This server has not set up its application questions yet. Please tell the staff.', ephemeral: true });
     const open = (active as any[]).find((a) => ['SUBMITTED', 'UNDER_REVIEW', 'ESCALATED', 'INTERVIEW_SCHEDULED', 'INTERVIEW_PENDING'].includes(a.status));
@@ -216,6 +221,12 @@ export const discordRecruitment = {
       }
     }
 
+    const { recruitmentLog } = await import('./recruitmentLog.service.js');
+    const { sheetsSync } = await import('./sheetsSync.service.js');
+    await recruitmentLog.post(app.communityId, `📥 New application from **${app.applicantDisplayNameSnapshot || app.applicantUsername}**${isSnowflake(applicantId) ? ` (<@${applicantId}>)` : ''}${app.recruiterCodeUsed ? ` · recruiter code **${app.recruiterCodeUsed}**${app.recruiterDiscordUserId ? ` (<@${String(app.recruiterDiscordUserId).replace(/^usr_/, '')}>)` : ''}` : ''}.`);
+    await recruitmentLog.recruiter(app.communityId, app, 'APPLIED');
+    void sheetsSync.push(app.id);
+
     if (cfg.dmOnReceived && isSnowflake(applicantId)) {
       await discordService.sendDM(applicantId, fillMsg(cfg.messages.received, {
         applicant: app.applicantDisplayNameSnapshot || app.applicantUsername || 'there', server: guild?.name || 'the server',
@@ -258,6 +269,19 @@ export const discordRecruitment = {
         const { applicationWorkflowService } = await import('../applicationWorkflow.service.js');
         await applicationWorkflowService.confirmDiscordJoin(app.communityId, applicantId).catch((err: any) => logger.warn(`[Recruitment] auto-join confirm failed: ${err?.message}`));
       }
+    }
+
+    // 2c. Open the server for them (Member role) and tell the log channel + recruiter; update the sheet.
+    if (approved && isSnowflake(applicantId)) {
+      const { secureGate } = await import('./secureGate.service.js');
+      await secureGate.onApproved(app.communityId, applicantId).catch(() => undefined);
+    }
+    {
+      const { recruitmentLog } = await import('./recruitmentLog.service.js');
+      const { sheetsSync } = await import('./sheetsSync.service.js');
+      await recruitmentLog.post(app.communityId, `${approved ? '✅ Approved' : '✖️ Rejected'}: **${vars.applicant}**${isSnowflake(reviewerDiscordId) ? ` by <@${reviewerDiscordId}>` : ''}${!approved && reason ? ` · reason: ${reason}` : ''}${app.recruiterCodeUsed ? ` · recruiter code **${app.recruiterCodeUsed}**` : ''}.`);
+      await recruitmentLog.recruiter(app.communityId, app, approved ? 'APPROVED' : 'REJECTED');
+      setTimeout(() => void sheetsSync.push(app.id), 3000);
     }
 
     // 3. Welcome announcement.
