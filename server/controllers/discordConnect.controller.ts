@@ -183,6 +183,7 @@ export async function getUserGuilds(req: Request, res: Response, next: NextFunct
             createdAt: guild.createdAt?.toISOString?.(),
             botJoinedAt: me?.joinedAt?.toISOString?.(),
             botRole: me?.roles?.highest?.name,
+            botRoles: me ? Array.from(me.roles.cache.values()).filter((r: any) => r.id !== me.guild.id).sort((a: any, b: any) => b.position - a.position).map((r: any) => r.name) : [],
             botAdmin: Boolean(me?.permissions?.has?.(8n)),
             missingPermissions: missing,
             secureSetup: gate.verified ? 'Locked' : gate.memberRoleId ? 'Needs attention' : 'Not set up',

@@ -12,7 +12,7 @@ interface ServerEntry {
   yourRole?: string;
   details?: {
     memberCount: number; textChannels: number; voiceChannels: number; roles: number; boostTier: number; boosts: number;
-    createdAt?: string; botJoinedAt?: string; botRole?: string; botAdmin: boolean; missingPermissions: string[];
+    createdAt?: string; botJoinedAt?: string; botRole?: string; botRoles?: string[]; botAdmin: boolean; missingPermissions: string[];
     secureSetup: string; activeModules: string[];
   };
 }
@@ -66,7 +66,7 @@ export function ServerPickerPage() {
 
   return (
     <div className="cm-site">
-      <header className="mx-auto flex max-w-[1400px] items-center justify-between px-5 py-5 sm:px-8">
+      <header className="mx-auto flex max-w-[min(94vw,2200px)] items-center justify-between px-5 py-5 sm:px-8">
         <a href="/" className="flex items-center gap-2.5">
           <img src="/favicon.svg" alt="" className="h-8 w-8" />
           <span className="cm-display text-xl font-bold">Community Manager</span>
@@ -78,7 +78,7 @@ export function ServerPickerPage() {
         )}
       </header>
 
-      <main className="mx-auto max-w-[1400px] px-5 pb-20 pt-6 sm:px-8">
+      <main className="mx-auto max-w-[min(94vw,2200px)] px-5 pb-20 pt-6 sm:px-8">
         <h1 className="text-[clamp(2.2rem,5vw,3.2rem)] font-extrabold">Choose a server</h1>
         <p className="mt-3 text-[var(--site-muted)]">
           These are the servers where you are an owner or admin.
@@ -120,7 +120,7 @@ export function ServerPickerPage() {
 
         {state === 'ready' && servers.length > 0 && (
           <>
-            <ul className="mt-10 grid gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+            <ul className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3 min-[1900px]:grid-cols-4 min-[2500px]:grid-cols-5">
               {servers.map((s) => <ServerCard key={s.guildId} server={s} onOpen={open} />)}
             </ul>
             <button onClick={load} className="mt-5 inline-flex items-center gap-2 text-[15px] text-[var(--site-muted)] hover:text-[var(--site-text)]">
@@ -198,7 +198,7 @@ function ServerCard({ server: s, onOpen }: { server: ServerEntry; onOpen: (s: Se
             </Row>
             <Row label="Secure Setup"><span className={d.secureSetup === 'Locked' ? 'text-[var(--site-mint)]' : d.secureSetup === 'Needs attention' ? 'text-[#FFC46B]' : 'text-[var(--site-muted)]'}>{d.secureSetup}</span></Row>
             <Row label="Active modules">{d.activeModules.length ? d.activeModules.join(' · ') : <span className="text-[var(--site-muted)]">None yet</span>}</Row>
-            <Row label="Bot role"><span className="text-[var(--site-muted)]">@{d.botRole || '—'}</span></Row>
+            <Row label={(d.botRoles?.length || 0) > 1 ? 'Bot roles' : 'Bot role'}><span className="text-right text-[var(--site-muted)]">{(d.botRoles?.length ? d.botRoles : d.botRole ? [d.botRole] : ['—']).map((r) => `@${r}`).join(', ')}</span></Row>
             <Row label="Server since"><span className="text-[var(--site-muted)]">{since(d.createdAt)}{d.boosts ? ` · ${d.boosts} boosts (level ${d.boostTier})` : ''}</span></Row>
           </div>
         </>

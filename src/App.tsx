@@ -756,7 +756,7 @@ export default function App() {
 
         {/* Dynamic Content View */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto w-full max-w-[1920px]">
+          <div className="mx-auto w-full max-w-[min(100%,2560px)]">
             {portalMode === 'COMMUNITY_DASHBOARD' && sectionHistory.current.length > 0 && (
               <button onClick={goBackSection} className="mb-4 inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-semibold text-slate-500 transition hover:bg-white hover:text-indigo-700">
                 <span aria-hidden>←</span> Back
