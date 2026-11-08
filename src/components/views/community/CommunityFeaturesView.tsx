@@ -1,3 +1,4 @@
+import { takeOpenTab } from './SetupGuideView.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { TrendingUp, Gift, MousePointerClick, BadgeCheck, ScrollText, Star, Cake, TerminalSquare, Plus, Trash2, Send, RefreshCw, Trophy } from 'lucide-react';
 import { Banner, Card, Toggle, Pick, MultiPick, SaveBar, input, btn, ghost, fmtDate, Resources } from './ServerToolsView.js';
@@ -26,7 +27,7 @@ function useApi(communityId: string) {
 
 export function CommunityFeaturesView({ communityId }: { communityId: string }) {
   const api = useApi(communityId);
-  const [tab, setTab] = useState<Tab>('levels');
+  const [tab, setTab] = useState<Tab>(() => takeOpenTab(['levels', 'giveaways', 'buttonRoles', 'verification', 'logs', 'starboard', 'birthdays', 'custom'] as const, 'levels'));
   const [cfg, setCfg] = useState<any>(null);
   const [res, setRes] = useState<Resources | null>(null);
   const [error, setError] = useState('');

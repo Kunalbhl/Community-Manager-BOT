@@ -28,7 +28,7 @@ export interface ReviewTier { name: string; roleIds: string[] }
 export interface ToolkitConfig {
   id: string;
   communityId: string;
-  tickets: { enabled: boolean; categoryId?: string; logChannelId?: string; staffRoleIds: string[]; types: TicketType[]; counter: number };
+  tickets: { enabled: boolean; categoryId?: string; logChannelId?: string; staffRoleIds: string[]; types: TicketType[]; counter: number; panelPostedAt?: string };
   warnings: { enabled: boolean; expiryDays: number; dmMember: boolean; reasons: WarningReason[]; thresholds: WarningThreshold[] };
   roleRules: { enabled: boolean; rules: RoleRule[] };
   reviewRooms: { enabled: boolean; categoryId?: string; applicantCanSee: boolean; tiers: ReviewTier[]; deleteAfterHours: number };
@@ -46,6 +46,7 @@ export interface RecruitmentDiscordConfig {
   sheetWebhookUrl?: string;
   sheetToken?: string;
   sheetLastSync?: { at: string; ok: boolean; error?: string };
+  panelPostedAt?: string;
   pingRoleIds: string[];
   reviewerRoleIds: string[];
   dmOnReceived: boolean;

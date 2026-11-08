@@ -210,6 +210,7 @@ import {
 } from '../controllers/platform.controller.js';
 import { recruiterRecordsController } from '../controllers/recruiterRecords.controller.js';
 import { getPublicContact, postPublicContact } from '../controllers/publicContact.controller.js';
+import { setupGuideHandler } from '../controllers/setupGuide.controller.js';
 import * as Toolkit from '../controllers/toolkit.controller.js';
 import * as Features from '../controllers/features.controller.js';
 import { getSocialCordStatus, setSocialCordEnabled } from '../controllers/socialcord.controller.js';
@@ -386,6 +387,7 @@ router.post(`${tk}/warnings`, requireTenantAccess(), requirePermission('communit
 router.post(`${tk}/warnings/:strikeId/revoke`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.revokeWarningHandler);
 router.post(`${tk}/recruitment/draft-quiz`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.draftQuizHandler);
 router.get(`${tk}/recruitment/threshold`, requireTenantAccess(), requirePermission('community.view'), Toolkit.screeningThresholdHandler);
+router.get('/communities/:communityId/setup-guide', requireTenantAccess(), requirePermission('community.view'), setupGuideHandler);
 router.post(`${tk}/workspace`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.provisionWorkspaceHandler);
 router.get(`${tk}/gate`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateStatusHandler);
 router.post(`${tk}/gate/lock`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateLockHandler);

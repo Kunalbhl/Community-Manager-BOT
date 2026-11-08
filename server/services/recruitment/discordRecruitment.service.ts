@@ -85,6 +85,8 @@ export const discordRecruitment = {
     const cfg = (await getToolkit(communityId)).recruitment;
     if (!(await questionsFor(communityId)).length) throw new Error('Add your application questions first (Recruitment → Questions).');
     await channel.send(this.panel(cfg));
+    const { saveToolkit } = await import('../toolkit/toolkitConfig.js');
+    await saveToolkit(communityId, { recruitment: { ...cfg, panelPostedAt: new Date().toISOString() } as any });
   },
 
   /** Button "Apply" or /apply. Shows the first page, or an explanation. */
