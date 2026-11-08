@@ -210,6 +210,7 @@ import {
 } from '../controllers/platform.controller.js';
 import { recruiterRecordsController } from '../controllers/recruiterRecords.controller.js';
 import { getPublicContact, postPublicContact } from '../controllers/publicContact.controller.js';
+import * as Toolkit from '../controllers/toolkit.controller.js';
 import { getSocialCordStatus, setSocialCordEnabled } from '../controllers/socialcord.controller.js';
 import { requirePermission, requirePlatformOwner, requireTenantAccess, requirePermissionOrApplicant } from '../middleware/auth.js';
 import { AiCommunityManagerController } from '../controllers/aiCommunityManager.controller.js';
@@ -353,6 +354,21 @@ router.get('/communities/:communityId/discord/members', DiscordResourcesControll
 
 // Community Persistent Discord Settings
 // SocialCord Notifier add-on (separate bot; this only stores the on/off choice and links).
+// Server toolkit: tickets, warning policy, role rules, review rooms, bulk tools
+const tk = '/communities/:communityId/toolkit';
+router.get(tk, requireTenantAccess(), requirePermission('community.view'), Toolkit.getToolkitHandler);
+router.put(`${tk}/settings/:section`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.saveToolkitSectionHandler);
+router.post(`${tk}/tickets/panel`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.postTicketPanelHandler);
+router.get(`${tk}/tickets`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listTicketsHandler);
+router.post(`${tk}/tickets/:ticketId/close`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.closeTicketHandler);
+router.get(`${tk}/warnings`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listWarningsHandler);
+router.post(`${tk}/warnings`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.issueWarningHandler);
+router.post(`${tk}/warnings/:strikeId/revoke`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.revokeWarningHandler);
+router.get(`${tk}/review-rooms`, requireTenantAccess(), requirePermission('applications.view'), Toolkit.listReviewRoomsHandler);
+router.post(`${tk}/bulk/preview`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkPreviewHandler);
+router.post(`${tk}/bulk`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkStartHandler);
+router.get(`${tk}/bulk`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkListHandler);
+router.post(`${tk}/bulk/:jobId/cancel`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkCancelHandler);
 router.get('/communities/:communityId/integrations/socialcord', requireTenantAccess(), getSocialCordStatus);
 router.put('/communities/:communityId/integrations/socialcord', requireTenantAccess(), requirePermission('settings.manage'), setSocialCordEnabled);
 router.get('/communities/:communityId/discord-settings', getCommunityDiscordSettings);

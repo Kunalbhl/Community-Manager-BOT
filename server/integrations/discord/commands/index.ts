@@ -13,6 +13,7 @@ import { helpCommand } from './help.command.js';
 import { userStatusCommand } from './userStatus.command.js';
 import { communityManagerPortalCommand } from './portal.command.js';
 import { approveCommand, rejectCommand, escalateCommand } from './reviewDecision.command.js';
+import { ticketCommand, warnCommand, warningsCommand } from './toolkit.command.js';
 import { communitiesRepository } from '../../../repositories/index.js';
 import { resolveUserCommunityRole } from '../../../services/authorization.service.js';
 import { auditService } from '../../../services/audit.service.js';
@@ -37,6 +38,9 @@ export const discordCommands: SlashCommandDefinition[] = [
   recruiterBenefitsCommand,     // /recruiter-benefits
   rulesCommand,                 // /rules
   supportCommand,               // /support
+  ticketCommand,                // /ticket
+  warnCommand,                  // /warn
+  warningsCommand,              // /warnings
   helpCommand,                  // /help
 ];
 

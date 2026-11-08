@@ -83,6 +83,9 @@ export function attachGatewayEventHandlers(client: Client): void {
         logger.info(`[DiscordGateway] Referral confirmed successful for joining member ${member.user.tag} (Recruiter: ${referralResult.recruiterDiscordId})`);
       }
       await applicationWorkflowService.confirmDiscordJoin(communityId, member.id);
+      import('../../../services/toolkit/roleRules.service.js')
+        .then(({ roleRules }) => roleRules.onMemberJoin(communityId, member.id))
+        .catch(() => undefined);
     } catch (err) {
       logger.error(`[DiscordGateway] Error confirming member join referral:`, undefined, { error: (err as Error).message });
     }
@@ -197,6 +200,8 @@ export function attachGatewayEventHandlers(client: Client): void {
   });
 
   const handleInteraction = async (interaction: Interaction): Promise<void> => {
+    const { handleToolkitInteraction } = await import('../toolkitInteractions.js');
+    if (await handleToolkitInteraction(interaction)) return;
     if (interaction.isChatInputCommand()) {
       await handleCommandInteraction(interaction);
     } else if (interaction.isButton()) {

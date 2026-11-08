@@ -312,6 +312,11 @@ export class ApplicationWorkflowService {
       updatedAt: now,
     });
 
+    // Private review room in Discord (when enabled in Recruitment > Review rooms).
+    import('./toolkit/reviewRooms.service.js')
+      .then(({ reviewRooms }) => reviewRooms.openForApplication(createdApp.id))
+      .catch((err) => logger.warn(`[ReviewRooms] open failed: ${err?.message}`));
+
     // Tell reviewers on Discord right away (free, always on).
     import('./reviewReminders.service.js')
       .then(({ reviewReminders }) =>
@@ -551,6 +556,18 @@ export class ApplicationWorkflowService {
           applicationStatus: 'REJECTED',
         },
       });
+    }
+
+    // Role rules + close the review room.
+    if (status === 'APPROVED' || status === 'REJECTED') {
+      import('./toolkit/reviewRooms.service.js')
+        .then(({ reviewRooms }) => reviewRooms.closeForApplication(app.id, status as any, String(input.actorDiscordUserId || actorUserId).replace(/^usr_/, '')))
+        .catch((err) => logger.warn(`[ReviewRooms] close failed: ${err?.message}`));
+    }
+    if (status === 'APPROVED') {
+      import('./toolkit/roleRules.service.js')
+        .then(({ roleRules }) => roleRules.applyForApplication(app.id))
+        .catch((err) => logger.warn(`[RoleRules] apply failed: ${err?.message}`));
     }
 
     try {
