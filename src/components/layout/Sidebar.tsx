@@ -15,7 +15,7 @@ import {
   ArrowLeft,
   User,
   Radio,
-  Megaphone, Wrench, PartyPopper, ListChecks, UserCog } from 'lucide-react';
+  Megaphone, Wrench, PartyPopper, ListChecks, UserCog, ClipboardList, LayoutGrid, CalendarClock, BrainCircuit, Plug } from 'lucide-react';
 import { PortalMode, PlatformSection, CommunitySection } from '../../types/ui.js';
 import { UserRole, Permission } from '../../../shared/types/rbac.js';
 import { hasPermission } from '../../../server/security/rbac.js';
@@ -58,6 +58,15 @@ interface PrimaryNavModule {
   matchingSections: CommunitySection[];
 }
 
+/** Each area gets its own colour so it is easy to spot. */
+const NAV_TONE: Record<string, string> = {
+  home: 'bg-sky-500/15 text-sky-300', 'setup-guide': 'bg-emerald-500/15 text-emerald-300', community: 'bg-violet-500/15 text-violet-300',
+  engagement: 'bg-orange-500/15 text-orange-300', recruitment: 'bg-pink-500/15 text-pink-300', moderation: 'bg-red-500/15 text-red-300',
+  'team-access': 'bg-amber-500/15 text-amber-300', capabilities: 'bg-yellow-400/15 text-yellow-300', 'community-features': 'bg-fuchsia-500/15 text-fuchsia-300',
+  'server-tools': 'bg-cyan-500/15 text-cyan-300', 'events-automation': 'bg-teal-500/15 text-teal-300', 'insights-ai': 'bg-indigo-400/20 text-indigo-200',
+  integrations: 'bg-lime-500/15 text-lime-300', settings: 'bg-slate-400/15 text-slate-300',
+};
+
 const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
   {
     id: 'home',
@@ -86,7 +95,7 @@ const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
   {
     id: 'recruitment',
     label: 'Recruitment',
-    icon: FileText,
+    icon: ClipboardList,
     matchingSections: [
       'recruitment',
       'applications',
@@ -121,7 +130,7 @@ const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
   {
     id: 'capabilities',
     label: 'All features',
-    icon: Sparkles,
+    icon: LayoutGrid,
     requiredPermission: 'community.view',
     matchingSections: ['capabilities'],
   },
@@ -142,19 +151,19 @@ const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
   {
     id: 'events-automation',
     label: 'Events & automation',
-    icon: Radio,
+    icon: CalendarClock,
     matchingSections: ['events-automation', 'events', 'automation'],
   },
   {
     id: 'insights-ai',
     label: 'Insights & AI',
-    icon: Sparkles,
+    icon: BrainCircuit,
     matchingSections: ['insights-ai', 'insights-dashboard', 'ai', 'reports'],
   },
   {
     id: 'integrations',
     label: 'Integrations',
-    icon: Sheet,
+    icon: Plug,
     matchingSections: ['integrations', 'spreadsheet', 'google-calendar', 'discord-gateway'],
   },
   {
@@ -330,12 +339,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         : 'text-slate-300 hover:bg-white/5 hover:text-white'
                     }`}
                   >
-                    <Icon
-                      className={`h-4 w-4 shrink-0 ${
-                        isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'
-                      }`}
-                    />
-                    <span className="truncate">{mod.label}</span>
+                    <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg transition duration-200 group-hover:scale-110 group-hover:-rotate-6 group-active:scale-95 ${NAV_TONE[mod.id] || 'bg-white/10 text-slate-300'} ${isActive ? 'ring-1 ring-white/30' : ''}`}>
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="truncate transition-transform duration-200 group-hover:translate-x-0.5">{mod.label}</span>
                   </button>
                 );
               })}

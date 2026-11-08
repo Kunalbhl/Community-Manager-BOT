@@ -6,12 +6,12 @@ import { Check } from 'lucide-react';
 export function CapabilitiesView() {
   const total = CATALOG.reduce((n, c) => n + c.items.length, 0);
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="mx-auto max-w-[min(100%,2200px)] space-y-6">
       <div>
         <h1 className="text-3xl font-extrabold text-slate-900">What Community Manager can do</h1>
         <p className="mt-1 text-slate-600">{total} live capabilities across {CATALOG.length} areas. This is the same list shown on our website, and everything on it works today.</p>
       </div>
-      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 min-[1900px]:grid-cols-4">
         {CATALOG.map((c) => (
           <section key={c.title} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
