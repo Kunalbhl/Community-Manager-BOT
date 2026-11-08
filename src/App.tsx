@@ -249,6 +249,13 @@ export default function App() {
     return () => clearInterval(interval);
   }, [fetchUnreadNotifications, selectedCommunity]);
 
+  // In-app links from any screen: window.dispatchEvent(new CustomEvent('cm:navigate', { detail: 'settings' }))
+  React.useEffect(() => {
+    const go = (e: Event) => { const s = (e as CustomEvent).detail; if (typeof s === 'string') setActiveCommunitySection(s as CommunitySection); };
+    window.addEventListener('cm:navigate', go);
+    return () => window.removeEventListener('cm:navigate', go);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Global Cmd+K / Ctrl+K listener
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

@@ -1,4 +1,4 @@
-import { takeOpenTab } from './SetupGuideView.js';
+import { takeOpenTab, goTo } from './SetupGuideView.js';
 import { TemplateField, RECRUIT_VARS } from '../../common/TemplateField.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -687,7 +687,7 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
           <div className="rounded-xl border border-slate-200 p-4 text-sm">
             <div className="font-bold text-slate-900">Screening threshold</div>
             <div className="mt-2 text-4xl font-extrabold text-indigo-600">{threshold ?? '…'}%</div>
-            <p className="mt-1 text-slate-500">Set in Settings → Recruitment. The score is shown to staff only.</p>
+            <p className="mt-1 text-slate-500">Set in <button type="button" className="font-semibold text-indigo-600 hover:underline" onClick={() => goTo('settings', 'recruitment')}>Settings → Recruitment ↗</button>. The score is shown to staff only.</p>
             <div className="mt-4 font-bold text-slate-900">Below the threshold</div>
             <select className={`${input} mt-2`} value={sc.onFail} onChange={(e) => setSc({ onFail: e.target.value })}>
               <option value="GUIDE_AND_CONTINUE">Explain the missed rules, then continue to the interview</option>
@@ -699,6 +699,8 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
         <label className="mt-5 block text-sm font-medium text-slate-700">Consent message (shown above your rules and guide)<textarea rows={2} className={`${input} mt-1`} value={sc.consentText} onChange={(e) => setSc({ consentText: e.target.value })} /></label>
       </Card>
 
+      <RulesCard api={api} res={res} />
+
       <Card title={`Rules quiz (${sc.questions.length})`} desc="Each question has 4 answers; mark the correct one. The explanation is shown to applicants who get it wrong."
         right={<div className="flex gap-2">
           <button className={ghost} disabled={!!drafting} onClick={async () => {
@@ -707,7 +709,7 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
           }}>🧠 Draft from my rules</button>
           <button className={ghost} onClick={() => setSc({ questions: [...sc.questions, { id: '', question: '', options: ['', '', '', ''], correct: 0, explain: '' }] })}><Plus className="h-4 w-4" /> Add question</button>
         </div>}>
-        {drafting && <p className="mb-4 text-sm text-slate-600">{drafting}</p>}
+        {drafting && <p className="mb-4 text-sm text-slate-600">{drafting}{/server rules/i.test(drafting) && <> <button type="button" className="font-semibold text-indigo-600 hover:underline" onClick={() => document.getElementById('server-rules')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>Go to Server rules ↑</button></>}</p>}
         {!sc.questions.length && <p className="text-sm text-slate-500">No rules questions yet. Without them, the applicant goes straight from consent to the interview.</p>}
         <div className="space-y-4">
           {sc.questions.map((q: any, i: number) => (
@@ -924,5 +926,51 @@ function SheetsCard({ api }: { api: any }) {
       </div>
       {msg && <p className="mt-3 text-sm text-slate-600">{msg}</p>}
     </Card>
+  );
+}
+
+/** The server's rules: shown with the consent message and used to draft the rules quiz. */
+function RulesCard({ api, res }: { api: any; res: Resources }) {
+  const [rules, setRules] = useState<any[]>([]);
+  const [text, setText] = useState('');
+  const [channelId, setChannelId] = useState('');
+  const [msg, setMsg] = useState('');
+  const load = useCallback(() => api('/recruitment/rules').then(setRules).catch((e: any) => setMsg(e.message)), [api]);
+  useEffect(() => { load(); }, [load]);
+  const add = async () => {
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    try { for (const l of lines) await api('/recruitment/rules', 'POST', { title: l }); setText(''); setMsg(''); load(); } catch (e: any) { setMsg(e.message); }
+  };
+  return (
+    <div id="server-rules">
+      <Card title={`Server rules (${rules.length})`} desc="Applicants see these with the consent message, and “Draft from my rules” writes quiz questions from them.">
+        {!!rules.length && <ol className="mb-4 space-y-2">
+          {rules.map((r, i) => (
+            <li key={r.id} className="flex items-start gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              <span className="font-bold text-slate-400">{i + 1}.</span>
+              <span className="flex-1 text-slate-800">{r.title}{r.description && r.description !== r.title ? <span className="block text-slate-500">{r.description}</span> : null}</span>
+              <button type="button" aria-label="Remove rule" className="text-slate-400 hover:text-rose-600" onClick={() => api(`/recruitment/rules/${r.id}`, 'DELETE').then(load).catch((e: any) => setMsg(e.message))}><Trash2 className="h-4 w-4" /></button>
+            </li>
+          ))}
+        </ol>}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div>
+            <div className="text-sm font-semibold text-slate-700">Copy from a Discord channel</div>
+            <p className="mt-1 text-xs text-slate-500">Leave empty to use the server’s official rules channel.</p>
+            <div className="mt-2 flex gap-2">
+              <div className="min-w-0 flex-1"><Pick options={res.textChannels} value={channelId} onChange={setChannelId} placeholder="Server rules channel" /></div>
+              <button type="button" className={ghost} onClick={async () => { try { const r = await api('/recruitment/rules/import', 'POST', { channelId }); setMsg(`Added ${r.added} rule${r.added === 1 ? '' : 's'} from #${r.channel}.`); load(); } catch (e: any) { setMsg(e.message); } }}>Import</button>
+            </div>
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-slate-700">Or type them</div>
+            <p className="mt-1 text-xs text-slate-500">One rule per line.</p>
+            <textarea rows={3} className={`${input} mt-2`} value={text} onChange={(e) => setText(e.target.value)} placeholder={'Be respectful to everyone\nNo advertising without permission'} />
+            <button type="button" className={`${ghost} mt-2`} disabled={!text.trim()} onClick={add}><Plus className="h-4 w-4" /> Add rules</button>
+          </div>
+        </div>
+        {msg && <p className="mt-3 text-sm text-slate-600">{msg}</p>}
+      </Card>
+    </div>
   );
 }

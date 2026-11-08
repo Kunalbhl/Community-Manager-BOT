@@ -385,6 +385,10 @@ router.post(`${tk}/tickets/:ticketId/close`, requireTenantAccess(), requirePermi
 router.get(`${tk}/warnings`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listWarningsHandler);
 router.post(`${tk}/warnings`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.issueWarningHandler);
 router.post(`${tk}/warnings/:strikeId/revoke`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.revokeWarningHandler);
+router.get(`${tk}/recruitment/rules`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listRulesHandler);
+router.post(`${tk}/recruitment/rules`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.addRuleHandler);
+router.post(`${tk}/recruitment/rules/import`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.importRulesHandler);
+router.delete(`${tk}/recruitment/rules/:ruleId`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.deleteRuleHandler);
 router.post(`${tk}/recruitment/draft-quiz`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.draftQuizHandler);
 router.get(`${tk}/recruitment/threshold`, requireTenantAccess(), requirePermission('community.view'), Toolkit.screeningThresholdHandler);
 router.get('/communities/:communityId/team', requireTenantAccess(), requirePermission('users.view'), Team.getTeamHandler);
