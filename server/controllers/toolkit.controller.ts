@@ -276,7 +276,7 @@ export async function draftQuizHandler(req: Request, res: Response) {
   try {
     const { communityQuestionsService } = await import('../services/communityQuestions.service.js');
     const rules = (await communityQuestionsService.listGuidelines(req.params.communityId)).filter((g: any) => g.enabled !== false);
-    if (!rules.length) throw new Error('Add your rules and guide first (Recruitment → Rules & guidelines), then try again.');
+    if (!rules.length) throw new Error('Add your server rules first (Server tools → Recruitment → Server rules, just above the quiz), then try again.');
     const { GeminiAIProvider } = await import('../services/ai/geminiProvider.js');
     const ai = new GeminiAIProvider();
     if (!ai.isConfigured()) throw new Error('Community Brain (AI) is not configured.');
@@ -369,5 +369,54 @@ export async function provisionWorkspaceHandler(req: Request, res: Response) {
   try {
     const { workspace } = await import('../services/serverWorkspace.service.js');
     ok(res, await workspace.provision(req.params.communityId));
+  } catch (err) { fail(res, err); }
+}
+
+/** Server rules used for the consent step and the rules quiz. */
+export async function listRulesHandler(req: Request, res: Response) {
+  try {
+    const { communityQuestionsService } = await import('../services/communityQuestions.service.js');
+    ok(res, await communityQuestionsService.listGuidelines(req.params.communityId));
+  } catch (err) { fail(res, err, 500); }
+}
+export async function addRuleHandler(req: Request, res: Response) {
+  try {
+    const { communityQuestionsService } = await import('../services/communityQuestions.service.js');
+    const list = await communityQuestionsService.listGuidelines(req.params.communityId);
+    ok(res, await communityQuestionsService.addGuideline(req.params.communityId, {
+      title: str(req.body?.title, 120), description: str(req.body?.description, 1000), category: 'RULE', order: list.length + 1,
+    }));
+  } catch (err) { fail(res, err); }
+}
+export async function deleteRuleHandler(req: Request, res: Response) {
+  try {
+    const { communityGuidelinesRepository } = await import('../repositories/index.js');
+    const g: any = await communityGuidelinesRepository.findById(req.params.ruleId);
+    if (!g || g.communityId !== req.params.communityId) throw new Error('Rule not found.');
+    await communityGuidelinesRepository.delete(g.id);
+    ok(res, { deleted: true });
+  } catch (err) { fail(res, err); }
+}
+/** Import rules from the server's Discord rules channel (or a picked channel): one rule per line/message. */
+export async function importRulesHandler(req: Request, res: Response) {
+  try {
+    const communityId = req.params.communityId;
+    const guild: any = await guildFor(communityId);
+    if (!guild) throw new Error('The bot is not connected to this server.');
+    const ch: any = isSnowflake(req.body?.channelId) ? guild.channels.cache.get(req.body.channelId) : guild.rulesChannel;
+    if (!ch?.messages) throw new Error('No rules channel found. Pick the channel that has your rules.');
+    const msgs = Array.from((await ch.messages.fetch({ limit: 20 })).values()).reverse() as any[];
+    const text = msgs.map((m) => [m.content, ...m.embeds.map((e: any) => [e.title, e.description, ...(e.fields || []).map((f: any) => `${f.name}: ${f.value}`)].filter(Boolean).join('\n'))].join('\n')).join('\n');
+    const lines = text.split('\n').map((l: string) => l.replace(/^[\s>*_#`~|•\-–\d.)]+/, '').replace(/[*_`~]/g, '').trim()).filter((l: string) => l.length >= 8 && l.length <= 300);
+    if (!lines.length) throw new Error(`Couldn't find rule text in #${ch.name}.`);
+    const { communityQuestionsService } = await import('../services/communityQuestions.service.js');
+    const existing = new Set((await communityQuestionsService.listGuidelines(communityId)).map((g: any) => g.title.toLowerCase()));
+    let n = 0;
+    for (const l of lines.slice(0, 25)) {
+      const title = l.slice(0, 120);
+      if (existing.has(title.toLowerCase())) continue;
+      await communityQuestionsService.addGuideline(communityId, { title, description: l.length > 120 ? l : '', category: 'RULE', order: existing.size + ++n });
+    }
+    ok(res, { added: n, channel: ch.name });
   } catch (err) { fail(res, err); }
 }

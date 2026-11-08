@@ -110,7 +110,7 @@ const LOCALES = [
 ];
 
 export const CommunitySettingsView: React.FC<CommunitySettingsViewProps> = ({ communityId, currentRole }) => {
-  const [activeTab, setActiveTab] = useState<SettingsSectionKey>('general');
+  const [activeTab, setActiveTab] = useState<SettingsSectionKey>(() => { try { const t = sessionStorage.getItem('cm_open_tab'); if (t === 'recruitment') { sessionStorage.removeItem('cm_open_tab'); return 'recruitment' as SettingsSectionKey; } } catch { /* ignore */ } return 'general'; });
   const [settings, setSettings] = useState<ConsolidatedCommunitySettings | null>(null);
   const [originalSettings, setOriginalSettings] = useState<ConsolidatedCommunitySettings | null>(null);
   const [loading, setLoading] = useState<boolean>(true);

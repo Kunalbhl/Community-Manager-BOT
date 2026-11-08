@@ -12,6 +12,12 @@ export function openSection(onNavigate: (s: string) => void, section: string, ta
   onNavigate(section);
 }
 
+/** Open a section from screens that don't receive onNavigate. */
+export function goTo(section: string, tab?: string) {
+  try { if (tab) sessionStorage.setItem('cm_open_tab', tab); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent('cm:navigate', { detail: section }));
+}
+
 /** Read once by tabbed screens to open the tab the guide pointed to. */
 export function takeOpenTab<T extends string>(allowed: readonly T[], fallback: T): T {
   try {
