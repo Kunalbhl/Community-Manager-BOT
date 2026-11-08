@@ -361,6 +361,7 @@ const view = [requireTenantAccess(), requirePermission('community.view')];
 const manage = [requireTenantAccess(), requirePermission('settings.manage')];
 router.get(ft, ...view, Features.getFeaturesHandler);
 router.put(`${ft}/settings/:section`, ...manage, Features.saveFeatureSectionHandler);
+router.get('/communities/:communityId/home-summary', ...view, Features.homeSummaryHandler);
 router.get(`${ft}/leaderboard`, ...view, Features.leaderboardHandler);
 router.post(`${ft}/levels/xp`, ...manage, Features.setXpHandler);
 router.post(`${ft}/verification/panel`, ...manage, Features.postVerifyPanelHandler);

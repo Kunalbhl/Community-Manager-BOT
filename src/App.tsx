@@ -5,6 +5,7 @@ import { NotificationDrawer } from './components/layout/NotificationDrawer.js';
 import { ContactPage } from './components/site/ContactPage.js';
 import { DiscordRedirect } from './components/site/DiscordRedirect.js';
 import { CommunityFeaturesView } from './components/views/community/CommunityFeaturesView.js';
+import { HomeToday } from './components/views/community/HomeToday.js';
 import { ServerToolsView } from './components/views/community/ServerToolsView.js';
 import { AccessDeniedView } from './components/views/AccessDeniedView.js';
 import { ApplicantPortalView } from './components/views/ApplicantPortalView.js';
@@ -458,11 +459,14 @@ export default function App() {
       case 'dashboard':
       case 'overview':
         return (
+          <>
+          <HomeToday communityId={selectedCommunity} onNavigate={(s) => setActiveCommunitySection(s as CommunitySection)} />
           <CommunityOverviewView
             currentRole={currentRole}
             communityId={selectedCommunity}
             onNavigate={(s) => setActiveCommunitySection(s as CommunitySection)}
           />
+          </>
         );
       case 'community':
       case 'community-config':

@@ -154,3 +154,49 @@ export async function endGiveawayHandler(req: Request, res: Response) {
 export async function cancelGiveawayHandler(req: Request, res: Response) {
   try { const g = await ownGiveaway(req); ok(res, await giveaways.cancel(g.id)); } catch (err) { fail(res, err); }
 }
+
+// ---------- dashboard home summary ----------
+export async function homeSummaryHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const where = [{ field: 'communityId', operator: '==' as const, value: communityId }];
+    const [{ applicationsRepository, interviewsRepository }, { ticketsRepository }, { strikesRepository }, { getToolkit }] = await Promise.all([
+      import('../repositories/index.js'), import('../services/toolkit/tickets.service.js'), import('../services/toolkit/warningPolicy.service.js'), import('../services/toolkit/toolkitConfig.js'),
+    ]);
+    const [apps, interviews, tickets, strikes, gws, top, feat, kit, guild] = await Promise.all([
+      applicationsRepository.list({ where } as any).catch(() => []),
+      interviewsRepository.list({ where } as any).catch(() => []),
+      ticketsRepository.list({ where } as any).catch(() => []),
+      strikesRepository.list({ where } as any).catch(() => []),
+      giveaways.list(communityId).catch(() => []),
+      levels.leaderboard(communityId, 3).catch(() => []),
+      getFeatures(communityId),
+      getToolkit(communityId),
+      guildFor(communityId),
+    ]);
+    const now = Date.now();
+    const DAY = 86_400_000;
+    const at = (x: any) => Date.parse(x.submittedAt || x.createdAt || '') || 0;
+    const days = Array.from({ length: 14 }, (_, i) => {
+      const start = new Date(now - (13 - i) * DAY); start.setHours(0, 0, 0, 0);
+      const s = start.getTime();
+      return { date: start.toISOString().slice(0, 10), count: (apps as any[]).filter((a) => at(a) >= s && at(a) < s + DAY).length };
+    });
+    const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+    ok(res, {
+      server: guild ? { name: guild.name, icon: guild.iconURL?.({ size: 128 }) || null, memberCount: guild.memberCount, online: true } : { online: false },
+      waiting: (apps as any[]).filter((a) => ['SUBMITTED', 'UNDER_REVIEW', 'ESCALATED'].includes(a.status)).length,
+      approved30d: (apps as any[]).filter((a) => a.status === 'APPROVED' && now - Date.parse(a.updatedAt || a.createdAt || '') < 30 * DAY).length,
+      interviewsToday: (interviews as any[]).filter((i) => i.status === 'SCHEDULED' && Date.parse(i.scheduledAt || '') >= startToday.getTime() && Date.parse(i.scheduledAt || '') < startToday.getTime() + DAY).length,
+      openTickets: (tickets as any[]).filter((t) => t.status !== 'CLOSED').length,
+      warnings7d: (strikes as any[]).filter((s) => now - Date.parse(s.createdAt) < 7 * DAY).length,
+      runningGiveaways: (gws as any[]).filter((g) => g.status === 'RUNNING').length,
+      applicationsByDay: days,
+      topMembers: top,
+      features: {
+        Tickets: kit.tickets.enabled, Warnings: kit.warnings.enabled, 'Role rules': kit.roleRules.enabled && kit.roleRules.rules.length > 0, 'Review rooms': kit.reviewRooms.enabled,
+        Levels: feat.levels.enabled, Verification: feat.verification.enabled, Logs: feat.logs.enabled, Starboard: feat.starboard.enabled, Birthdays: feat.birthdays.enabled, 'Custom commands': feat.customCommands.enabled,
+      },
+    });
+  } catch (err) { fail(res, err, 500); }
+}
