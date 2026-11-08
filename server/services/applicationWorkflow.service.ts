@@ -401,7 +401,7 @@ export class ApplicationWorkflowService {
     // 8. Event-driven Notification dispatch
     try {
       const { AutomationEventBusService } = await import('./automation.service.js');
-      await AutomationEventBusService.publish({
+      AutomationEventBusService.publish({
         eventType: 'APPLICATION_SUBMITTED',
         communityId,
         actorDiscordUserId: applicantDiscordUserId,
@@ -414,7 +414,7 @@ export class ApplicationWorkflowService {
           status: createdApp.status,
           recruiterCode: createdApp.recruiterCode,
         },
-      });
+      }).catch((err: any) => logger.warn(`[ApplicationWorkflow] automation publish failed: ${err?.message}`));
     } catch (err: any) {
       logger.error(`[ApplicationWorkflow] Error publishing APPLICATION_SUBMITTED: ${err.message}`);
     }
@@ -585,7 +585,7 @@ export class ApplicationWorkflowService {
     try {
       if (status === 'APPROVED' || status === 'REJECTED') {
         const { AutomationEventBusService } = await import('./automation.service.js');
-        await AutomationEventBusService.publish({
+        AutomationEventBusService.publish({
           eventType: status === 'APPROVED' ? 'APPLICATION_APPROVED' : 'APPLICATION_REJECTED',
           communityId,
           actorDiscordUserId: app.applicantDiscordUserId || app.applicantDiscordId,
@@ -598,7 +598,7 @@ export class ApplicationWorkflowService {
             rejectionReason: status === 'REJECTED' ? rejectionReason : undefined,
             reviewedBy: actorUserId,
           },
-        });
+        }).catch((err: any) => logger.warn(`[ApplicationWorkflow] automation publish failed: ${err?.message}`));
       }
     } catch (err: any) {
       logger.error(`[ApplicationWorkflow] Error publishing application review event: ${err.message}`);
@@ -683,7 +683,7 @@ export class ApplicationWorkflowService {
 
     try {
       const { AutomationEventBusService } = await import('./automation.service.js');
-      await AutomationEventBusService.publish({
+      AutomationEventBusService.publish({
         eventType: 'RECRUITMENT_SUCCESSFUL',
         communityId,
         actorDiscordUserId: discordUserId,
@@ -696,7 +696,7 @@ export class ApplicationWorkflowService {
           recruiterDiscordUserId: targetApp.recruiterDiscordUserId,
           status: 'JOINED',
         },
-      });
+      }).catch((err: any) => logger.warn(`[ApplicationWorkflow] automation publish failed: ${err?.message}`));
     } catch (err: any) {
       logger.error(`[ApplicationWorkflow] Error publishing RECRUITMENT_SUCCESSFUL: ${err.message}`);
     }

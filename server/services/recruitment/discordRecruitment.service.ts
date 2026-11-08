@@ -251,6 +251,15 @@ export const discordRecruitment = {
       await discordService.sendDM(applicantId, fillMsg(approved ? cfg.messages.approved : cfg.messages.rejected, vars)).catch(() => undefined);
     }
 
+    // 2b. Already in the server? Then they have joined: mark it and run join-time role rules.
+    if (approved && guild && isSnowflake(applicantId)) {
+      const member = await guild.members.fetch(applicantId).catch(() => null);
+      if (member) {
+        const { applicationWorkflowService } = await import('../applicationWorkflow.service.js');
+        await applicationWorkflowService.confirmDiscordJoin(app.communityId, applicantId).catch((err: any) => logger.warn(`[Recruitment] auto-join confirm failed: ${err?.message}`));
+      }
+    }
+
     // 3. Welcome announcement.
     if (approved && guild && cfg.announceChannelId) {
       const ch: any = guild.channels.cache.get(cfg.announceChannelId);
