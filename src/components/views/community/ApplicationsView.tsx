@@ -2390,11 +2390,17 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
         isOpen={!!selectedApp}
         onClose={() => setSelectedApp(null)}
         title={selectedApp?.applicantUsername || 'Candidate Profile'}
-        subtitle={`Discord UID: ${selectedApp?.applicantDiscordId || 'N/A'}`}
+        subtitle={`${(selectedApp as any)?.applicantDisplayNameSnapshot ? `${(selectedApp as any).applicantDisplayNameSnapshot} · ` : ''}via ${(selectedApp as any)?.source === 'DISCORD' ? 'Discord' : 'website'}`}
         badge={selectedApp?.status}
       >
         {selectedApp && (
           <div className="space-y-6">
+            {(selectedApp as any).discordReviewUrl && (
+              <a href={(selectedApp as any).discordReviewUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
+                Open the original application in Discord <span aria-hidden>↗</span>
+              </a>
+            )}
             
             {/* Drawer interior tabs */}
             <div className="border-b border-slate-200">
@@ -2458,7 +2464,7 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                       </button>
                     )}
 
-                    {selectedApp.status !== 'APPROVED' && selectedApp.status !== 'JOINED' && (
+                    {!['APPROVED', 'JOINED', 'JOIN_PENDING', 'REJECTED'].includes(selectedApp.status) && (
                       <button
                         onClick={() => handleUpdateStatus(selectedApp.id, 'APPROVED')}
                         className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700"
