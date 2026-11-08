@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChannelSelect } from '../../common/DiscordPickers.js';
 import {
   Sliders,
   CheckCircle,
@@ -416,12 +417,7 @@ export const CommunityHubView: React.FC<CommunityHubViewProps> = ({
 
                   <div>
                     <label className="block font-bold uppercase text-slate-700">Welcome Channel</label>
-                    <input
-                      type="text"
-                      value={welcomeChannel}
-                      onChange={(e) => setWelcomeChannel(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm font-mono"
-                    />
+                    <ChannelSelect valueType="hashName" value={welcomeChannel} onChange={setWelcomeChannel} className="mt-1" />
                   </div>
                 </>
               )}

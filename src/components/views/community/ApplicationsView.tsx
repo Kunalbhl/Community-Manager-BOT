@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { MemberSelect } from '../../common/DiscordPickers.js';
+import { RoleSelect } from '../../common/DiscordPickers.js';
 import {
   FileText,
   Search,
@@ -3168,13 +3170,7 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
 
               <div>
                 <label className="block text-[10px] font-black uppercase text-slate-500">Discord Role ID to Grant</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 102938102938"
-                  value={newBenefitRoleId}
-                  onChange={(e) => setNewBenefitRoleId(e.target.value)}
-                  className="mt-1 w-full font-mono rounded-lg border border-slate-300 p-2.5 text-xs"
-                />
+                <RoleSelect className="mt-1" value={newBenefitRoleId} onChange={setNewBenefitRoleId} />
               </div>
 
               <div>
@@ -3226,14 +3222,7 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
             <form onSubmit={handleManualJoinSubmit} className="space-y-4">
               <div>
                 <label className="block text-[10px] font-black uppercase text-slate-500">Candidate Discord User ID</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. 102938102938"
-                  value={manualJoinDiscordId}
-                  onChange={(e) => setManualJoinDiscordId(e.target.value)}
-                  className="mt-1 w-full font-mono rounded-lg border border-slate-300 p-2.5 text-xs"
-                />
+                <div className="mt-1"><MemberSelect value={manualJoinDiscordId} onChange={(id) => setManualJoinDiscordId(id)} /></div>
               </div>
 
               <div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { RoleSelect } from '../../common/DiscordPickers.js';
 import {
   MessageSquare,
   Sparkles,
@@ -589,13 +590,7 @@ export const WelcomeOnboardingView: React.FC<WelcomeOnboardingViewProps> = ({ co
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Recruited Member Role ID (Discord Role ID)
                   </label>
-                  <input
-                    type="text"
-                    value={newMemberRoleId}
-                    onChange={(e) => setNewMemberRoleId(e.target.value)}
-                    placeholder="e.g. 987654321098765432"
-                    className="w-full md:w-1/2 rounded-lg border border-slate-300 p-2.5 text-sm font-mono focus:border-indigo-500 focus:outline-hidden"
-                  />
+                  <div className="md:w-1/2"><RoleSelect value={newMemberRoleId} onChange={setNewMemberRoleId} /></div>
                   <div className="mt-2 rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 flex items-start gap-2">
                     <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                     <div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChannelSelect, RoleSelect } from '../../common/DiscordPickers.js';
 import {
   Sliders,
   Shield,
@@ -882,20 +883,7 @@ export const CommunitySettingsView: React.FC<CommunitySettingsViewProps> = ({ co
                           <span>{roleKey}</span>
                         </td>
                         <td className="px-4 py-3">
-                          <input
-                            type="text"
-                            disabled={isProtected && roleKey === 'OWNER'}
-                            value={roleConfig.discordRoleName || ''}
-                            onChange={(e) =>
-                              updateRoleMapping(roleKey as UserRole, { discordRoleName: e.target.value })
-                            }
-                            placeholder="@role-name"
-                            className={`rounded border px-2.5 py-1 text-xs shadow-sm ${
-                              isProtected && roleKey === 'OWNER'
-                                ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
-                                : 'border-slate-300 focus:border-indigo-500 focus:outline-none'
-                            }`}
-                          />
+                          <div className="min-w-[180px]"><RoleSelect valueType="name" value={roleConfig.discordRoleName || ''} onChange={(v) => updateRoleMapping(roleKey as UserRole, { discordRoleName: v })} /></div>
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -1214,17 +1202,7 @@ export const CommunitySettingsView: React.FC<CommunitySettingsViewProps> = ({ co
                       </select>
 
                       {catConfig.destination === 'DISCORD' && (
-                        <input
-                          type="text"
-                          value={catConfig.channelName || ''}
-                          onChange={(e) => {
-                            const newCats = { ...settings.notifications.categories };
-                            newCats[catKey] = { ...catConfig, channelName: e.target.value };
-                            updateNotifications({ categories: newCats });
-                          }}
-                          placeholder="#channel"
-                          className="w-32 rounded border border-slate-300 px-2 py-1 text-xs shadow-sm focus:border-indigo-500 focus:outline-none"
-                        />
+                        <div className="w-48"><ChannelSelect valueType="hashName" value={catConfig.channelName || ''} onChange={(v) => { const newCats = { ...settings.notifications.categories }; newCats[catKey] = { ...catConfig, channelName: v }; updateNotifications({ categories: newCats }); }} /></div>
                       )}
 
                       <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">

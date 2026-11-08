@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChannelSelect } from '../../common/DiscordPickers.js';
 import {
   Calendar,
   Users,
@@ -323,14 +324,7 @@ export const EventsView: React.FC<EventsViewProps> = ({ communityId }) => {
 
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase">Discord Channel ID</label>
-                <input
-                  id="event-input-channel"
-                  type="text"
-                  value={channelId}
-                  onChange={e => setChannelId(e.target.value)}
-                  placeholder="Optional channel ID for sync notice"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:ring-indigo-500 focus:border-indigo-500"
-                />
+                <ChannelSelect className="mt-1" value={channelId} placeholder="Channel for the event notice (optional)" onChange={setChannelId} />
               </div>
 
               <div className="grid grid-cols-2 gap-2">

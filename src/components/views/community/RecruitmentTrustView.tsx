@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ChannelSelect } from '../../common/DiscordPickers.js';
+import { MemberSelect } from '../../common/DiscordPickers.js';
+import { RoleSelect } from '../../common/DiscordPickers.js';
 import {
   ShieldAlert,
   UserCheck,
@@ -621,13 +624,7 @@ export const RecruitmentTrustView: React.FC<RecruitmentTrustViewProps> = ({
               <div className="flex items-end gap-2">
                 <div className="flex-1">
                   <label className="block text-xs font-semibold text-slate-700">Discord Role ID (Optional)</label>
-                  <input
-                    type="text"
-                    placeholder="123456789012345678"
-                    value={newBenefitRoleId}
-                    onChange={(e) => setNewBenefitRoleId(e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm font-mono"
-                  />
+                  <RoleSelect className="mt-1" value={newBenefitRoleId} onChange={setNewBenefitRoleId} />
                 </div>
                 <button
                   type="submit"
@@ -743,13 +740,7 @@ export const RecruitmentTrustView: React.FC<RecruitmentTrustViewProps> = ({
             <form onSubmit={handleCheckRisk} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700">Discord User ID</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 987654321098765432"
-                  value={riskCheckDiscordId}
-                  onChange={(e) => setRiskCheckDiscordId(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono"
-                />
+                <div className="mt-1"><MemberSelect value={riskCheckDiscordId} onChange={(id) => setRiskCheckDiscordId(id)} /></div>
               </div>
 
               <div>
@@ -807,14 +798,7 @@ export const RecruitmentTrustView: React.FC<RecruitmentTrustViewProps> = ({
                 <label className="block text-xs font-semibold text-slate-700">
                   Discord User ID (Authoritative Primary ID) *
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 123456789012345678"
-                  value={flagDiscordId}
-                  onChange={(e) => setFlagDiscordId(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-mono"
-                  required
-                />
+                <div className="mt-1"><MemberSelect value={flagDiscordId} onChange={(id) => setFlagDiscordId(id)} /></div>
               </div>
 
               <div>
@@ -951,14 +935,7 @@ export const RecruitmentTrustView: React.FC<RecruitmentTrustViewProps> = ({
             <form onSubmit={handleAddChannel} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
               <div>
                 <label className="block text-xs font-semibold text-slate-700">Discord Channel ID *</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 102938475610293847"
-                  value={newChannelId}
-                  onChange={(e) => setNewChannelId(e.target.value)}
-                  className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm font-mono"
-                  required
-                />
+                <ChannelSelect className="mt-1" value={newChannelId} onChange={(v) => { setNewChannelId(v); }} />
               </div>
 
               <div>

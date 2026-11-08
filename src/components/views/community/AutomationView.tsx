@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { ChannelSelect } from '../../common/DiscordPickers.js';
+import { MemberSelect } from '../../common/DiscordPickers.js';
+import { RoleSelect } from '../../common/DiscordPickers.js';
 import {
   Cpu,
   Play,
@@ -499,75 +502,7 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ communityId }) =
                             <option key={op} value={op}>{op}</option>
                           ))}
                         </select>
-                        <input
-                          type="text"
-                          value={c.value}
-                          onChange={e => handleConditionChange(i, 'value', e.target.value)}
-                          placeholder="value"
-                          className="w-1/3 rounded border border-slate-300 px-2 py-1 text-[11px]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCondition(i)}
-                          className="text-rose-500 hover:text-rose-700"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="border-t border-slate-100 pt-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold text-slate-700 uppercase">Actions</label>
-                  <button
-                    type="button"
-                    onClick={handleAddAction}
-                    className="flex items-center gap-1 text-[11px] text-indigo-600 font-semibold hover:text-indigo-800"
-                  >
-                    <Plus className="h-3 w-3" /> Add Action
-                  </button>
-                </div>
-
-                <div className="mt-2 space-y-3">
-                  {actions.map((act, i) => (
-                    <div key={i} className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs space-y-2">
-                      <div className="flex items-center justify-between">
-                        <select
-                          value={act.type}
-                          onChange={e => handleActionTypeChange(i, e.target.value)}
-                          className="rounded border border-slate-300 px-2 py-1 text-xs font-semibold bg-white"
-                        >
-                          {registries.actions.map(a => (
-                            <option key={a.type} value={a.type}>
-                              {a.name}
-                            </option>
-                          ))}
-                        </select>
-                        {actions.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveAction(i)}
-                            className="text-rose-500 hover:text-rose-700"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Custom inputs based on action type */}
-                      {act.type === 'SEND_DISCORD_MESSAGE' && (
-                        <div className="space-y-1.5">
-                          <input
-                            type="text"
-                            placeholder="Target Channel ID (or leave empty for DM)"
-                            value={act.config.channelId || ''}
-                            onChange={e => handleActionConfigChange(i, 'channelId', e.target.value)}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-[11px]"
-                          />
+                        <ChannelSelect value={act.config.channelId || ''} onChange={(v) => handleActionConfigChange(i, 'channelId', v)} />
                           <div className="flex items-center gap-2">
                             <input
                               type="checkbox"
@@ -589,21 +524,8 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ communityId }) =
 
                       {(act.type === 'ASSIGN_DISCORD_ROLE' || act.type === 'REMOVE_DISCORD_ROLE') && (
                         <div className="space-y-1.5">
-                          <input
-                            type="text"
-                            placeholder="Discord Role ID"
-                            value={act.config.roleId || ''}
-                            onChange={e => handleActionConfigChange(i, 'roleId', e.target.value)}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-[11px]"
-                            required
-                          />
-                          <input
-                            type="text"
-                            placeholder="Target User Discord ID (optional, defaults to actor)"
-                            value={act.config.discordUserId || ''}
-                            onChange={e => handleActionConfigChange(i, 'discordUserId', e.target.value)}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-[11px]"
-                          />
+                          <RoleSelect value={act.config.roleId || ''} onChange={(v) => handleActionConfigChange(i, 'roleId', v)} />
+                          <MemberSelect value={act.config.discordUserId || ''} placeholder="Target member (optional, defaults to the member who triggered it)" onChange={(id) => handleActionConfigChange(i, 'discordUserId', id)} />
                         </div>
                       )}
 

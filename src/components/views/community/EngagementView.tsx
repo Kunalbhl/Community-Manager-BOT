@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { MemberSelect } from '../../common/DiscordPickers.js';
+import { ChannelSelect } from '../../common/DiscordPickers.js';
 import { Megaphone, MessageSquare, Send, Calendar, Clock, BarChart3, Plus, Volume2 } from 'lucide-react';
 
 interface EngagementViewProps {
@@ -400,13 +402,7 @@ export const EngagementView: React.FC<EngagementViewProps> = ({ communityId, ini
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase">Channel ID</label>
-                <input
-                  type="text"
-                  value={annChannel}
-                  onChange={e => setAnnChannel(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:border-indigo-500 focus:ring-indigo-500 font-mono"
-                  required
-                />
+                <ChannelSelect className="mt-1" value={annChannel} onChange={setAnnChannel} />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase">Content</label>
@@ -555,14 +551,7 @@ export const EngagementView: React.FC<EngagementViewProps> = ({ communityId, ini
             <form onSubmit={handleCreateReminder} className="mt-4 space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase">Target User (Discord ID/Username)</label>
-                <input
-                  type="text"
-                  value={remUser}
-                  onChange={e => setRemUser(e.target.value)}
-                  placeholder="345678912345"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs"
-                  required
-                />
+                <div className="mt-1"><MemberSelect value={remUser} onChange={(id) => setRemUser(id)} /></div>
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase">Trigger Time</label>
@@ -640,13 +629,7 @@ export const EngagementView: React.FC<EngagementViewProps> = ({ communityId, ini
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase">Channel ID</label>
-                <input
-                  type="text"
-                  value={pollChannel}
-                  onChange={e => setPollChannel(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs font-mono"
-                  required
-                />
+                <ChannelSelect className="mt-1" value={pollChannel} onChange={setPollChannel} />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase">Options (one option per line)</label>

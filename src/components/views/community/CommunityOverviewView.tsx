@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { MemberSelect } from '../../common/DiscordPickers.js';
 import {
   FileText,
   Clock,
@@ -1060,14 +1061,7 @@ export const CommunityOverviewView: React.FC<CommunityOverviewViewProps> = ({
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Discord User ID</label>
-                <input
-                  type="text"
-                  required
-                  value={applicantDiscordId}
-                  onChange={(e) => setApplicantDiscordId(e.target.value)}
-                  placeholder="e.g. 123456789012345678"
-                  className="w-full rounded-lg border border-slate-300 p-2.5 font-medium text-slate-800 focus:border-indigo-500 focus:outline-hidden"
-                />
+                <MemberSelect value={applicantDiscordId} onChange={(id) => setApplicantDiscordId(id)} />
               </div>
 
               <div>
