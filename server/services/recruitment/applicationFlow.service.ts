@@ -235,6 +235,8 @@ export const applicationFlow = {
       }],
     });
 
+    import('./sheetsSync.service.js').then(({ sheetsSync }) => sheetsSync.push(r.applicationId)).catch(() => undefined);
+    import('./recruitmentLog.service.js').then(({ recruitmentLog }) => recruitmentLog.post(r.communityId, `📊 Screening for **${r.applicantName}**: **${score}%** (threshold ${need}%) — ${passed ? 'passed' : 'below threshold, guidance given'}.`)).catch(() => undefined);
     if (passed) {
       await chat?.send({ content: '✅ Thank you, your answers have been shared with the team.' });
       return this.toInterview(roomId);
@@ -351,6 +353,8 @@ export const applicationFlow = {
       components: staffPanel({ ...(r as any), flow: { ...r.flow, stage: 'AWAITING_DECISION' } }, t.reviewRooms.tiers.length),
     });
     await applicationsRepository.update(r.applicationId, { interviewCompletedAt: new Date().toISOString(), interviewSummary: summary || undefined, updatedAt: new Date().toISOString() } as any).catch(() => undefined);
+    import('./sheetsSync.service.js').then(({ sheetsSync }) => sheetsSync.push(r.applicationId)).catch(() => undefined);
+    import('./recruitmentLog.service.js').then(({ recruitmentLog }) => recruitmentLog.post(r.communityId, `🎤 Interview finished for **${r.applicantName}**. Waiting for a decision.`)).catch(() => undefined);
   },
 
   async markDecided(roomId: string) {

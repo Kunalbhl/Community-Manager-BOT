@@ -386,6 +386,13 @@ router.post(`${tk}/warnings`, requireTenantAccess(), requirePermission('communit
 router.post(`${tk}/warnings/:strikeId/revoke`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.revokeWarningHandler);
 router.post(`${tk}/recruitment/draft-quiz`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.draftQuizHandler);
 router.get(`${tk}/recruitment/threshold`, requireTenantAccess(), requirePermission('community.view'), Toolkit.screeningThresholdHandler);
+router.get(`${tk}/gate`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateStatusHandler);
+router.post(`${tk}/gate/lock`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateLockHandler);
+router.post(`${tk}/gate/undo`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateUndoHandler);
+router.post(`${tk}/gate/confirm`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateConfirmHandler);
+router.get(`${tk}/sheets`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.sheetScriptHandler);
+router.post(`${tk}/sheets/connect`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.sheetConnectHandler);
+router.post(`${tk}/sheets/resync`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.sheetResyncHandler);
 router.post(`${tk}/recruitment/panel`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.postApplyPanelHandler);
 router.get('/communities/:communityId/discord/member-search', requireTenantAccess(), requirePermission('community.view'), Toolkit.searchMembersHandler);
 router.get(`${tk}/review-rooms`, requireTenantAccess(), requirePermission('applications.view'), Toolkit.listReviewRoomsHandler);

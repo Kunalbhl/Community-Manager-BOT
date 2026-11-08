@@ -41,6 +41,11 @@ export interface RecruitmentDiscordConfig {
   applyEnabled: boolean;
   askRecruiterCode: boolean;
   reviewChannelId?: string;
+  logChannelId?: string;
+  notifyRecruiter: boolean;
+  sheetWebhookUrl?: string;
+  sheetToken?: string;
+  sheetLastSync?: { at: string; ok: boolean; error?: string };
   pingRoleIds: string[];
   reviewerRoleIds: string[];
   dmOnReceived: boolean;
@@ -108,7 +113,7 @@ export function defaultToolkit(communityId: string): ToolkitConfig {
     roleRules: { enabled: true, rules: [] },
     reviewRooms: { enabled: true, applicantCanSee: true, tiers: [{ name: 'Recruiters', roleIds: [] }, { name: 'Senior staff', roleIds: [] }, { name: 'Leadership', roleIds: [] }], deleteAfterHours: 24 },
     recruitment: {
-      applyEnabled: true, askRecruiterCode: true, pingRoleIds: [], reviewerRoleIds: [], dmOnReceived: true, messages: { ...DEFAULT_RECRUITMENT_MESSAGES },
+      applyEnabled: true, askRecruiterCode: true, notifyRecruiter: true, pingRoleIds: [], reviewerRoleIds: [], dmOnReceived: true, messages: { ...DEFAULT_RECRUITMENT_MESSAGES },
       screening: { mode: 'AUTO', onFail: 'GUIDE_AND_CONTINUE', questions: [], consentText: 'Before we continue, please read our rules and guide below carefully. Press **I have read and agree** when you are done.' },
       interview: { mode: 'MANUAL' },
     },
