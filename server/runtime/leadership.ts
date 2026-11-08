@@ -16,6 +16,8 @@ import { isPostgresEnabled, postgresStore } from '../repositories/postgres.store
 const LEASE_NAME = 'discord-bot';
 const LEASE_TTL_SECONDS = 60;
 const RENEW_EVERY_MS = 20_000;
+/** How often a standby checks whether it can take over (the VM's next container uses a short value for fast handoffs). */
+const STANDBY_POLL_MS = Math.max(1000, Number(process.env.BOT_STANDBY_POLL_MS || RENEW_EVERY_MS));
 
 export interface LeadershipHooks {
   onBecomeLeader: () => Promise<void> | void;
@@ -26,6 +28,7 @@ const holderId = `${process.env.BOT_INSTANCE_ROLE || 'web'}:${os.hostname()}:${c
 const priority = Number(process.env.BOT_LEADER_PRIORITY || 10);
 let isLeader = false;
 let timer: NodeJS.Timeout | null = null;
+let stopped = false;
 let lastError: string | undefined;
 let lastLeaseOkAt = Date.now();
 
@@ -75,12 +78,16 @@ export async function startLeadership(hooks: LeadershipHooks): Promise<void> {
     }
   };
 
-  await tick();
-  timer = setInterval(tick, RENEW_EVERY_MS);
+  const loop = async () => {
+    await tick();
+    if (!stopped) timer = setTimeout(loop, isLeader ? RENEW_EVERY_MS : STANDBY_POLL_MS);
+  };
+  await loop();
 }
 
 export async function stopLeadership(): Promise<void> {
-  if (timer) clearInterval(timer);
+  stopped = true;
+  if (timer) clearTimeout(timer);
   timer = null;
   if (isLeader && isPostgresEnabled()) {
     try { await postgresStore.releaseLease(LEASE_NAME, holderId); } catch { /* best effort */ }

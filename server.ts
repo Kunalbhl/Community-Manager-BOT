@@ -59,6 +59,11 @@ async function startServer() {
   app.get('/health/live', getLiveness);
   app.get('/health/ready', getReadiness);
   app.get('/health/external', getExternalDependenciesHealth);
+  // 200 only on the instance actively running the bot (used by the VM's front door during handoffs).
+  app.get('/health/active', (_req: Request, res: Response) => {
+    const ok = getLeadershipStatus().isLeader && discordService.isReady();
+    res.status(ok ? 200 : 503).json({ active: ok });
+  });
   app.get('/health/leader', (_req: Request, res: Response) => {
     res.json({ ...getLeadershipStatus(), discord: discordService.getDiagnostics?.() });
   });

@@ -1,0 +1,13 @@
+# HTTPS front door for the bot API. Requests always go to the container that is running the bot.
+# During an update the old and new containers hand over; requests wait (up to 25s) instead of failing.
+{$PUBLIC_API_HOST} {
+	reverse_proxy cm-bot-blue:3000 cm-bot-green:3000 bot:3000 {
+		lb_policy first
+		lb_try_duration 25s
+		lb_try_interval 500ms
+		health_uri /health/active
+		health_interval 2s
+		health_timeout 2s
+		health_status 200
+	}
+}
