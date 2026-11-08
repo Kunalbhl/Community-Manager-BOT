@@ -75,6 +75,10 @@ export const AUTHORITATIVE_INSTALL_PERMISSION_BITFIELD = buildAuthoritativeInsta
  * Requires VITE_DISCORD_CLIENT_ID to be set at build time.
  */
 export function getAddToDiscordUrl(options: AddToDiscordOptions = {}): string {
+  // Through our own sign-in so Discord sends the person back to finish setup afterwards.
+  if (!options.redirectUri && typeof window !== 'undefined') {
+    return `${getAuthoritativeAppOrigin()}/api/v1/auth/login?redirect=true&install=1${options.guildId ? `&guildId=${encodeURIComponent(options.guildId)}` : ''}`;
+  }
   const clientId = resolveClientIdOrWarn();
   const permissions = AUTHORITATIVE_INSTALL_PERMISSION_BITFIELD;
   const scopes = encodeURIComponent('bot applications.commands');

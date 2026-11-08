@@ -88,12 +88,25 @@ export async function authLogin(req: Request, res: Response, next: NextFunction)
     const state = crypto.randomBytes(32).toString('hex');
 
     const redirectUri = typeof req.query.redirectUri === 'string' ? req.query.redirectUri : undefined;
-    const returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : undefined;
+    let returnTo = typeof req.query.returnTo === 'string' ? req.query.returnTo : undefined;
 
     // Embed onboarding context in state so callback knows where to return the user
     const fromOnboarding = req.query.from === 'onboarding' || Boolean(req.header('referer')?.includes('onboarding'));
     const stateWithHint = fromOnboarding ? `${state}:onboarding` : state;
-    const url = discordAuthService.getOAuthUrl(stateWithHint, redirectUri);
+    let url = discordAuthService.getOAuthUrl(stateWithHint, redirectUri);
+
+    // "Add bot" flow: same sign-in, plus the bot install. Discord then comes back to our callback,
+    // and the user lands on the server picker with that server ready to set up (no dead-end page).
+    if (req.query.install === '1') {
+      const guildId = typeof req.query.guildId === 'string' && /^\d{15,21}$/.test(req.query.guildId) ? req.query.guildId : undefined;
+      const { AUTHORITATIVE_INSTALL_PERMISSION_BITFIELD } = await import('../services/discordPermissionEngine.service.js');
+      const u = new URL(url);
+      u.searchParams.set('scope', 'identify guilds bot applications.commands');
+      u.searchParams.set('permissions', AUTHORITATIVE_INSTALL_PERMISSION_BITFIELD);
+      if (guildId) { u.searchParams.set('guild_id', guildId); u.searchParams.set('disable_guild_select', 'true'); }
+      url = u.toString();
+      returnTo = `/servers?installed=${guildId || '1'}`;
+    }
 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes expiration
 

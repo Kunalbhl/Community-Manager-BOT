@@ -31,6 +31,14 @@ export function ServerPickerPage() {
       list.sort((a, b) => Number(b.botStatus === 'CONNECTED') - Number(a.botStatus === 'CONNECTED') || a.name.localeCompare(b.name));
       setServers(list);
       setState('ready');
+      // Just came back from adding the bot: open that server's setup straight away.
+      const installed = new URLSearchParams(window.location.search).get('installed');
+      if (installed) {
+        window.history.replaceState(null, '', '/servers');
+        const hit = list.find((x) => x.guildId === installed && x.botStatus === 'CONNECTED');
+        if (hit) { open(hit, hit.setupStatus !== 'READY'); return; }
+        if (installed !== '1') setTimeout(load, 2500); // bot may need a moment to register the server
+      }
     } catch (e: any) {
       setError(e?.message || 'Could not load your servers.');
       setState('error');
