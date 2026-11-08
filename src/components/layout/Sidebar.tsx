@@ -15,8 +15,7 @@ import {
   ArrowLeft,
   User,
   Radio,
-  Megaphone,
-} from 'lucide-react';
+  Megaphone, Wrench } from 'lucide-react';
 import { PortalMode, PlatformSection, CommunitySection } from '../../types/ui.js';
 import { UserRole, Permission } from '../../../shared/types/rbac.js';
 import { hasPermission } from '../../../server/security/rbac.js';
@@ -104,6 +103,13 @@ const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
     label: 'Moderation & safety',
     icon: ShieldCheck,
     matchingSections: ['moderation', 'warnings', 'community-config', 'blacklist'],
+  },
+  {
+    id: 'server-tools',
+    label: 'Server tools',
+    icon: Wrench,
+    requiredPermission: 'community.view',
+    matchingSections: ['server-tools'],
   },
   {
     id: 'events-automation',

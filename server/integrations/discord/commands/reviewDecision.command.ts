@@ -2,7 +2,6 @@ import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { SlashCommandDefinition, CommandContext } from './types.js';
 import { applicationsRepository } from '../../../repositories/index.js';
 import { auditService } from '../../../services/audit.service.js';
-import { notificationService } from '../../../services/notification.service.js';
 
 export const approveCommand: SlashCommandDefinition = {
   data: new SlashCommandBuilder()
@@ -42,38 +41,11 @@ export const approveCommand: SlashCommandDefinition = {
       return;
     }
 
-    const now = new Date().toISOString();
-    const updated = await applicationsRepository.update(applicationId, {
-      status: 'APPROVED',
-      reviewerNotes: notes,
-      reviewedAt: now,
-      updatedAt: now,
-    });
-
-    await auditService.record({
-      communityId,
-      guildId,
-      actorUserId: `usr_${discordUserId}`,
-      discordUserId,
-      actorRole: effectiveRole,
-      effectiveRole,
-      action: 'APPLICATION_APPROVED',
-      targetType: 'application',
-      targetId: applicationId,
-      previousState: { status: app.status },
-      newState: { status: 'APPROVED', reviewerNotes: notes },
-      source: 'DISCORD_BOT_COMMAND',
-    });
-
-    await notificationService.send({
-      communityId,
-      recipientUserId: app.applicantUserId,
-      recipientDiscordId: app.applicantDiscordId,
-      type: 'APPLICATION_APPROVED',
-      channel: 'DISCORD_DM',
-      title: 'Application Approved!',
-      body: `Congratulations! Your application to our community has been approved.`,
-    });
+    const { applicationWorkflowService } = await import('../../../services/applicationWorkflow.service.js');
+    await applicationWorkflowService.reviewApplication({
+      applicationId, communityId, status: 'APPROVED', reviewerNotes: notes,
+      actorUserId: `usr_${discordUserId}`, actorRole: effectiveRole, actorDiscordUserId: discordUserId,
+    } as any);
 
     await interaction.reply({
       content: `✅ **Application Approved**\n\n• **ID:** \`${applicationId}\`\n• **Applicant:** <@${app.applicantDiscordId}>\n• **Decided by:** <@${discordUserId}> (${effectiveRole})\n• **Notes:** ${notes}`,
@@ -120,38 +92,11 @@ export const rejectCommand: SlashCommandDefinition = {
       return;
     }
 
-    const now = new Date().toISOString();
-    await applicationsRepository.update(applicationId, {
-      status: 'REJECTED',
-      reviewerNotes: reason,
-      reviewedAt: now,
-      updatedAt: now,
-    });
-
-    await auditService.record({
-      communityId,
-      guildId,
-      actorUserId: `usr_${discordUserId}`,
-      discordUserId,
-      actorRole: effectiveRole,
-      effectiveRole,
-      action: 'APPLICATION_REJECTED',
-      targetType: 'application',
-      targetId: applicationId,
-      previousState: { status: app.status },
-      newState: { status: 'REJECTED', reviewerNotes: reason },
-      source: 'DISCORD_BOT_COMMAND',
-    });
-
-    await notificationService.send({
-      communityId,
-      recipientUserId: app.applicantUserId,
-      recipientDiscordId: app.applicantDiscordId,
-      type: 'APPLICATION_REJECTED',
-      channel: 'DISCORD_DM',
-      title: 'Application Update',
-      body: `Thank you for your interest. After review, your application was not accepted at this time.`,
-    });
+    const { applicationWorkflowService } = await import('../../../services/applicationWorkflow.service.js');
+    await applicationWorkflowService.reviewApplication({
+      applicationId, communityId, status: 'REJECTED', reviewerNotes: reason, rejectionReason: reason,
+      actorUserId: `usr_${discordUserId}`, actorRole: effectiveRole, actorDiscordUserId: discordUserId,
+    } as any);
 
     await interaction.reply({
       content: `🚫 **Application Rejected**\n\n• **ID:** \`${applicationId}\`\n• **Applicant:** <@${app.applicantDiscordId}>\n• **Decided by:** <@${discordUserId}> (${effectiveRole})\n• **Reason:** ${reason}`,

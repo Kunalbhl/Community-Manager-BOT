@@ -800,6 +800,7 @@ export class ModerationActionService {
     actorDiscordUserId: string;
     reason: string;
     requestId?: string;
+    durationMinutes?: number;
   }): Promise<ModerationActionExecution> {
     const lockKey = `${params.communityId}_${params.actionType}_${params.targetDiscordUserId}`;
 
@@ -870,17 +871,6 @@ export class ModerationActionService {
         return { ...execution, status: 'ROLE_HIERARCHY_BLOCKED', failureReason: 'Target is the guild owner' };
       }
 
-      // Role hierarchy evaluation: Bot or actor role must be superior
-      // Mock hierarchy blockage for specific targetIDs to simulate failures truthfully
-      if (params.targetDiscordUserId.includes('higher_role') || params.targetDiscordUserId === 'usr_t14_higher') {
-        await moderationActionExecutionsRepository.update(execution.id, {
-          status: 'ROLE_HIERARCHY_BLOCKED',
-          failureReason: 'ROLE_HIERARCHY_BLOCKED: The bot role position sits lower than target member role position',
-          updatedAt: new Date().toISOString(),
-        });
-        return { ...execution, status: 'ROLE_HIERARCHY_BLOCKED', failureReason: 'Bot role is lower than target' };
-      }
-
       // Step 4: Discord client diagnostics / connection check
       const community = await communitiesRepository.getById(execution.communityId);
       const guildId = community?.guildId || community?.discordGuildId || '';
@@ -894,32 +884,41 @@ export class ModerationActionService {
         return { ...execution, status: 'BOT_NOT_CONNECTED', failureReason: 'Discord client is disconnected' };
       }
 
-      // Simulate execution of actions cleanly
+      // Real Discord execution.
       let actionCompleted = false;
-      let discordResMessage = 'Simulated Discord operation executed successfully';
-
-      // Real execution attempt on Discord client where technically supported in test/mock environment
-      if (discordService.isConnected()) {
-        try {
-          // Action mapping logic to real/stubbed endpoints
-          actionCompleted = true;
-          discordResMessage = `Executed ${params.actionType} successfully on target Discord ID ${params.targetDiscordUserId}`;
-        } catch (discordErr) {
-          await moderationActionExecutionsRepository.update(execution.id, {
-            status: 'FAILED',
-            failureReason: `Discord API error: ${(discordErr as Error).message}`,
-            updatedAt: new Date().toISOString(),
-          });
-          return { ...execution, status: 'FAILED', failureReason: (discordErr as Error).message };
+      let discordResMessage = '';
+      try {
+        const client: any = discordService.client;
+        const guild: any = client?.guilds?.cache?.get(guildId) || (guildId ? await client?.guilds?.fetch(guildId).catch(() => null) : null);
+        if (!guild) throw new Error('GUILD_NOT_REACHABLE: the bot is not in this server.');
+        const reason = String(params.reason || 'No reason given').slice(0, 450);
+        if (params.actionType === 'UNBAN') {
+          await guild.members.unban(params.targetDiscordUserId, reason);
+        } else if (params.actionType === 'BAN') {
+          await guild.members.ban(params.targetDiscordUserId, { reason, deleteMessageSeconds: 0 });
+        } else {
+          const member: any = await guild.members.fetch(params.targetDiscordUserId).catch(() => null);
+          if (!member) throw new Error('MEMBER_NOT_FOUND: that member is not in the server.');
+          if (params.actionType === 'TIMEOUT') {
+            const minutes = Math.min(Math.max(Number(params.durationMinutes) || 60, 1), 28 * 24 * 60);
+            await member.timeout(minutes * 60_000, reason);
+          } else if (params.actionType === 'REMOVE_TIMEOUT') {
+            await member.timeout(null, reason);
+          } else if (params.actionType === 'KICK') {
+            await member.kick(reason);
+          }
         }
-      } else {
-        // Gateway is disconnected
+        actionCompleted = true;
+        discordResMessage = `${params.actionType} applied in Discord`;
+      } catch (discordErr) {
+        const msg = (discordErr as Error).message || 'Discord API error';
+        const blocked = /Missing Permissions|hierarch/i.test(msg);
         await moderationActionExecutionsRepository.update(execution.id, {
-          status: 'BOT_NOT_CONNECTED',
-          failureReason: 'Discord bot connection offline',
+          status: blocked ? 'ROLE_HIERARCHY_BLOCKED' : 'FAILED',
+          failureReason: blocked ? 'The bot role must be above the member’s highest role and have the needed permission.' : msg,
           updatedAt: new Date().toISOString(),
         });
-        return { ...execution, status: 'BOT_NOT_CONNECTED' };
+        return { ...execution, status: blocked ? 'ROLE_HIERARCHY_BLOCKED' : 'FAILED', failureReason: msg };
       }
 
       if (actionCompleted) {

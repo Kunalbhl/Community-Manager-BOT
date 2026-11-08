@@ -1,0 +1,562 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Ticket, ShieldAlert, UserCheck, Mic, Layers, Plus, Trash2, Save, RefreshCw, Send, X, CheckCircle2, AlertTriangle, ArrowUp,
+} from 'lucide-react';
+
+/* ------------------------------------------------------------------ */
+/* Types + API                                                         */
+/* ------------------------------------------------------------------ */
+interface Opt { id: string; name: string; color?: string }
+interface Resources { connected: boolean; roles: Opt[]; textChannels: Opt[]; categories: Opt[] }
+type Tab = 'tickets' | 'warnings' | 'roles' | 'rooms' | 'bulk';
+
+function useApi(communityId: string) {
+  const base = `/api/v1/communities/${encodeURIComponent(communityId)}/toolkit`;
+  const headers = { 'Content-Type': 'application/json', 'x-community-id': communityId };
+  return useCallback(async (path: string, method = 'GET', body?: unknown) => {
+    const r = await fetch(`${base}${path}`, { method, credentials: 'include', headers, body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.success) throw new Error(j?.error?.message || 'Something went wrong.');
+    return j.data;
+  }, [base]);
+}
+
+const TABS: { id: Tab; label: string; icon: any; hint: string }[] = [
+  { id: 'tickets', label: 'Tickets', icon: Ticket, hint: 'Members open private tickets by type; staff claim and close them.' },
+  { id: 'warnings', label: 'Warning system', icon: ShieldAlert, hint: 'Each reason gives points. Reaching a points level triggers an action automatically.' },
+  { id: 'roles', label: 'Role rules', icon: UserCheck, hint: 'Which roles an approved applicant gets, and when.' },
+  { id: 'rooms', label: 'Review rooms', icon: Mic, hint: 'A private channel per application, with a temporary voice room and escalation by rank.' },
+  { id: 'bulk', label: 'Bulk tools', icon: Layers, hint: 'Do one thing to many members or channels at once.' },
+];
+
+/* ------------------------------------------------------------------ */
+/* View                                                                */
+/* ------------------------------------------------------------------ */
+export function ServerToolsView({ communityId }: { communityId: string }) {
+  const api = useApi(communityId);
+  const [tab, setTab] = useState<Tab>('tickets');
+  const [config, setConfig] = useState<any>(null);
+  const [res, setRes] = useState<Resources | null>(null);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setError('');
+    try {
+      const d = await api('');
+      setConfig(d.config);
+      setRes(d.resources);
+    } catch (e: any) { setError(e.message); }
+  }, [api]);
+
+  useEffect(() => { if (communityId) load(); }, [communityId, load]);
+
+  const save = async (section: string, value: any) => {
+    const saved = await api(`/settings/${section}`, 'PUT', value);
+    setConfig(saved);
+  };
+
+  const current = TABS.find((t) => t.id === tab)!;
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900">Server tools</h1>
+        <p className="mt-1 text-slate-500">Tickets, warnings, recruitment roles, review rooms and bulk actions for your Discord server.</p>
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {TABS.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300'}`}>
+            <t.icon className="h-4 w-4" /> {t.label}
+          </button>
+        ))}
+      </div>
+      <p className="text-sm text-slate-500">{current.hint}</p>
+
+      {error && <Banner tone="error">{error} <button onClick={load} className="ml-2 underline">Try again</button></Banner>}
+      {res && !res.connected && <Banner tone="warn">The bot is not connected to this server right now, so roles and channels can’t be listed. Settings still save.</Banner>}
+      {!config && !error && <div className="h-64 animate-pulse rounded-2xl bg-slate-100" />}
+
+      {config && res && (
+        <>
+          {tab === 'tickets' && <TicketsTab api={api} cfg={config.tickets} res={res} onSave={(v) => save('tickets', v)} />}
+          {tab === 'warnings' && <WarningsTab api={api} cfg={config.warnings} onSave={(v) => save('warnings', v)} />}
+          {tab === 'roles' && <RoleRulesTab cfg={config.roleRules} res={res} onSave={(v) => save('roleRules', v)} />}
+          {tab === 'rooms' && <ReviewRoomsTab api={api} cfg={config.reviewRooms} res={res} onSave={(v) => save('reviewRooms', v)} />}
+          {tab === 'bulk' && <BulkTab api={api} res={res} />}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared bits                                                         */
+/* ------------------------------------------------------------------ */
+function Banner({ tone, children }: { tone: 'error' | 'warn' | 'ok'; children: React.ReactNode }) {
+  const c = tone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700' : tone === 'warn' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800';
+  const I = tone === 'ok' ? CheckCircle2 : AlertTriangle;
+  return <div className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${c}`}><I className="mt-0.5 h-4 w-4 shrink-0" /><div>{children}</div></div>;
+}
+
+function Card({ title, desc, children, right }: { title: string; desc?: string; children: React.ReactNode; right?: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div><h2 className="text-lg font-bold text-slate-900">{title}</h2>{desc && <p className="mt-1 text-sm text-slate-500">{desc}</p>}</div>
+        {right}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const input = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+const btn = 'inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50';
+const ghost = 'inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50';
+
+function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
+      <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className={`relative h-6 w-11 rounded-full transition ${on ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${on ? 'left-[22px]' : 'left-0.5'}`} />
+      </button>
+      {label}
+    </label>
+  );
+}
+
+function Pick({ options, value, onChange, placeholder }: { options: Opt[]; value?: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <select className={input} value={value || ''} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{placeholder}</option>
+      {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+    </select>
+  );
+}
+
+function MultiPick({ options, value, onChange, placeholder, prefix = '' }: { options: Opt[]; value: string[]; onChange: (v: string[]) => void; placeholder: string; prefix?: string }) {
+  const byId = useMemo(() => new Map(options.map((o) => [o.id, o])), [options]);
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {value.map((id) => (
+          <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
+            {prefix}{byId.get(id)?.name || id}
+            <button type="button" onClick={() => onChange(value.filter((v) => v !== id))} aria-label="Remove"><X className="h-3 w-3" /></button>
+          </span>
+        ))}
+        {!value.length && <span className="text-xs text-slate-400">None selected</span>}
+      </div>
+      <select className={input} value="" onChange={(e) => e.target.value && onChange([...value, e.target.value])}>
+        <option value="">{placeholder}</option>
+        {options.filter((o) => !value.includes(o.id)).map((o) => <option key={o.id} value={o.id}>{prefix}{o.name}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function SaveBar({ onSave }: { onSave: () => Promise<void> }) {
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [err, setErr] = useState('');
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <button className={btn} disabled={state === 'saving'} onClick={async () => {
+        setState('saving');
+        try { await onSave(); setState('saved'); setTimeout(() => setState('idle'), 2500); } catch (e: any) { setErr(e.message); setState('error'); }
+      }}><Save className="h-4 w-4" /> {state === 'saving' ? 'Saving…' : 'Save changes'}</button>
+      {state === 'saved' && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+      {state === 'error' && <span className="text-sm font-medium text-rose-600">{err}</span>}
+    </div>
+  );
+}
+
+const fmtDate = (s?: string) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '');
+
+/* ------------------------------------------------------------------ */
+/* Tickets                                                             */
+/* ------------------------------------------------------------------ */
+function TicketsTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Resources; onSave: (v: any) => Promise<void> }) {
+  const [c, setC] = useState(cfg);
+  const [panelChannel, setPanelChannel] = useState('');
+  const [panelMsg, setPanelMsg] = useState('');
+  const [tickets, setTickets] = useState<any[] | null>(null);
+  const roles = res.roles.map((r) => ({ ...r }));
+
+  const loadTickets = useCallback(() => api('/tickets').then(setTickets).catch(() => setTickets([])), [api]);
+  useEffect(() => { loadTickets(); }, [loadTickets]);
+
+  const setType = (i: number, patch: any) => setC({ ...c, types: c.types.map((t: any, n: number) => (n === i ? { ...t, ...patch } : t)) });
+
+  return (
+    <div className="grid gap-6 2xl:grid-cols-[1.3fr_1fr]">
+      <div className="space-y-6">
+        <Card title="Ticket settings" right={<Toggle on={c.enabled} onChange={(v) => setC({ ...c, enabled: v })} label={c.enabled ? 'On' : 'Off'} />}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="text-sm font-medium text-slate-700">Category for ticket channels<div className="mt-1"><Pick options={res.categories} value={c.categoryId} onChange={(v) => setC({ ...c, categoryId: v })} placeholder="Create “Tickets” automatically" /></div></label>
+            <label className="text-sm font-medium text-slate-700">Log channel (opened / closed tickets)<div className="mt-1"><Pick options={res.textChannels} value={c.logChannelId} onChange={(v) => setC({ ...c, logChannelId: v })} placeholder="No log channel" /></div></label>
+            <div className="text-sm font-medium text-slate-700 md:col-span-2">Staff roles that see every ticket<div className="mt-1"><MultiPick options={roles} value={c.staffRoleIds} onChange={(v) => setC({ ...c, staffRoleIds: v })} placeholder="Add a staff role" prefix="@" /></div></div>
+          </div>
+        </Card>
+
+        <Card title="Ticket types" desc="Members pick one of these. Each type can add its own team on top of the staff roles."
+          right={<button className={ghost} onClick={() => setC({ ...c, types: [...c.types, { key: '', label: 'New type', emoji: '🎫', description: '', staffRoleIds: [] }] })}><Plus className="h-4 w-4" /> Add type</button>}>
+          <div className="space-y-3">
+            {c.types.map((t: any, i: number) => (
+              <div key={i} className="grid gap-3 rounded-xl border border-slate-200 p-4 lg:grid-cols-[70px_1fr_1.4fr_1.2fr_auto] lg:items-start">
+                <input className={input} value={t.emoji} onChange={(e) => setType(i, { emoji: e.target.value })} aria-label="Emoji" />
+                <input className={input} value={t.label} onChange={(e) => setType(i, { label: e.target.value })} placeholder="Label" />
+                <input className={input} value={t.description} onChange={(e) => setType(i, { description: e.target.value })} placeholder="Short description" />
+                <MultiPick options={roles} value={t.staffRoleIds || []} onChange={(v) => setType(i, { staffRoleIds: v })} placeholder="Extra team" prefix="@" />
+                <button className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setC({ ...c, types: c.types.filter((_: any, n: number) => n !== i) })} aria-label="Delete type"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5"><SaveBar onSave={() => onSave(c)} /></div>
+        </Card>
+
+        <Card title="Post the ticket panel" desc="Members open tickets from this panel or with /ticket.">
+          <div className="flex flex-wrap gap-3">
+            <div className="min-w-[240px] flex-1"><Pick options={res.textChannels} value={panelChannel} onChange={setPanelChannel} placeholder="Choose a channel" /></div>
+            <button className={btn} disabled={!panelChannel} onClick={async () => {
+              setPanelMsg('');
+              try { await api('/tickets/panel', 'POST', { channelId: panelChannel }); setPanelMsg('Panel posted.'); } catch (e: any) { setPanelMsg(e.message); }
+            }}><Send className="h-4 w-4" /> Post panel</button>
+          </div>
+          {panelMsg && <p className="mt-3 text-sm text-slate-600">{panelMsg}</p>}
+        </Card>
+      </div>
+
+      <Card title="Recent tickets" right={<button className={ghost} onClick={loadTickets}><RefreshCw className="h-4 w-4" /> Refresh</button>}>
+        {!tickets ? <div className="h-40 animate-pulse rounded-xl bg-slate-100" /> : !tickets.length ? <p className="text-sm text-slate-500">No tickets yet.</p> : (
+          <ul className="divide-y divide-slate-100">
+            {tickets.slice(0, 40).map((t) => (
+              <li key={t.id} className="flex items-start justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <div className="font-semibold text-slate-900">#{t.number} · {t.subject}</div>
+                  <div className="text-xs text-slate-500">{t.typeLabel} · by {t.openerName} · {fmtDate(t.createdAt)}{t.claimedByName ? ` · claimed by ${t.claimedByName}` : ''}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${t.status === 'OPEN' ? 'bg-emerald-50 text-emerald-700' : t.status === 'CLAIMED' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>{t.status}</span>
+                  {t.status !== 'CLOSED' && <button className="text-xs font-semibold text-rose-600 hover:underline" onClick={async () => { await api(`/tickets/${t.id}/close`, 'POST', { reason: 'Closed from dashboard' }).catch(() => undefined); loadTickets(); }}>Close</button>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Warnings                                                            */
+/* ------------------------------------------------------------------ */
+function WarningsTab({ api, cfg, onSave }: { api: any; cfg: any; onSave: (v: any) => Promise<void> }) {
+  const [c, setC] = useState(cfg);
+  const [list, setList] = useState<any[] | null>(null);
+  const [form, setForm] = useState({ discordUserId: '', reasonKey: cfg.reasons[0]?.key || '', note: '' });
+  const [result, setResult] = useState('');
+
+  const loadList = useCallback(() => api('/warnings').then(setList).catch(() => setList([])), [api]);
+  useEffect(() => { loadList(); }, [loadList]);
+
+  const setReason = (i: number, p: any) => setC({ ...c, reasons: c.reasons.map((r: any, n: number) => (n === i ? { ...r, ...p } : r)) });
+  const setStep = (i: number, p: any) => setC({ ...c, thresholds: c.thresholds.map((r: any, n: number) => (n === i ? { ...r, ...p } : r)) });
+
+  return (
+    <div className="grid gap-6 2xl:grid-cols-[1.3fr_1fr]">
+      <div className="space-y-6">
+        <Card title="How warnings work" right={<Toggle on={c.enabled} onChange={(v) => setC({ ...c, enabled: v })} label={c.enabled ? 'On' : 'Off'} />}>
+          <ol className="grid gap-3 md:grid-cols-3">
+            {[['1', 'A moderator warns', 'With /warn or from here, choosing a reason.'], ['2', 'Points add up', 'Each reason has points. Points expire after the time below.'], ['3', 'Actions trigger', 'Crossing a points level times out, kicks or bans automatically.']].map(([n, t, d]) => (
+              <li key={n} className="rounded-xl bg-slate-50 p-4"><div className="text-2xl font-extrabold text-indigo-600">{n}</div><div className="mt-1 font-semibold text-slate-900">{t}</div><div className="text-sm text-slate-500">{d}</div></li>
+            ))}
+          </ol>
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <label className="text-sm font-medium text-slate-700">Points expire after (days)<input type="number" min={1} max={365} className={`${input} mt-1`} value={c.expiryDays} onChange={(e) => setC({ ...c, expiryDays: Number(e.target.value) })} /></label>
+            <div className="flex items-end"><Toggle on={c.dmMember} onChange={(v) => setC({ ...c, dmMember: v })} label="DM the member when warned" /></div>
+          </div>
+        </Card>
+
+        <Card title="Reasons and points" right={<button className={ghost} onClick={() => setC({ ...c, reasons: [...c.reasons, { key: '', label: 'New reason', points: 1 }] })}><Plus className="h-4 w-4" /> Add reason</button>}>
+          <div className="space-y-2">
+            {c.reasons.map((r: any, i: number) => (
+              <div key={i} className="grid grid-cols-[1fr_110px_auto] items-center gap-3">
+                <input className={input} value={r.label} onChange={(e) => setReason(i, { label: e.target.value })} />
+                <div className="flex items-center gap-2"><input type="number" min={1} max={20} className={input} value={r.points} onChange={(e) => setReason(i, { points: Number(e.target.value) })} /><span className="text-xs text-slate-500">pts</span></div>
+                <button className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setC({ ...c, reasons: c.reasons.filter((_: any, n: number) => n !== i) })} aria-label="Delete reason"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card title="Automatic actions" desc="When a member’s active points reach a level, the action runs once."
+          right={<button className={ghost} onClick={() => setC({ ...c, thresholds: [...c.thresholds, { points: 5, action: 'TIMEOUT', durationMinutes: 60 }] })}><Plus className="h-4 w-4" /> Add step</button>}>
+          <div className="space-y-2">
+            {c.thresholds.map((t: any, i: number) => (
+              <div key={i} className="grid grid-cols-[auto_110px_auto_150px_1fr_auto] items-center gap-3 text-sm">
+                <span className="text-slate-500">At</span>
+                <input type="number" min={1} className={input} value={t.points} onChange={(e) => setStep(i, { points: Number(e.target.value) })} />
+                <span className="text-slate-500">points →</span>
+                <select className={input} value={t.action} onChange={(e) => setStep(i, { action: e.target.value })}>
+                  <option value="TIMEOUT">Timeout</option><option value="KICK">Kick</option><option value="BAN">Ban</option>
+                </select>
+                {t.action === 'TIMEOUT' ? (
+                  <select className={input} value={t.durationMinutes} onChange={(e) => setStep(i, { durationMinutes: Number(e.target.value) })}>
+                    {[[10, '10 minutes'], [60, '1 hour'], [360, '6 hours'], [1440, '1 day'], [4320, '3 days'], [10080, '1 week'], [40320, '28 days']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                ) : <span />}
+                <button className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setC({ ...c, thresholds: c.thresholds.filter((_: any, n: number) => n !== i) })} aria-label="Delete step"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5"><SaveBar onSave={() => onSave(c)} /></div>
+        </Card>
+      </div>
+
+      <div className="space-y-6">
+        <Card title="Warn a member">
+          <div className="space-y-3">
+            <input className={input} placeholder="Discord user ID" value={form.discordUserId} onChange={(e) => setForm({ ...form, discordUserId: e.target.value.trim() })} />
+            <select className={input} value={form.reasonKey} onChange={(e) => setForm({ ...form, reasonKey: e.target.value })}>
+              {c.reasons.map((r: any) => <option key={r.key || r.label} value={r.key}>{r.label} ({r.points} pts)</option>)}
+            </select>
+            <input className={input} placeholder="Note (optional)" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+            <button className={btn} onClick={async () => {
+              setResult('');
+              try {
+                const r = await api('/warnings', 'POST', form);
+                setResult(`Warned: ${r.reason.label}. Points ${r.pointsBefore} → ${r.pointsAfter}.${r.threshold ? ` Action: ${r.threshold.action}${r.actionResult ? ` (${r.actionResult})` : ''}.` : ''}`);
+                loadList();
+              } catch (e: any) { setResult(e.message); }
+            }}><ShieldAlert className="h-4 w-4" /> Issue warning</button>
+            {result && <p className="text-sm text-slate-600">{result}</p>}
+          </div>
+        </Card>
+        <Card title="Recent warnings" right={<button className={ghost} onClick={loadList}><RefreshCw className="h-4 w-4" /></button>}>
+          {!list ? <div className="h-32 animate-pulse rounded-xl bg-slate-100" /> : !list.length ? <p className="text-sm text-slate-500">No warnings yet.</p> : (
+            <ul className="divide-y divide-slate-100">
+              {list.slice(0, 30).map((s) => (
+                <li key={s.id} className="flex items-start justify-between gap-3 py-3 text-sm">
+                  <div><div className="font-semibold text-slate-900">{s.reasonLabel} · {s.points} pts</div><div className="text-xs text-slate-500">&lt;@{s.discordUserId}&gt; · {fmtDate(s.createdAt)}{s.revoked ? ' · revoked' : ''}</div></div>
+                  {!s.revoked && <button className="text-xs font-semibold text-slate-500 hover:text-rose-600" onClick={async () => { await api(`/warnings/${s.id}/revoke`, 'POST').catch(() => undefined); loadList(); }}>Revoke</button>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Role rules                                                          */
+/* ------------------------------------------------------------------ */
+const CONDITIONS: [string, string][] = [
+  ['ALWAYS', 'Every approved applicant'],
+  ['ANSWER_CONTAINS', 'An answer contains…'],
+  ['RECRUITER_CODE', 'Used a specific recruiter code'],
+  ['ANY_RECRUITER_CODE', 'Used any recruiter code'],
+  ['SOURCE', 'Came from a source'],
+];
+
+function RoleRulesTab({ cfg, res, onSave }: { cfg: any; res: Resources; onSave: (v: any) => Promise<void> }) {
+  const [c, setC] = useState(cfg);
+  const setRule = (i: number, p: any) => setC({ ...c, rules: c.rules.map((r: any, n: number) => (n === i ? { ...r, ...p } : r)) });
+  return (
+    <Card title="Role rules on approval" desc="When an application is approved, every enabled rule that matches runs. If the person hasn’t joined yet, rules run when they join."
+      right={<div className="flex items-center gap-3"><Toggle on={c.enabled} onChange={(v) => setC({ ...c, enabled: v })} label={c.enabled ? 'On' : 'Off'} />
+        <button className={ghost} onClick={() => setC({ ...c, rules: [...c.rules, { id: '', name: 'New rule', enabled: true, condition: { type: 'ALWAYS' }, addRoleIds: [], removeRoleIds: [] }] })}><Plus className="h-4 w-4" /> Add rule</button></div>}>
+      {!c.rules.length && <p className="mb-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No rules yet. Example: “Every approved applicant” → add <b>@Member</b>, remove <b>@Applicant</b>.</p>}
+      <div className="space-y-4">
+        {c.rules.map((r: any, i: number) => (
+          <div key={i} className="rounded-xl border border-slate-200 p-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <input className={`${input} max-w-xs font-semibold`} value={r.name} onChange={(e) => setRule(i, { name: e.target.value })} />
+              <Toggle on={r.enabled} onChange={(v) => setRule(i, { enabled: v })} label={r.enabled ? 'Enabled' : 'Disabled'} />
+              <button className="ml-auto rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setC({ ...c, rules: c.rules.filter((_: any, n: number) => n !== i) })} aria-label="Delete rule"><Trash2 className="h-4 w-4" /></button>
+            </div>
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <div className="space-y-2 text-sm font-medium text-slate-700">
+                When
+                <select className={input} value={r.condition.type} onChange={(e) => setRule(i, { condition: { type: e.target.value } })}>
+                  {CONDITIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+                {r.condition.type === 'ANSWER_CONTAINS' && (<>
+                  <input className={input} placeholder="Question contains (optional)" value={r.condition.question || ''} onChange={(e) => setRule(i, { condition: { ...r.condition, question: e.target.value } })} />
+                  <input className={input} placeholder="Answer contains" value={r.condition.value || ''} onChange={(e) => setRule(i, { condition: { ...r.condition, value: e.target.value } })} />
+                </>)}
+                {r.condition.type === 'RECRUITER_CODE' && <input className={input} placeholder="Recruiter code" value={r.condition.code || ''} onChange={(e) => setRule(i, { condition: { ...r.condition, code: e.target.value } })} />}
+                {r.condition.type === 'SOURCE' && <input className={input} placeholder="Source, e.g. website" value={r.condition.source || ''} onChange={(e) => setRule(i, { condition: { ...r.condition, source: e.target.value } })} />}
+              </div>
+              <div className="text-sm font-medium text-slate-700">Give roles<div className="mt-2"><MultiPick options={res.roles} value={r.addRoleIds} onChange={(v) => setRule(i, { addRoleIds: v })} placeholder="Add a role" prefix="@" /></div></div>
+              <div className="text-sm font-medium text-slate-700">Remove roles<div className="mt-2"><MultiPick options={res.roles} value={r.removeRoleIds} onChange={(v) => setRule(i, { removeRoleIds: v })} placeholder="Add a role" prefix="@" /></div></div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-xs text-slate-500">The bot’s own role must be above every role it gives or removes (Server Settings → Roles).</p>
+      <div className="mt-5"><SaveBar onSave={() => onSave(c)} /></div>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Review rooms                                                        */
+/* ------------------------------------------------------------------ */
+function ReviewRoomsTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Resources; onSave: (v: any) => Promise<void> }) {
+  const [c, setC] = useState(cfg);
+  const [rooms, setRooms] = useState<any[] | null>(null);
+  useEffect(() => { api('/review-rooms').then(setRooms).catch(() => setRooms([])); }, [api]);
+  const setTier = (i: number, p: any) => setC({ ...c, tiers: c.tiers.map((t: any, n: number) => (n === i ? { ...t, ...p } : t)) });
+
+  return (
+    <div className="grid gap-6 2xl:grid-cols-[1.3fr_1fr]">
+      <div className="space-y-6">
+        <Card title="Review rooms" right={<Toggle on={c.enabled} onChange={(v) => setC({ ...c, enabled: v })} label={c.enabled ? 'On' : 'Off'} />}
+          desc="Every new application gets a private channel. Inside it, reviewers can start a temporary voice room for the interview, escalate to a higher rank, and approve or reject.">
+          <div className="grid gap-4 md:grid-cols-3">
+            <label className="text-sm font-medium text-slate-700">Category<div className="mt-1"><Pick options={res.categories} value={c.categoryId} onChange={(v) => setC({ ...c, categoryId: v })} placeholder="Create “Applications”" /></div></label>
+            <label className="text-sm font-medium text-slate-700">Delete closed rooms after (hours)<input type="number" min={1} max={720} className={`${input} mt-1`} value={c.deleteAfterHours} onChange={(e) => setC({ ...c, deleteAfterHours: Number(e.target.value) })} /></label>
+            <div className="flex items-end"><Toggle on={c.applicantCanSee} onChange={(v) => setC({ ...c, applicantCanSee: v })} label="Applicant can join the room" /></div>
+          </div>
+        </Card>
+        <Card title="Reviewer ranks" desc="Rooms start with the first rank. “Escalate” opens the room to the next rank and pings them. Only the current rank or higher can decide."
+          right={<button className={ghost} onClick={() => setC({ ...c, tiers: [...c.tiers, { name: 'New rank', roleIds: [] }] })}><Plus className="h-4 w-4" /> Add rank</button>}>
+          <div className="space-y-3">
+            {c.tiers.map((t: any, i: number) => (
+              <div key={i} className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-[40px_220px_1fr_auto] md:items-start">
+                <div className="grid h-9 w-9 place-items-center rounded-full bg-indigo-50 font-bold text-indigo-700">{i + 1}</div>
+                <input className={input} value={t.name} onChange={(e) => setTier(i, { name: e.target.value })} />
+                <MultiPick options={res.roles} value={t.roleIds} onChange={(v) => setTier(i, { roleIds: v })} placeholder="Add a role for this rank" prefix="@" />
+                <button className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setC({ ...c, tiers: c.tiers.filter((_: any, n: number) => n !== i) })} aria-label="Delete rank"><Trash2 className="h-4 w-4" /></button>
+              </div>
+            ))}
+          </div>
+          <div className="mt-5"><SaveBar onSave={() => onSave(c)} /></div>
+        </Card>
+      </div>
+      <Card title="Open rooms">
+        {!rooms ? <div className="h-32 animate-pulse rounded-xl bg-slate-100" /> : !rooms.length ? <p className="text-sm text-slate-500">No review rooms yet.</p> : (
+          <ul className="divide-y divide-slate-100">
+            {rooms.slice(0, 30).map((r) => (
+              <li key={r.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                <div><div className="font-semibold text-slate-900">{r.applicantName}</div><div className="text-xs text-slate-500">{fmtDate(r.createdAt)}{r.voiceChannelId ? ' · voice room open' : ''}</div></div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700"><ArrowUp className="h-3 w-3" />{c.tiers[r.tier]?.name || `Rank ${r.tier + 1}`}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${r.status === 'OPEN' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{r.decision || r.status}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Bulk tools                                                          */
+/* ------------------------------------------------------------------ */
+const ACTIONS: { id: string; label: string; desc: string; audience: boolean }[] = [
+  { id: 'ADD_ROLE', label: 'Give a role', desc: 'Add a role to every matching member.', audience: true },
+  { id: 'REMOVE_ROLE', label: 'Remove a role', desc: 'Take a role from every matching member.', audience: true },
+  { id: 'DM_MEMBERS', label: 'DM members', desc: 'Send a direct message (up to 1,000 per run).', audience: true },
+  { id: 'CHANNEL_MESSAGE', label: 'Message channels', desc: 'Post the same message in several channels.', audience: false },
+  { id: 'NICKNAME_RESET', label: 'Reset nicknames', desc: 'Clear nicknames of matching members.', audience: true },
+  { id: 'PURGE_MESSAGES', label: 'Delete messages', desc: 'Delete recent messages (under 14 days old) in channels.', audience: false },
+  { id: 'KICK_MEMBERS', label: 'Kick members', desc: 'Remove matching members from the server.', audience: true },
+];
+
+function BulkTab({ api, res }: { api: any; res: Resources }) {
+  const [action, setAction] = useState('ADD_ROLE');
+  const [aud, setAud] = useState<any>({ mode: 'ALL', days: 7, includeBots: false });
+  const [p, setP] = useState<any>({ roleId: '', message: '', channelIds: [], count: 50, fromUserId: '', confirm: '' });
+  const [preview, setPreview] = useState<any>(null);
+  const [msg, setMsg] = useState('');
+  const [jobs, setJobs] = useState<any[]>([]);
+  const a = ACTIONS.find((x) => x.id === action)!;
+
+  const loadJobs = useCallback(() => api('/bulk').then(setJobs).catch(() => undefined), [api]);
+  useEffect(() => { loadJobs(); const t = setInterval(loadJobs, 4000); return () => clearInterval(t); }, [loadJobs]);
+
+  return (
+    <div className="grid gap-6 2xl:grid-cols-[1.3fr_1fr]">
+      <Card title="New bulk action">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {ACTIONS.map((x) => (
+            <button key={x.id} onClick={() => { setAction(x.id); setPreview(null); setMsg(''); }}
+              className={`rounded-xl border p-3 text-left transition ${action === x.id ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300'}`}>
+              <div className={`text-sm font-bold ${x.id === 'KICK_MEMBERS' ? 'text-rose-700' : 'text-slate-900'}`}>{x.label}</div>
+              <div className="mt-0.5 text-xs text-slate-500">{x.desc}</div>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+          {(action === 'ADD_ROLE' || action === 'REMOVE_ROLE') && <label className="text-sm font-medium text-slate-700">Role<div className="mt-1"><Pick options={res.roles} value={p.roleId} onChange={(v) => setP({ ...p, roleId: v })} placeholder="Choose a role" /></div></label>}
+          {(action === 'DM_MEMBERS' || action === 'CHANNEL_MESSAGE') && (
+            <label className="text-sm font-medium text-slate-700 lg:col-span-2">Message<textarea rows={4} maxLength={2000} className={`${input} mt-1`} value={p.message} onChange={(e) => setP({ ...p, message: e.target.value })} placeholder="Use {user} to mention each member in DMs" /></label>
+          )}
+          {(action === 'CHANNEL_MESSAGE' || action === 'PURGE_MESSAGES') && <div className="text-sm font-medium text-slate-700 lg:col-span-2">Channels<div className="mt-1"><MultiPick options={res.textChannels} value={p.channelIds} onChange={(v) => setP({ ...p, channelIds: v })} placeholder="Add a channel" prefix="#" /></div></div>}
+          {action === 'PURGE_MESSAGES' && (<>
+            <label className="text-sm font-medium text-slate-700">Messages per channel (max 100)<input type="number" min={1} max={100} className={`${input} mt-1`} value={p.count} onChange={(e) => setP({ ...p, count: Number(e.target.value) })} /></label>
+            <label className="text-sm font-medium text-slate-700">Only from user ID (optional)<input className={`${input} mt-1`} value={p.fromUserId} onChange={(e) => setP({ ...p, fromUserId: e.target.value.trim() })} /></label>
+          </>)}
+        </div>
+
+        {a.audience && (
+          <div className="mt-6 rounded-xl bg-slate-50 p-4">
+            <div className="text-sm font-bold text-slate-900">Who</div>
+            <div className="mt-3 grid gap-3 lg:grid-cols-3">
+              <select className={input} value={aud.mode} onChange={(e) => { setAud({ ...aud, mode: e.target.value }); setPreview(null); }}>
+                <option value="ALL">All members</option><option value="HAS_ROLE">Members with a role</option><option value="MISSING_ROLE">Members without a role</option>
+                <option value="JOINED_WITHIN_DAYS">Joined in the last N days</option><option value="JOINED_BEFORE_DAYS">Joined more than N days ago</option><option value="USER_IDS">Specific user IDs</option>
+              </select>
+              {(aud.mode === 'HAS_ROLE' || aud.mode === 'MISSING_ROLE') && <Pick options={res.roles} value={aud.roleId} onChange={(v) => { setAud({ ...aud, roleId: v }); setPreview(null); }} placeholder="Choose a role" />}
+              {(aud.mode === 'JOINED_WITHIN_DAYS' || aud.mode === 'JOINED_BEFORE_DAYS') && <input type="number" min={1} className={input} value={aud.days} onChange={(e) => { setAud({ ...aud, days: Number(e.target.value) }); setPreview(null); }} />}
+              {aud.mode === 'USER_IDS' && <textarea rows={2} className={`${input} lg:col-span-2`} placeholder="One ID per line or comma" value={(aud.userIds || []).join('\n')} onChange={(e) => { setAud({ ...aud, userIds: e.target.value.split(/[\s,]+/).filter(Boolean) }); setPreview(null); }} />}
+              <Toggle on={aud.includeBots} onChange={(v) => { setAud({ ...aud, includeBots: v }); setPreview(null); }} label="Include bots" />
+            </div>
+            <button className={`${ghost} mt-3`} onClick={async () => { setMsg(''); try { setPreview(await api('/bulk/preview', 'POST', { audience: aud })); } catch (e: any) { setMsg(e.message); } }}><RefreshCw className="h-4 w-4" /> Count matching members</button>
+            {preview && <p className="mt-2 text-sm text-slate-700"><b>{preview.count}</b> members match{preview.sample?.length ? `, e.g. ${preview.sample.map((s: any) => s.name).join(', ')}` : ''}.</p>}
+          </div>
+        )}
+
+        {action === 'KICK_MEMBERS' && <label className="mt-4 block text-sm font-medium text-rose-700">Type KICK to confirm<input className={`${input} mt-1`} value={p.confirm} onChange={(e) => setP({ ...p, confirm: e.target.value })} /></label>}
+
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <button className={`${btn} ${action === 'KICK_MEMBERS' ? '!bg-rose-600 hover:!bg-rose-700' : ''}`} onClick={async () => {
+            setMsg('');
+            try { await api('/bulk', 'POST', { action, ...p, audience: aud }); setMsg('Started. Progress is shown on the right.'); loadJobs(); } catch (e: any) { setMsg(e.message); }
+          }}><Layers className="h-4 w-4" /> Run</button>
+          {msg && <span className="text-sm text-slate-600">{msg}</span>}
+        </div>
+      </Card>
+
+      <Card title="Runs">
+        {!jobs.length ? <p className="text-sm text-slate-500">No bulk runs yet.</p> : (
+          <ul className="space-y-3">
+            {jobs.slice(0, 15).map((j) => {
+              const pct = j.total ? Math.round(((j.done + j.failed) / j.total) * 100) : j.status === 'DONE' ? 100 : 0;
+              return (
+                <li key={j.id} className="rounded-xl border border-slate-200 p-4 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-900">{ACTIONS.find((x) => x.id === j.action)?.label || j.action}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${j.status === 'DONE' ? 'bg-emerald-50 text-emerald-700' : j.status === 'FAILED' ? 'bg-rose-50 text-rose-700' : 'bg-indigo-50 text-indigo-700'}`}>{j.status}</span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-indigo-600 transition-all" style={{ width: `${pct}%` }} /></div>
+                  <div className="mt-1 flex justify-between text-xs text-slate-500"><span>{j.done} done{j.failed ? ` · ${j.failed} failed` : ''} of {j.total}</span><span>{fmtDate(j.createdAt)}</span></div>
+                  {(j.status === 'RUNNING' || j.status === 'QUEUED') && <button className="mt-2 text-xs font-semibold text-rose-600 hover:underline" onClick={() => api(`/bulk/${j.id}/cancel`, 'POST').then(loadJobs)}>Cancel</button>}
+                  {!!j.errors?.length && <p className="mt-2 text-xs text-rose-600">{j.errors[0]}</p>}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
+    </div>
+  );
+}

@@ -138,6 +138,8 @@ export function startReminderScheduler() {
       await reviewReminders.sendInterviewReminders();
       if (ticks % 30 === 1) await reviewReminders.sendWaitingDigests(); // every ~30 min check, sends at most once a day
       if (ticks % 10 === 1) await moderationSchedulerService.processScheduledPass(); // expire warnings, blacklists, restrictions
+      const { reviewRooms } = await import('./toolkit/reviewRooms.service.js');
+      await reviewRooms.housekeeping(); // empty voice rooms + expired review rooms
     } catch (err: any) {
       logger.warn(`[Reminders] Scheduler pass failed: ${err?.message}`);
     }

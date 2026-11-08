@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   ArrowRight, Plus, LogIn, ClipboardList, Mic, PartyPopper, Sparkles, HeartHandshake, Radar, ShieldCheck,
   Lock, KeyRound, Users, BarChart3, Zap, Check, X, Minus, Gamepad2, Palette, GraduationCap, Trophy, Swords,
-  Workflow, BellRing, CalendarDays, Gift, Brain, Bot, Layers, Menu,
+  Workflow, BellRing, Ticket, CalendarDays, Gift, Brain, Bot, Layers, Menu,
 } from 'lucide-react';
 import { getAddToDiscordUrl, getDiscordLoginUrl } from '../../lib/discordUrls.js';
 import { SiteHeader, SiteFooter, WRAP, useSignedIn, MadeInIndia } from './SiteChrome.js';
@@ -197,7 +197,7 @@ export function SiteLanding() {
               <BellRing className="mt-1 h-8 w-8 shrink-0 text-[var(--site-signal)]" aria-hidden />
               <div>
                 <h3 className="text-2xl font-bold">Share your social media in Discord</h3>
-                <p className="mt-2 max-w-xl text-[var(--site-muted)]">SocialCord Notifier is our social media bot: new posts from your social accounts appear in your Discord channels automatically. Switch it on from your dashboard.</p>
+                <p className="mt-2 max-w-xl text-[var(--site-muted)]">SocialCord Notifier is The Social Media Alert Bot for Discord: new posts from your social media accounts are announced in your Discord channels automatically. Switch it on from your dashboard.</p>
               </div>
             </div>
             <a href={loginHref} className="cm-btn-ghost shrink-0 self-start md:self-auto">Turn it on <ArrowRight className="h-4 w-4" aria-hidden /></a>
@@ -248,19 +248,21 @@ export function SiteLanding() {
 /* Content                                                             */
 /* ------------------------------------------------------------------ */
 const CATALOG: { icon: any; title: string; items: string[] }[] = [
-  { icon: ClipboardList, title: 'Recruitment', items: ['Custom application forms', '/apply inside Discord', 'Review queue', 'Approve or reject in one click', 'Escalate and flag', 'Reviewer notes', 'Applicant status checks', 'Requirement checks', 'Blacklist screening', 'Applicant portal'] },
+  { icon: ClipboardList, title: 'Recruitment', items: ['Custom application forms', '/apply inside Discord', 'Review queue', 'Approve or reject in one click', 'Escalate and flag', 'Reviewer notes', 'Applicant status checks', 'Requirement checks', 'Blacklist screening', 'Applicant portal', 'Role rules on approval'] },
   { icon: Radar, title: 'Recruiters & referrals', items: ['Personal recruiter codes', 'Referral tracking', 'Recruiter benefits', 'Recruiter leaderboard', 'Recruiter portal', 'Recruiter performance records', 'Shareable portal links'] },
-  { icon: Mic, title: 'Interviews', items: ['Interview scheduling', 'DM reminders 60 and 10 min before', 'Interview sessions inside Discord', 'Recorded answers and outcomes', 'Interview notes', 'Optional Google Calendar sync'] },
+  { icon: Mic, title: 'Interviews', items: ['Interview scheduling', 'DM reminders 60 and 10 min before', 'Interview sessions inside Discord', 'Recorded answers and outcomes', 'Interview notes', 'Private review room per application', 'Temporary interview voice rooms', 'Escalation by reviewer rank', 'Optional Google Calendar sync'] },
   { icon: PartyPopper, title: 'Onboarding', items: ['Roles given on approval', 'Welcome messages', 'Welcome DMs', 'Server rules command', 'Guided setup wizard', 'Setup checklist for admins'] },
   { icon: Users, title: 'Members', items: ['Member directory sync', 'Member 360 timeline', 'Lifecycle stages', 'Member status lookups', 'Cohorts', 'Search across everything'] },
-  { icon: ShieldCheck, title: 'Moderation & safety', items: ['Warnings and cases', 'Blacklists', 'Auto-moderation rules', 'Escalation queue', 'Staff audit trail', 'Security audit log'] },
+  { icon: ShieldCheck, title: 'Moderation & safety', items: ['Points-based warning system', 'Automatic timeout, kick or ban', 'Warnings and cases', 'Blacklists', 'Auto-moderation rules', 'Escalation queue', 'Staff audit trail', 'Security audit log'] },
   { icon: CalendarDays, title: 'Events & engagement', items: ['Events with sign-ups', 'Event reminders', 'Announcements', 'Polls', 'Engagement campaigns', 'Re-engagement campaigns', 'Rewards and recognition'] },
   { icon: Workflow, title: 'Automation', items: ['Workflow triggers', 'Scheduled jobs', 'New-application DMs', 'Daily reviewer digests', 'Follow-ups and nudges', 'Notification routing'] },
   { icon: BarChart3, title: 'Insights & AI', items: ['Application funnel', 'Drop-off analysis', 'Retention by cohort', 'Recruiter quality scores', 'Exportable reports', 'Community Brain suggestions', 'Lifecycle intelligence'] },
-  { icon: Layers, title: 'Team & platform', items: ['Staff roles and permissions', 'Multi-server workspaces', 'Per-user notification settings', 'Discord diagnostics', 'SocialCord social media bot', 'Support command', '24/7 hosting with failover'] },
+  { icon: Ticket, title: 'Tickets', items: ['Ticket panel with types', '/ticket command', 'Private ticket channels', 'Staff teams per type', 'Claim and close', 'Transcripts and log channel'] },
+  { icon: Zap, title: 'Bulk tools', items: ['Bulk role give / remove', 'Bulk DMs', 'Message many channels', 'Bulk message delete', 'Bulk nickname reset', 'Bulk kick with confirmation', 'Live progress'] },
+  { icon: Layers, title: 'Team & platform', items: ['Staff roles and permissions', 'Multi-server workspaces', 'Per-user notification settings', 'Discord diagnostics', 'SocialCord: The Social Media Alert Bot', 'Support command', '24/7 hosting with failover'] },
 ];
 
-const ROADMAP = ['Support tickets', 'Levels and XP', 'Giveaways', 'Reaction and button roles', 'Member verification', 'Server activity logs', 'Starboard', 'Birthdays', 'Custom commands', 'Multi-language'];
+const ROADMAP = ['Levels and XP', 'Giveaways', 'Reaction and button roles', 'Member verification', 'Server activity logs', 'Starboard', 'Birthdays', 'Custom commands', 'Multi-language'];
 
 const ROLES = [
   { name: 'Owner', color: '#FF5C8A', text: 'Full control of the server, its settings and who is on staff.' },

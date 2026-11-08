@@ -300,7 +300,9 @@ export class WorkflowActionService {
             if (!discordService.isConnected()) {
               return { success: false, error: 'BOT_NOT_CONNECTED: Discord bot gateway is disconnected. Action failed closed.' };
             }
-          } else if (simulation || !discordService.isConnected()) {
+          } else if (!simulation && !discordService.isConnected()) {
+            return { success: false, error: 'BOT_NOT_CONNECTED: the bot is offline, nothing was sent.' };
+          } else if (simulation) {
             return {
               success: true,
               result: `[Simulation] Message rendered: "${content}" destined for ${action.config.sendAsDM ? `User ${recipientId}` : `Channel ${channelId || 'unspecified'}`}`,
@@ -359,7 +361,9 @@ export class WorkflowActionService {
             if (!discordService.isConnected()) {
               return { success: false, error: 'BOT_NOT_CONNECTED: Discord bot gateway is disconnected. Action failed closed.' };
             }
-          } else if (simulation || !discordService.isConnected()) {
+          } else if (!simulation && !discordService.isConnected()) {
+            return { success: false, error: 'BOT_NOT_CONNECTED: the bot is offline, nothing was sent.' };
+          } else if (simulation) {
             return { success: true, result: `[Simulation] Template sent to ${recipientId || channelId}: "${templateBody}"` };
           }
 
@@ -388,7 +392,9 @@ export class WorkflowActionService {
             if (!discordService.isConnected()) {
               return { success: false, error: 'BOT_NOT_CONNECTED: Discord bot gateway is disconnected. Action failed closed.' };
             }
-          } else if (simulation || !discordService.isConnected()) {
+          } else if (!simulation && !discordService.isConnected()) {
+            return { success: false, error: 'BOT_NOT_CONNECTED: the bot is offline, nothing was sent.' };
+          } else if (simulation) {
             return { success: true, result: `[Simulation] Role ${roleId} assigned to user ${discordUserId}.` };
           }
 
@@ -419,7 +425,9 @@ export class WorkflowActionService {
             if (!discordService.isConnected()) {
               return { success: false, error: 'BOT_NOT_CONNECTED: Discord bot gateway is disconnected. Action failed closed.' };
             }
-          } else if (simulation || !discordService.isConnected()) {
+          } else if (!simulation && !discordService.isConnected()) {
+            return { success: false, error: 'BOT_NOT_CONNECTED: the bot is offline, nothing was sent.' };
+          } else if (simulation) {
             return { success: true, result: `[Simulation] Role ${roleId} removed from user ${discordUserId}.` };
           }
 

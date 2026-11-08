@@ -72,7 +72,7 @@ async function build(): Promise<any> {
 
 export async function getPublicContact(_req: Request, res: Response) {
   try {
-    if (!cache || Date.now() - cache.at > TTL || !cache.data.guild) cache = { at: Date.now(), data: await build() };
+    if (!cache || Date.now() - cache.at > TTL || !cache.data.guild || !cache.data.owner || !cache.data.invite) cache = { at: Date.now(), data: await build() };
     res.set('Cache-Control', 'public, max-age=300');
     res.json({ success: true, data: cache.data });
   } catch (err: any) {

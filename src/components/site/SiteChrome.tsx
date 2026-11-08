@@ -107,7 +107,7 @@ export function SiteFooter() {
             </div>
           </div>
           <a href={invite} target={c?.invite ? '_blank' : undefined} rel="noopener noreferrer" className="cm-btn-ghost mt-5 !py-2 text-[15px]">
-            <DiscordLogo className="h-5 w-5 text-[#8EA1FF]" /> Kunal Pareek
+            <DiscordLogo className="h-5 w-5 text-[#8EA1FF]" /> Mr. Technical Gamer
           </a>
         </div>
       </div>
