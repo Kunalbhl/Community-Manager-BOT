@@ -34,11 +34,11 @@ export function useDiscordResources(communityId?: string): Res | null {
 const base = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
 
 /** Value can be the channel ID (default) or its name ("#name" / "name"), for older settings that store names. */
-export function ChannelSelect({ value, onChange, valueType = 'id', placeholder = 'Choose a channel', communityId, className = '', kind = 'text' }: {
-  value?: string; onChange: (v: string) => void; valueType?: 'id' | 'name' | 'hashName'; placeholder?: string; communityId?: string; className?: string; kind?: 'text' | 'category';
+export function ChannelSelect({ value, onChange, valueType = 'id', placeholder = 'Choose a channel', communityId, className = '', kind = 'text', exclude = [] }: {
+  value?: string; onChange: (v: string) => void; valueType?: 'id' | 'name' | 'hashName'; placeholder?: string; communityId?: string; className?: string; kind?: 'text' | 'category'; exclude?: string[];
 }) {
   const res = useDiscordResources(communityId);
-  const list = (kind === 'category' ? res?.categories : res?.textChannels) || [];
+  const list = ((kind === 'category' ? res?.categories : res?.textChannels) || []).filter((c) => !exclude.includes(c.id));
   const toVal = (o: Opt) => (valueType === 'id' ? o.id : valueType === 'hashName' ? `#${o.name}` : o.name);
   const cur = String(value || '');
   const known = list.some((o) => toVal(o) === cur);
@@ -51,11 +51,11 @@ export function ChannelSelect({ value, onChange, valueType = 'id', placeholder =
   );
 }
 
-export function RoleSelect({ value, onChange, valueType = 'id', placeholder = 'Choose a role', communityId, className = '' }: {
-  value?: string; onChange: (v: string) => void; valueType?: 'id' | 'name' | 'atName'; placeholder?: string; communityId?: string; className?: string;
+export function RoleSelect({ value, onChange, valueType = 'id', placeholder = 'Choose a role', communityId, className = '', exclude = [] }: {
+  value?: string; onChange: (v: string) => void; valueType?: 'id' | 'name' | 'atName'; placeholder?: string; communityId?: string; className?: string; exclude?: string[];
 }) {
   const res = useDiscordResources(communityId);
-  const list = res?.roles || [];
+  const list = (res?.roles || []).filter((r) => !exclude.includes(r.id) || r.id === value);
   const toVal = (o: Opt) => (valueType === 'id' ? o.id : valueType === 'atName' ? `@${o.name}` : o.name);
   const cur = String(value || '');
   const known = list.some((o) => toVal(o) === cur);

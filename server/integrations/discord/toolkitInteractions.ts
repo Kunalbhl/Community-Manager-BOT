@@ -23,6 +23,15 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
   if (!id.startsWith('cm:')) return false;
   const [, area, action, arg] = id.split(':');
 
+  // ---------- events: Register / Can't go ----------
+  if (area === 'evt' && (action === 'join' || action === 'leave')) {
+    await interaction.deferReply({ ephemeral: true });
+    const communityId = await communityForGuild(interaction.guildId);
+    const { eventPosts } = await import('../../services/eventPosts.service.js');
+    await interaction.editReply({ content: await eventPosts.press(interaction, communityId, arg, action === 'join'), allowedMentions: { parse: [] } });
+    return true;
+  }
+
   // ---------- guided application chat ----------
   if (area === 'noop') { await interaction.deferUpdate().catch(() => undefined); return true; }
   if (area === 'flow') {
