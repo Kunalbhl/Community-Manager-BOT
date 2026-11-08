@@ -48,6 +48,19 @@ export const AUTHORITATIVE_DISCORD_PERMISSIONS = {
   ReadMessageHistory: 65536n,
   ManageRoles: 268435456n,
   UseApplicationCommands: 2147483648n,
+  ManageChannels: 16n,
+  CreateInstantInvite: 1n,
+  AddReactions: 64n,
+  Connect: 1048576n,
+  MoveMembers: 16777216n,
+  ManageThreads: 17179869184n,
+  CreatePublicThreads: 34359738368n,
+  CreatePrivateThreads: 68719476736n,
+  SendMessagesInThreads: 274877906944n,
+  KickMembers: 2n,
+  BanMembers: 4n,
+  ModerateMembers: 1099511627776n,
+  ManageNicknames: 134217728n,
 };
 
 export function buildAuthoritativeInstallPermissions(): string {
