@@ -386,6 +386,7 @@ router.post(`${tk}/warnings`, requireTenantAccess(), requirePermission('communit
 router.post(`${tk}/warnings/:strikeId/revoke`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.revokeWarningHandler);
 router.post(`${tk}/recruitment/draft-quiz`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.draftQuizHandler);
 router.get(`${tk}/recruitment/threshold`, requireTenantAccess(), requirePermission('community.view'), Toolkit.screeningThresholdHandler);
+router.post(`${tk}/workspace`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.provisionWorkspaceHandler);
 router.get(`${tk}/gate`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateStatusHandler);
 router.post(`${tk}/gate/lock`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateLockHandler);
 router.post(`${tk}/gate/undo`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateUndoHandler);

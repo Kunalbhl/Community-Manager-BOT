@@ -362,3 +362,10 @@ export async function sheetResyncHandler(req: Request, res: Response) {
     ok(res, { rows: await sheetsSync.resync(req.params.communityId) });
   } catch (err) { fail(res, err); }
 }
+
+export async function provisionWorkspaceHandler(req: Request, res: Response) {
+  try {
+    const { workspace } = await import('../services/serverWorkspace.service.js');
+    ok(res, await workspace.provision(req.params.communityId));
+  } catch (err) { fail(res, err); }
+}

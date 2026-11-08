@@ -357,6 +357,11 @@ export class DiscordGuildLinkService {
             logger.warn(`[DiscordGuildLink] Welcome message notice: ${(err as Error).message}`);
           });
         }
+        if (source === 'BOT_JOIN') {
+          import('./serverWorkspace.service.js')
+            .then(({ workspace }) => workspace.provision(targetCommunityId))
+            .catch((err) => logger.warn(`[DiscordGuildLink] Workspace setup notice: ${err?.message}`));
+        }
       } catch (err) {
         // Ignored
       }
@@ -415,39 +420,50 @@ export class DiscordGuildLinkService {
     if (!discordService.isConnected()) return;
     try {
       const client = (discordService as any)['client'];
-      if (!client) return;
-      const guild = await client.guilds.fetch(guildId);
+      const guild = client ? await client.guilds.fetch(guildId).catch(() => null) : null;
       if (!guild) return;
 
-      const appUrl = config.APP_URL || 'http://localhost:3000';
-      const portalUrl = `${appUrl}/community/${communityId}`;
+      // Once per server, and only in Discord's own system channel (where "X added Community Manager" appears).
+      const community: any = await communitiesRepository.getById(communityId).catch(() => null);
+      if (community?.welcomePostedAt) return;
+      const channel: any = guild.systemChannel;
+      if (!channel || !channel.permissionsFor(guild.members.me)?.has('SendMessages')) return;
+      await communitiesRepository.update(communityId, { welcomePostedAt: new Date().toISOString() } as any).catch(() => undefined);
 
+      // Who invited the bot (needs View Audit Log; falls back to the owner).
+      let inviterId: string = guild.ownerId;
+      try {
+        const { AuditLogEvent } = await import('discord.js');
+        const logs = await guild.fetchAuditLogs({ type: AuditLogEvent.BotAdd, limit: 5 });
+        const entry = logs.entries.find((e: any) => e.target?.id === client.user.id);
+        if (entry?.executor?.id) inviterId = entry.executor.id;
+      } catch { /* no audit log access */ }
+
+      const appUrl = (config.APP_URL || 'https://community-manager-bot-720940628402.asia-southeast1.run.app').replace(/\/$/, '');
       const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
-      const linkButton = new ButtonBuilder()
-        .setLabel('Open Community Manager')
-        .setStyle(ButtonStyle.Link)
-        .setURL(portalUrl);
-      const row = new ActionRowBuilder<any>().addComponents(linkButton);
-
-      const messageContent = `🎉 **Community Manager is connected.**\n\nYour server **${guild.name}** has been detected successfully. Continue setup to configure roles, rules, recruitment and interviews.`;
-
-      let targetChannel = guild.systemChannel;
-      if (!targetChannel) {
-        const channels = await guild.channels.fetch();
-        targetChannel = channels.find(
-          (c: any) => c && c.isTextBased() && c.permissionsFor(guild.members.me)?.has('SendMessages')
-        );
-      }
-
-      if (targetChannel && 'send' in targetChannel) {
-        await (targetChannel as any).send({
-          content: messageContent,
-          components: [row],
-        });
-        logger.info(`[DiscordGuildLink] Sent welcome message to channel ${targetChannel.id} in guild ${guildId}`);
-      }
+      const row = new ActionRowBuilder<any>().addComponents(
+        new ButtonBuilder().setLabel('Complete setup').setStyle(ButtonStyle.Link).setURL(`${appUrl}/servers?installed=${guildId}`),
+        new ButtonBuilder().setLabel('About Community Manager').setStyle(ButtonStyle.Link).setURL(`${appUrl}/`),
+      );
+      await channel.send({
+        content: `Thank you for the invite, <@${inviterId}>.`,
+        allowedMentions: { users: [inviterId] },
+        embeds: [{
+          color: 0x7c8cff,
+          title: 'Community Manager is now active',
+          description: `From first application to long-term member, **${guild.name}** now runs on one system — recruitment, screening, interviews, moderation, tickets and engagement, around the clock.`,
+          fields: [
+            { name: '📋 Recruitment', value: 'Applications, screening, interviews', inline: true },
+            { name: '🛡️ Safety', value: 'Warnings, auto-moderation, logs', inline: true },
+            { name: '⚙️ Operations', value: 'Roles, tickets, automation', inline: true },
+          ],
+          footer: { text: 'Your workspace is being prepared. Complete setup in about two minutes.' },
+        }],
+        components: [row],
+      });
+      logger.info(`[DiscordGuildLink] Welcome posted in system channel of ${guildId}`);
     } catch (err) {
-      logger.warn(`[DiscordGuildLink] Notice sending installation welcome message: ${(err as Error).message}`);
+      logger.warn(`[DiscordGuildLink] Welcome message notice: ${(err as Error).message}`);
     }
   }
 
