@@ -64,6 +64,7 @@ export const AUTHORITATIVE_BOT_PERMISSIONS = [
   PermissionFlagsBits.BanMembers,
   PermissionFlagsBits.ModerateMembers,
   PermissionFlagsBits.ManageNicknames,
+  PermissionFlagsBits.ViewAuditLog,
 ] as const;
 
 export function buildAuthoritativeInstallPermissions(): bigint {

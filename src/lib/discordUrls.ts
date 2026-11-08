@@ -61,6 +61,7 @@ export const AUTHORITATIVE_DISCORD_PERMISSIONS = {
   BanMembers: 4n,
   ModerateMembers: 1099511627776n,
   ManageNicknames: 134217728n,
+  ViewAuditLog: 128n,
 };
 
 export function buildAuthoritativeInstallPermissions(): string {

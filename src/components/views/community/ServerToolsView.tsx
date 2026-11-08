@@ -812,7 +812,7 @@ function SecureSetupCard({ api, res }: { api: any; res: Resources }) {
   const g = s.gate || {};
   const job = g.job;
   const verified = g.verified;
-  const run = async (fn: () => Promise<any>, ok: string) => { setMsg(''); try { await fn(); setMsg(ok); await load(); } catch (e: any) { setMsg(e.message); } };
+  const run = async (fn: () => Promise<any>, ok: string) => { setMsg(''); try { await fn(); if (ok) setMsg(ok); await load(); } catch (e: any) { setMsg(e.message); } };
 
   return (
     <section className={`rounded-2xl border-2 p-6 shadow-sm ${verified ? 'border-emerald-300 bg-emerald-50/40' : 'border-amber-300 bg-amber-50/40'}`}>
@@ -825,7 +825,10 @@ function SecureSetupCard({ api, res }: { api: any; res: Resources }) {
               : 'Discord does not let bots control its own “Apply to Join”, so Community Manager locks your server instead: newcomers see only the channels you choose until they are approved. Recruitment, the Apply panel and application chats stay off until this is done.'}
           </p>
         </div>
-        <button className={ghost} onClick={load}><RefreshCw className="h-4 w-4" /> Re-check</button>
+        <div className="flex gap-2">
+          <button className={ghost} onClick={() => run(async () => { const r = await api('/workspace', 'POST'); setMsg(`Workspace ready: ${r.used.map((u: any) => `${u.purpose} → #${u.channel}${u.created ? ' (new)' : ''}`).join(' · ')}. Staff roles: ${r.staffRoles.join(', ') || 'none found'}.`); }, '')}>⚙️ Auto-configure workspace</button>
+          <button className={ghost} onClick={load}><RefreshCw className="h-4 w-4" /> Re-check</button>
+        </div>
       </div>
 
       {!!s.problems?.length && <div className="mt-4"><Banner tone="error">{s.problems.map((p: string) => <div key={p}>{p.replace(/\*\*/g, '')}</div>)}</Banner></div>}
