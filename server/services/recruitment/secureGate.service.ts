@@ -86,6 +86,9 @@ export const secureGate = {
     if (!me?.permissions.has(PermissionFlagsBits.ManageRoles) || !me?.permissions.has(PermissionFlagsBits.ManageChannels)) throw new Error('Give the bot Manage Roles and Manage Channels first.');
     const publicIds = params.publicChannelIds.filter((id) => isSnowflake(id) && guild.channels.cache.has(id));
     if (!publicIds.length) throw new Error('Choose at least one public channel (for example welcome or apply).');
+    // Discord Onboarding channels must stay readable by everyone; keep them public instead of failing.
+    const onboarding: any = await (guild as any).fetchOnboarding?.().catch(() => null);
+    for (const id of (onboarding?.enabled ? onboarding.defaultChannels?.keys?.() || [] : [])) if (!publicIds.includes(id)) publicIds.push(id);
     const cur = await getGate(communityId);
     if (cur.job?.status === 'RUNNING') throw new Error('Secure Setup is already running.');
 
