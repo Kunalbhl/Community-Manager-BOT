@@ -88,6 +88,9 @@ export function attachGatewayEventHandlers(client: Client): void {
       import('../../../services/toolkit/roleRules.service.js')
         .then(({ roleRules }) => roleRules.onMemberJoin(communityId, member.id))
         .catch(() => undefined);
+      import('../../../services/toolkit/reviewRooms.service.js')
+        .then(({ reviewRooms }) => reviewRooms.onApplicantJoined(communityId, member.id))
+        .catch(() => undefined);
     } catch (err) {
       logger.error(`[DiscordGateway] Error confirming member join referral:`, undefined, { error: (err as Error).message });
     }
@@ -303,6 +306,11 @@ export function attachGatewayEventHandlers(client: Client): void {
     } catch (err: any) {
       logger.warn(`[AutoMod] evaluation failed: ${err?.message}`);
     }
+
+    // Guided application chat (automatic interview answers, manual interview transcript).
+    import('../../../services/recruitment/applicationFlow.service.js')
+      .then(({ applicationFlow }) => applicationFlow.onChatMessage(message))
+      .catch(() => undefined);
 
     // Levels / XP and custom commands (never blocks the rest).
     await onFeatureMessage(message).catch(() => undefined);

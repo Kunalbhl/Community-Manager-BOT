@@ -80,7 +80,7 @@ export function ServerToolsView({ communityId }: { communityId: string }) {
 
       {config && res && (
         <>
-          {tab === 'recruit' && <RecruitTab api={api} cfg={config.recruitment} res={res} onSave={(v) => save('recruitment', v)} />}
+          {tab === 'recruit' && <RecruitTab api={api} cfg={config.recruitment} rooms={config.reviewRooms} res={res} onSave={(v) => save('recruitment', v)} onSaveRooms={(v) => save('reviewRooms', v)} goRooms={() => setTab('rooms')} />}
           {tab === 'tickets' && <TicketsTab api={api} cfg={config.tickets} res={res} onSave={(v) => save('tickets', v)} />}
           {tab === 'warnings' && <WarningsTab communityId={communityId} api={api} cfg={config.warnings} onSave={(v) => save('warnings', v)} />}
           {tab === 'roles' && <RoleRulesTab cfg={config.roleRules} res={res} onSave={(v) => save('roleRules', v)} />}
@@ -634,8 +634,14 @@ export function MembersPick({ communityId, value, onChange }: { communityId: str
 /* ------------------------------------------------------------------ */
 /* Recruitment in Discord                                              */
 /* ------------------------------------------------------------------ */
-function RecruitTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Resources; onSave: (v: any) => Promise<void> }) {
+function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { api: any; cfg: any; rooms: any; res: Resources; onSave: (v: any) => Promise<void>; onSaveRooms: (v: any) => Promise<void>; goRooms: () => void }) {
   const [c, setC] = useState(cfg);
+  const [threshold, setThreshold] = useState<number | null>(null);
+  const [drafting, setDrafting] = useState('');
+  useEffect(() => { api('/recruitment/threshold').then((d: any) => setThreshold(d.threshold)).catch(() => undefined); }, [api]);
+  const sc = c.screening;
+  const setSc = (p: any) => setC({ ...c, screening: { ...c.screening, ...p } });
+  const setQ = (i: number, p: any) => setSc({ questions: sc.questions.map((q: any, n: number) => (n === i ? { ...q, ...p } : q)) });
   const [panelCh, setPanelCh] = useState('');
   const [msg, setMsg] = useState('');
   const setM = (k: string, v: string) => setC({ ...c, messages: { ...c.messages, [k]: v } });
@@ -651,6 +657,78 @@ function RecruitTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Resour
           <li key={t} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="text-2xl font-extrabold text-indigo-600">{i + 1}</div><div className="mt-1 font-bold text-slate-900">{t}</div><div className="text-sm text-slate-500">{d}</div></li>
         ))}
       </ol>
+
+      <Card title="Private application chat" desc="Each applicant gets their own private chat with the bot and your authority roles. Inside it, a private staff thread (the applicant can’t see it) holds scores, summaries, escalations and staff discussion."
+        right={<Toggle on={rooms.enabled} onChange={(v) => onSaveRooms({ ...rooms, enabled: v })} label={rooms.enabled ? 'On' : 'Off'} />}>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 p-4">
+            <div className="text-sm font-bold text-slate-900">Rules screening is run by</div>
+            <div className="mt-3 space-y-2 text-sm">
+              {[['AUTO', 'Community Manager (automatic)', 'Starts right after the applicant agrees to the rules.'], ['MANUAL', 'Interviewer (manual)', 'Staff press “Send rules quiz” when ready; the bot observes and records.']].map(([v, l, d]) => (
+                <label key={v} className={`flex cursor-pointer gap-3 rounded-lg border p-3 ${sc.mode === v ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}`}>
+                  <input type="radio" checked={sc.mode === v} onChange={() => setSc({ mode: v })} className="mt-1" /><span><b className="text-slate-900">{l}</b><br /><span className="text-slate-500">{d}</span></span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 p-4">
+            <div className="text-sm font-bold text-slate-900">Interview is run by</div>
+            <div className="mt-3 space-y-2 text-sm">
+              {[['AUTO', 'Community Manager (automatic)', 'The bot asks your interview questions and posts the answers and a summary for staff.'], ['MANUAL', 'Interviewer (manual)', 'An interviewer presses “Start interview”; the bot keeps the transcript and summarises it.']].map(([v, l, d]) => (
+                <label key={v} className={`flex cursor-pointer gap-3 rounded-lg border p-3 ${c.interview.mode === v ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200'}`}>
+                  <input type="radio" checked={c.interview.mode === v} onChange={() => setC({ ...c, interview: { mode: v } })} className="mt-1" /><span><b className="text-slate-900">{l}</b><br /><span className="text-slate-500">{d}</span></span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 p-4 text-sm">
+            <div className="font-bold text-slate-900">Screening threshold</div>
+            <div className="mt-2 text-4xl font-extrabold text-indigo-600">{threshold ?? '…'}%</div>
+            <p className="mt-1 text-slate-500">Set in Settings → Recruitment. The score is shown to staff only.</p>
+            <div className="mt-4 font-bold text-slate-900">Below the threshold</div>
+            <select className={`${input} mt-2`} value={sc.onFail} onChange={(e) => setSc({ onFail: e.target.value })}>
+              <option value="GUIDE_AND_CONTINUE">Explain the missed rules, then continue to the interview</option>
+              <option value="GUIDE_AND_HOLD">Explain the missed rules, then wait for staff to decide</option>
+            </select>
+            <button className="mt-4 text-sm font-semibold text-indigo-600 hover:underline" onClick={goRooms}>Set reviewer ranks and escalation →</button>
+          </div>
+        </div>
+        <label className="mt-5 block text-sm font-medium text-slate-700">Consent message (shown above your rules and guide)<textarea rows={2} className={`${input} mt-1`} value={sc.consentText} onChange={(e) => setSc({ consentText: e.target.value })} /></label>
+      </Card>
+
+      <Card title={`Rules quiz (${sc.questions.length})`} desc="Each question has 4 answers; mark the correct one. The explanation is shown to applicants who get it wrong."
+        right={<div className="flex gap-2">
+          <button className={ghost} disabled={!!drafting} onClick={async () => {
+            setDrafting('Drafting from your rules…');
+            try { const qs = await api('/recruitment/draft-quiz', 'POST', { count: 6 }); setSc({ questions: [...sc.questions, ...qs] }); setDrafting(`Added ${qs.length} draft questions. Check them, then save.`); } catch (e: any) { setDrafting(e.message); }
+          }}>🧠 Draft from my rules</button>
+          <button className={ghost} onClick={() => setSc({ questions: [...sc.questions, { id: '', question: '', options: ['', '', '', ''], correct: 0, explain: '' }] })}><Plus className="h-4 w-4" /> Add question</button>
+        </div>}>
+        {drafting && <p className="mb-4 text-sm text-slate-600">{drafting}</p>}
+        {!sc.questions.length && <p className="text-sm text-slate-500">No rules questions yet. Without them, the applicant goes straight from consent to the interview.</p>}
+        <div className="space-y-4">
+          {sc.questions.map((q: any, i: number) => (
+            <div key={i} className="rounded-xl border border-slate-200 p-4">
+              <div className="flex items-start gap-3">
+                <span className="mt-2 text-sm font-bold text-slate-400">{i + 1}.</span>
+                <input className={`${input} font-semibold`} placeholder="Question" value={q.question} onChange={(e) => setQ(i, { question: e.target.value })} />
+                <button className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setSc({ questions: sc.questions.filter((_: any, n: number) => n !== i) })} aria-label="Delete question"><Trash2 className="h-4 w-4" /></button>
+              </div>
+              <div className="mt-3 grid gap-2 pl-6 md:grid-cols-2">
+                {[0, 1, 2, 3].map((k) => (
+                  <label key={k} className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${q.correct === k ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200'}`}>
+                    <input type="radio" name={`correct-${i}`} checked={q.correct === k} onChange={() => setQ(i, { correct: k })} title="Correct answer" />
+                    <span className="text-sm font-bold text-slate-500">{'ABCD'[k]}</span>
+                    <input className="w-full bg-transparent text-sm focus:outline-none" placeholder={`Answer ${'ABCD'[k]}`} value={q.options[k] || ''} onChange={(e) => setQ(i, { options: q.options.map((o: string, n: number) => (n === k ? e.target.value : o)) })} />
+                  </label>
+                ))}
+              </div>
+              <input className={`${input} mt-2 ml-6 w-[calc(100%-1.5rem)]`} placeholder="Explanation shown if they get it wrong" value={q.explain} onChange={(e) => setQ(i, { explain: e.target.value })} />
+            </div>
+          ))}
+        </div>
+        <div className="mt-5"><SaveBar onSave={() => onSave(c)} /></div>
+      </Card>
 
       <div className="grid gap-6 2xl:grid-cols-2">
         <Card title="Where things happen">

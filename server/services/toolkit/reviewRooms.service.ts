@@ -79,7 +79,8 @@ export const reviewRooms = {
     }
     const applicantId = app.applicantDiscordUserId || app.applicantDiscordId;
     const applicantName = app.applicantUsernameSnapshot || app.applicantUsername || 'applicant';
-    const staff = rolesUpTo(cfg.tiers, 0).filter((id) => isSnowflake(id) && guild.roles.cache.has(id));
+    const rec = (await getToolkit(app.communityId)).recruitment;
+    const staff = [...new Set([...rolesUpTo(cfg.tiers, 0), ...rec.reviewerRoleIds])].filter((id) => isSnowflake(id) && guild.roles.cache.has(id));
     const applicantInServer = cfg.applicantCanSee && isSnowflake(applicantId) && (await guild.members.fetch(applicantId).catch(() => null));
 
     const channel = await guild.channels.create({
@@ -101,24 +102,8 @@ export const reviewRooms = {
       createdAt: new Date().toISOString(),
     } as any);
 
-    const answers = Array.isArray(app.answers)
-      ? app.answers.slice(0, 10).map((a: any) => ({ name: String(a.questionText || a.questionId).slice(0, 256), value: String(a.answerText || (a.answerValues || []).join(', ') || '—').slice(0, 1024) }))
-      : [];
-    await channel.send({
-      content: `${staff.map((r) => `<@&${r}>`).join(' ')} New application to review${applicantInServer ? ` · <@${applicantId}> welcome, staff will talk with you here.` : ''}`,
-      allowedMentions: { roles: staff, users: applicantInServer ? [applicantId] : [] },
-      embeds: [{
-        title: `📥 Application · ${applicantName}`,
-        color: 0x7c8cff,
-        fields: [
-          { name: 'Reviewer rank', value: cfg.tiers[0]?.name || 'Reviewers', inline: true },
-          { name: 'Recruiter code', value: String(app.recruiterCodeUsed || app.recruiterCode || '—'), inline: true },
-          ...answers,
-        ],
-        footer: { text: 'Use the buttons below. Escalate to bring in the next rank.' },
-      }],
-      components: buttons(room, cfg.tiers.length),
-    });
+    const { applicationFlow } = await import('../recruitment/applicationFlow.service.js');
+    await applicationFlow.begin(room.id, staff, Boolean(applicantInServer)).catch((err) => logger.warn(`[ReviewRooms] flow start failed: ${err?.message}`));
     return room;
   },
 
@@ -160,10 +145,12 @@ export const reviewRooms = {
     }
     const updated = await reviewRoomsRepository.update(roomId, { tier: next, history: [...room.history, { at: new Date().toISOString(), by: actor.id, event: `Escalated to ${cfg.tiers[next].name}` }] } as any);
     await applicationsRepository.update(room.applicationId, { status: 'ESCALATED', escalationTier: next, escalationTierName: cfg.tiers[next].name, updatedAt: new Date().toISOString() } as any).catch(() => undefined);
-    await channel?.send({
-      content: `⬆️ <@${actor.id}> escalated this application to **${cfg.tiers[next].name}** ${nextRoles.map((r) => `<@&${r}>`).join(' ')}. Please review and decide or take it to the next round.`,
+    const { applicationFlow, staffPanel } = await import('../recruitment/applicationFlow.service.js');
+    const thread: any = await applicationFlow.staffThread(roomId);
+    await (thread || channel)?.send({
+      content: `⬆️ <@${actor.id}> escalated this application to **${cfg.tiers[next].name}** ${nextRoles.map((r) => `<@&${r}>`).join(' ')}. Please review the chat above and decide, or take it to the next round.`,
       allowedMentions: { roles: nextRoles },
-      components: buttons(updated as any, cfg.tiers.length),
+      components: thread ? staffPanel(updated as any, cfg.tiers.length) : buttons(updated as any, cfg.tiers.length),
     });
     return `Escalated to ${cfg.tiers[next].name}.`;
   },
@@ -177,9 +164,26 @@ export const reviewRooms = {
     const channel: any = guild?.channels.cache.get(room.channelId);
     if (room.voiceChannelId) await guild?.channels.cache.get(room.voiceChannelId)?.delete('Application decided').catch(() => undefined);
     if (channel && isSnowflake(room.applicantId)) await channel.permissionOverwrites.delete(room.applicantId).catch(() => undefined);
-    await channel?.send({ content: `${decision === 'APPROVED' ? '✅ **Approved**' : '❌ **Rejected**'} by <@${byId}>. This room closes in ${cfg.deleteAfterHours} hour(s).`, allowedMentions: { parse: [] } }).catch(() => undefined);
+    const { applicationFlow } = await import('../recruitment/applicationFlow.service.js');
+    await applicationFlow.markDecided(applicationId).catch(() => undefined);
+    const thread: any = await applicationFlow.staffThread(applicationId).catch(() => null);
+    await thread?.send({ content: `${decision === 'APPROVED' ? '✅ **Approved**' : '✖️ **Rejected**'} by <@${byId}>. The applicant was messaged. This chat closes in ${cfg.deleteAfterHours} hour(s).`, allowedMentions: { parse: [] } }).catch(() => undefined);
+    await channel?.send({ content: `This application is now closed. Thank you! The decision has been sent to the applicant by DM.`, allowedMentions: { parse: [] } }).catch(() => undefined);
     if (channel) await channel.setName(`closed-${channel.name}`.slice(0, 100)).catch(() => undefined);
     await reviewRoomsRepository.update(applicationId, { status: 'CLOSED', decision, voiceChannelId: null, closedAt: new Date().toISOString(), history: [...room.history, { at: new Date().toISOString(), by: byId, event: decision }] } as any);
+  },
+
+  /** Applicant joined the server after applying: let them into their chat and start the guided flow. */
+  async onApplicantJoined(communityId: string, discordUserId: string) {
+    const rooms = await reviewRoomsRepository.list({ where: [{ field: 'communityId', operator: '==', value: communityId }] }).catch(() => [] as ReviewRoomDoc[]);
+    const room: any = rooms.find((x) => x.applicantId === discordUserId && x.status === 'OPEN');
+    if (!room) return;
+    const guild = await guildFor(communityId);
+    const channel: any = guild?.channels.cache.get(room.channelId);
+    if (!channel) return;
+    await channel.permissionOverwrites.edit(discordUserId, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true, AttachFiles: true, EmbedLinks: true }).catch(() => undefined);
+    const { applicationFlow } = await import('../recruitment/applicationFlow.service.js');
+    if (!room.flow?.consentAt) await applicationFlow.askConsent(room.id);
   },
 
   /** Every minute on the active bot: delete empty voice rooms and expired closed rooms. */
