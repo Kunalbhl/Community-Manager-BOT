@@ -210,6 +210,7 @@ import {
 } from '../controllers/platform.controller.js';
 import { recruiterRecordsController } from '../controllers/recruiterRecords.controller.js';
 import { getPublicContact, postPublicContact } from '../controllers/publicContact.controller.js';
+import * as Team from '../controllers/team.controller.js';
 import { setupGuideHandler } from '../controllers/setupGuide.controller.js';
 import * as Toolkit from '../controllers/toolkit.controller.js';
 import * as Features from '../controllers/features.controller.js';
@@ -387,6 +388,10 @@ router.post(`${tk}/warnings`, requireTenantAccess(), requirePermission('communit
 router.post(`${tk}/warnings/:strikeId/revoke`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.revokeWarningHandler);
 router.post(`${tk}/recruitment/draft-quiz`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.draftQuizHandler);
 router.get(`${tk}/recruitment/threshold`, requireTenantAccess(), requirePermission('community.view'), Toolkit.screeningThresholdHandler);
+router.get('/communities/:communityId/team', requireTenantAccess(), requirePermission('users.view'), Team.getTeamHandler);
+router.post('/communities/:communityId/team/link-role', requireTenantAccess(), requirePermission('users.manage'), Team.linkRoleHandler);
+router.post('/communities/:communityId/team/permissions', requireTenantAccess(), requirePermission('users.manage'), Team.setRolePermissionsHandler);
+router.post('/communities/:communityId/team/member', requireTenantAccess(), requirePermission('users.manage'), Team.setMemberRoleHandler);
 router.get('/communities/:communityId/setup-guide', requireTenantAccess(), requirePermission('community.view'), setupGuideHandler);
 router.post(`${tk}/workspace`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.provisionWorkspaceHandler);
 router.get(`${tk}/gate`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateStatusHandler);

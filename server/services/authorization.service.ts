@@ -297,6 +297,14 @@ export async function resolveUserCommunityRole(
     ...(explicitRoleIds || []),
     ...(discordMember && Array.isArray(discordMember.discordRoleIds) ? discordMember.discordRoleIds : [])
   ];
+  // Live roles from Discord (the stored copy can be out of date).
+  try {
+    const { discordService } = await import('../integrations/discord/discord.service.js');
+    const gid = community.guildId || community.discordGuildId || String(community.id).replace(/^comm_/, '');
+    const guild: any = discordService.getGuild(gid);
+    const live = guild ? (guild.members.cache.get(discordUserId) || (await guild.members.fetch(discordUserId).catch(() => null))) : null;
+    if (live) memberRoleIds.push(...Array.from(live.roles.cache.keys()) as string[]);
+  } catch { /* bot offline: fall back to stored roles */ }
   const uniqueRoleIds = Array.from(new Set(memberRoleIds));
   if (uniqueRoleIds.length > 0) {
     const mappings = (community as any).discordRoleMappings || [];
@@ -318,12 +326,14 @@ export async function resolveUserCommunityRole(
         where: [{ field: 'communityId', operator: '==', value: communityId }],
       });
       for (const roleDoc of dbRoles) {
-        const discordRoleId = (roleDoc as any).discordRoleId || (roleDoc as any).roleId;
-        if (discordRoleId && uniqueRoleIds.includes(discordRoleId)) {
-          const targetRole = (roleDoc.canonicalRole || roleDoc.name || 'MEMBER') as UserRole;
+        const linkedIds: string[] = Array.isArray((roleDoc as any).discordRoleIds) && (roleDoc as any).discordRoleIds.length ? (roleDoc as any).discordRoleIds : [(roleDoc as any).discordRoleId || (roleDoc as any).roleId].filter(Boolean);
+        if (linkedIds.some((id) => uniqueRoleIds.includes(id))) {
+          const targetRole = ((roleDoc as any).canonicalRole || (roleDoc as any).type || (roleDoc as any).role || 'MEMBER') as UserRole;
+          if (!['CONTROLLER', 'INTERVIEWER', 'RECRUITER', 'OWNER'].includes(targetRole)) continue;
+          const perms = targetRole === 'OWNER' ? [...ALL_COMMUNITY_PERMISSIONS] : [...(roleDoc.permissions || DEFAULT_ROLE_PERMISSIONS[targetRole] || [])];
           candidateRoles.push({
             role: targetRole,
-            permissions: [...(roleDoc.permissions || DEFAULT_ROLE_PERMISSIONS[targetRole] || [])],
+            permissions: perms as Permission[],
             source: 'DISCORD_ROLE_MAPPING',
           });
         }

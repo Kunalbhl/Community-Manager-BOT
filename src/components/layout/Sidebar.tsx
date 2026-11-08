@@ -15,7 +15,7 @@ import {
   ArrowLeft,
   User,
   Radio,
-  Megaphone, Wrench, PartyPopper, ListChecks } from 'lucide-react';
+  Megaphone, Wrench, PartyPopper, ListChecks, UserCog } from 'lucide-react';
 import { PortalMode, PlatformSection, CommunitySection } from '../../types/ui.js';
 import { UserRole, Permission } from '../../../shared/types/rbac.js';
 import { hasPermission } from '../../../server/security/rbac.js';
@@ -111,6 +111,13 @@ const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
     matchingSections: ['moderation', 'warnings', 'community-config', 'blacklist'],
   },
 
+  {
+    id: 'team-access',
+    label: 'Team & access',
+    icon: UserCog,
+    requiredPermission: 'users.view',
+    matchingSections: ['team-access'],
+  },
   {
     id: 'community-features',
     label: 'Community features',

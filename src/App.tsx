@@ -5,6 +5,7 @@ import { NotificationDrawer } from './components/layout/NotificationDrawer.js';
 import { ContactPage } from './components/site/ContactPage.js';
 import { DiscordRedirect } from './components/site/DiscordRedirect.js';
 import { CommunityFeaturesView } from './components/views/community/CommunityFeaturesView.js';
+import { TeamAccessView } from './components/views/community/TeamAccessView.js';
 import { SetupGuideView } from './components/views/community/SetupGuideView.js';
 import { HomeToday } from './components/views/community/HomeToday.js';
 import { ServerToolsView } from './components/views/community/ServerToolsView.js';
@@ -510,6 +511,8 @@ export default function App() {
         return <ApplicationsView communityId={selectedCommunity} currentRole={currentRole} initialTab="overview" />;
       case 'moderation':
         return <ModerationView communityId={selectedCommunity} initialTab="warnings" />;
+      case 'team-access':
+        return <TeamAccessView communityId={selectedCommunity} canEdit={currentRole === 'OWNER' || currentRole === 'PLATFORM_OWNER'} />;
       case 'setup-guide':
         return <SetupGuideView communityId={selectedCommunity} onNavigate={(s) => setActiveCommunitySection(s as CommunitySection)} />;
       case 'community-features':
