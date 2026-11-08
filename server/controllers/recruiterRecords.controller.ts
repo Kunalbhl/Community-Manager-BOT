@@ -279,12 +279,12 @@ export class RecruiterRecordsController {
 
     const validation = recruiterRecordService.validateTemplateVariables(template);
     const sampleContext = {
-      recruiterName: 'Recruiter Alex',
-      recruiterMention: '<@disc_rec_alex_123>',
-      recruiterCode: 'VIP2026',
-      applicantName: 'Applicant Jordan',
-      applicantDiscordUserId: 'disc_app_jordan_999',
-      applicationId: 'app_test_1001',
+      recruiterName: 'Ashish Anubhav',
+      recruiterMention: '@Ashish',
+      recruiterCode: 'ASHISH',
+      applicantName: 'Sufiyan',
+      applicantDiscordUserId: '—',
+      applicationId: '(example)',
       applicationStatus: 'JOINED',
       joinedAt: new Date().toISOString(),
       benefit: 'Custom Recruiter Role Perk',
@@ -292,8 +292,8 @@ export class RecruiterRecordsController {
       benefitStatus: 'PENDING',
       successfulRecruitmentCount: 5,
       pendingBenefitCount: 1,
-      communityName: 'Dev Community',
-      claimedBy: '<@disc_admin_001> (AdminSam)',
+      communityName: 'Your server',
+      claimedBy: '@Kunal',
       claimedAt: new Date().toISOString(),
       ...context,
     };

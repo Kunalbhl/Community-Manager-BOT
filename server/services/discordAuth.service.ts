@@ -306,18 +306,6 @@ export class DiscordAuthService {
       throw new Error('Invalid token scheme: Live authorization required. Simulated token rejected in production environments.');
     }
 
-    if (config.APP_RUNTIME_MODE === 'DEVELOPMENT_SIMULATION') {
-      return [
-        {
-          id: '1547515985416822884',
-          name: 'Development Community Guild',
-          owner: true,
-          permissions: AUTHORITATIVE_INSTALL_PERMISSION_BITFIELD,
-          features: [],
-        },
-      ];
-    }
-
     const isMock = accessToken.startsWith('dev_token_') || accessToken.startsWith('mock_');
     if (isMock) {
       throw new Error('Invalid token scheme: Live authorization required. Simulated token rejected in production environments.');

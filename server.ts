@@ -27,100 +27,7 @@ process.on('uncaughtException', (err: Error) => {
   logger.error('[Process] Uncaught exception (kept alive):', undefined, { error: err?.message, stack: err?.stack });
 });
 
-async function seedDefaultCommunity() {
-  if (config.NODE_ENV === 'production' || config.APP_RUNTIME_MODE !== 'DEVELOPMENT_SIMULATION') {
-    logger.info('Production or Preview mode active: Default community seeder bypassed.');
-    return;
-  }
-  try {
-  const personas = [
-    { userId: 'usr_owner_dev', role: 'OWNER' as const, name: 'Server Owner' },
-    { userId: 'usr_controller', role: 'CONTROLLER' as const, name: 'Controller' },
-    { userId: 'usr_interviewer', role: 'INTERVIEWER' as const, name: 'Interviewer' },
-    { userId: 'usr_recruiter', role: 'RECRUITER' as const, name: 'Recruiter' },
-    { userId: 'usr_member', role: 'MEMBER' as const, name: 'Guild Member' },
-    { userId: 'usr_applicant', role: 'APPLICANT' as const, name: 'Applicant' },
-  ];
-
-  const seedCommunityWithPersonas = async (commId: string, commName: string, guildId: string) => {
-    const nowStr = new Date().toISOString();
-    let existing = await communitiesRepository.getById(commId);
-    if (!existing) {
-      existing = await communitiesRepository.create({
-        id: commId,
-        name: commName,
-        guildId,
-        discordGuildId: guildId,
-        ownerUserId: 'usr_owner_dev',
-        createdAt: nowStr,
-        updatedAt: nowStr,
-        isActive: true,
-        setupStatus: 'COMPLETED',
-      });
-      logger.info(`Auto-seeded community tenant ${commId} (${commName}) for local development.`);
-    } else {
-      if (existing.ownerUserId !== 'usr_owner_dev' || existing.guildId !== guildId || existing.setupStatus !== 'COMPLETED') {
-        await communitiesRepository.update(commId, {
-          ...existing,
-          guildId,
-          discordGuildId: guildId,
-          ownerUserId: 'usr_owner_dev',
-          setupStatus: 'COMPLETED',
-          isActive: true,
-          updatedAt: nowStr,
-        });
-      }
-    }
-
-    for (const p of personas) {
-      const accessId = `${commId}_${p.userId}`;
-      const existingAccess = await communityMemberAccessRepository.getById(accessId);
-      if (!existingAccess) {
-        await communityMemberAccessRepository.create({
-          id: accessId,
-          communityId: commId,
-          discordUserId: p.userId,
-          role: p.role,
-          permissions: (DEFAULT_ROLE_PERMISSIONS as any)[p.role] || [],
-          source: 'MANUAL_ASSIGNMENT',
-          createdAt: nowStr,
-          updatedAt: nowStr,
-        });
-      }
-      const memberId = `${commId}_${p.userId}`;
-      const existingMember = await discordMembersRepository.getById(memberId);
-      if (!existingMember) {
-        await discordMembersRepository.create({
-          id: memberId,
-          communityId: commId,
-          discordGuildId: guildId,
-          discordUserId: p.userId,
-          usernameSnapshot: p.name,
-          displayNameSnapshot: p.name,
-          discordRoleIds: [],
-          joinedAt: nowStr,
-          syncedAt: nowStr,
-          source: 'MANUAL_ADD',
-          membershipStatus: 'ACTIVE',
-          syncState: 'SYNCED',
-        });
-      }
-    }
-  };
-
-    const devGuildId = process.env.DEV_GUILD_ID || 'dev_guild_local';
-    await seedCommunityWithPersonas('comm_default', 'Primary Community', devGuildId);
-    await seedCommunityWithPersonas(`comm_${devGuildId}`, 'Development Community Guild', devGuildId);
-  } catch (err) {
-    logger.warn('Failed to seed default community:', err);
-  }
-}
-
 async function connectDiscordBot() {
-  if (config.APP_RUNTIME_MODE === 'DEVELOPMENT_SIMULATION') {
-    logger.info('[DiscordGateway] DEVELOPMENT_SIMULATION mode: skipping real Discord login. Set APP_RUNTIME_MODE=REAL_DISCORD_PREVIEW or PRODUCTION with DISCORD_BOT_TOKEN to connect.');
-    return;
-  }
   if (!config.DISCORD_BOT_TOKEN) {
     logger.warn('[DiscordGateway] DISCORD_BOT_TOKEN not set — bot cannot log in. Dashboard will still run.');
     return;
@@ -137,7 +44,6 @@ async function connectDiscordBot() {
 
 async function startServer() {
   ProductionRuntimeActivationService.verifyStartup();
-  await seedDefaultCommunity();
   const app = express();
   const PORT = Number(process.env.PORT || config.PORT || 3000);
 

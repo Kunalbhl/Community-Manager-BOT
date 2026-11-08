@@ -1837,7 +1837,7 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                     <EmptyState
                       icon={Users}
                       title="No candidates registered"
-                      description="Create simulated candidate profiles to test recruitment operations."
+                      description="Applications appear here as soon as someone applies in Discord or on the website."
                       actionLabel="Submit Application"
                       onAction={() => setShowSubmitModal(true)}
                     />
