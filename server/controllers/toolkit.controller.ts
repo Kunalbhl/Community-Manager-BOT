@@ -343,7 +343,7 @@ export async function sheetScriptHandler(req: Request, res: Response) {
     const t = await getToolkit(req.params.communityId);
     let token = t.recruitment.sheetToken;
     if (!token) { token = newSheetToken(); await saveToolkit(req.params.communityId, { recruitment: { ...t.recruitment, sheetToken: token } }); }
-    ok(res, { script: sheetsSync.script(token), url: t.recruitment.sheetWebhookUrl || '', lastSync: t.recruitment.sheetLastSync || null });
+    ok(res, { script: sheetsSync.script(token), url: t.recruitment.sheetWebhookUrl || '', viewUrl: t.recruitment.sheetViewUrl || '', roleIds: t.recruitment.sheetRoleIds || [], lastSync: t.recruitment.sheetLastSync || null });
   } catch (err) { fail(res, err, 500); }
 }
 export async function sheetConnectHandler(req: Request, res: Response) {
@@ -418,5 +418,17 @@ export async function importRulesHandler(req: Request, res: Response) {
       await communityQuestionsService.addGuideline(communityId, { title, description: l.length > 120 ? l : '', category: 'RULE', order: existing.size + ++n });
     }
     ok(res, { added: n, channel: ch.name });
+  } catch (err) { fail(res, err); }
+}
+
+/** Who may open the sheet from Discord (/sheet). */
+export async function sheetAccessHandler(req: Request, res: Response) {
+  try {
+    const viewUrl = String(req.body?.viewUrl || '').trim();
+    if (viewUrl && !/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[\w-]+/.test(viewUrl)) throw new Error('Paste the sheet link from your browser. It looks like https://docs.google.com/spreadsheets/d/…');
+    const roleIds = (Array.isArray(req.body?.roleIds) ? req.body.roleIds : []).filter(isSnowflake).slice(0, 25);
+    const t = await getToolkit(req.params.communityId);
+    await saveToolkit(req.params.communityId, { recruitment: { ...t.recruitment, sheetViewUrl: viewUrl || undefined, sheetRoleIds: roleIds } });
+    ok(res, { saved: true });
   } catch (err) { fail(res, err); }
 }

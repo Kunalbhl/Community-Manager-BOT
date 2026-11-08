@@ -119,6 +119,13 @@ const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
     matchingSections: ['team-access'],
   },
   {
+    id: 'capabilities',
+    label: 'All features',
+    icon: Sparkles,
+    requiredPermission: 'community.view',
+    matchingSections: ['capabilities'],
+  },
+  {
     id: 'community-features',
     label: 'Community features',
     icon: PartyPopper,

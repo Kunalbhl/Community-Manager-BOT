@@ -39,6 +39,7 @@ export type CommunitySection =
   | 'setup-guide'
   | 'team-access'
   | 'community-features'
+  | 'capabilities'
   | 'overview'
   | 'dashboard'
   | 'applications'
