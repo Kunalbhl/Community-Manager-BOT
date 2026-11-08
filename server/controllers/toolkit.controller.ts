@@ -102,7 +102,7 @@ export async function saveToolkitSectionHandler(req: Request, res: Response) {
         pingRoleIds: ids(b.pingRoleIds), reviewerRoleIds: ids(b.reviewerRoleIds),
         logChannelId: isSnowflake(b.logChannelId) ? b.logChannelId : undefined,
         notifyRecruiter: b.notifyRecruiter !== false,
-        sheetWebhookUrl: cur.sheetWebhookUrl, sheetToken: cur.sheetToken, sheetLastSync: cur.sheetLastSync,
+        sheetWebhookUrl: cur.sheetWebhookUrl, sheetToken: cur.sheetToken, sheetLastSync: cur.sheetLastSync, panelPostedAt: (cur as any).panelPostedAt,
         screening: {
           mode: b.screening?.mode === 'MANUAL' ? 'MANUAL' : 'AUTO',
           onFail: b.screening?.onFail === 'GUIDE_AND_HOLD' ? 'GUIDE_AND_HOLD' : 'GUIDE_AND_CONTINUE',
@@ -138,6 +138,8 @@ export async function postTicketPanelHandler(req: Request, res: Response) {
     const channel = isSnowflake(req.body?.channelId) ? guild.channels.cache.get(req.body.channelId) : null;
     if (!channel) throw new Error('Pick a channel for the ticket panel.');
     await ticketService.postPanel(communityId, channel);
+    const tk2 = await getToolkit(communityId);
+    await saveToolkit(communityId, { tickets: { ...tk2.tickets, panelPostedAt: new Date().toISOString() } as any });
     ok(res, { posted: true });
   } catch (err) { fail(res, err); }
 }

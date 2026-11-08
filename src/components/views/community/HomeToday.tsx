@@ -68,6 +68,8 @@ export function HomeToday({ communityId, onNavigate }: { communityId: string; on
         </div>
       </div>
 
+      <SetupNudge communityId={communityId} onNavigate={onNavigate} />
+
       {/* Tiles */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 2xl:grid-cols-6">
         {tiles.map((t) => (
@@ -136,5 +138,22 @@ export function HomeToday({ communityId, onNavigate }: { communityId: string; on
         </div>
       </div>
     </section>
+  );
+}
+
+function SetupNudge({ communityId, onNavigate }: { communityId: string; onNavigate: (s: string) => void }) {
+  const [p, setP] = React.useState<{ done: number; total: number } | null>(null);
+  React.useEffect(() => {
+    fetch(`/api/v1/communities/${encodeURIComponent(communityId)}/setup-guide`, { credentials: 'include', headers: { 'x-community-id': communityId } })
+      .then((r) => r.json()).then((j) => j.success && setP({ done: j.data.done, total: j.data.total })).catch(() => undefined);
+  }, [communityId]);
+  if (!p || p.done >= p.total) return null;
+  const pct = Math.round((p.done / p.total) * 100);
+  return (
+    <button onClick={() => onNavigate('setup-guide')} className="flex w-full items-center gap-4 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-4 text-left transition hover:border-indigo-400">
+      <div className="text-2xl font-extrabold text-indigo-600">{pct}%</div>
+      <div className="flex-1"><div className="font-bold text-slate-900">Finish setting up your server</div><div className="text-sm text-slate-600">{p.done} of {p.total} steps done. The setup guide walks you through each module.</div></div>
+      <span className="text-sm font-semibold text-indigo-600">Open setup guide →</span>
+    </button>
   );
 }

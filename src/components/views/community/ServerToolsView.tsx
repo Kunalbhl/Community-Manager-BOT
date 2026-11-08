@@ -1,3 +1,4 @@
+import { takeOpenTab } from './SetupGuideView.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ClipboardList, Ticket, ShieldAlert, UserCheck, Mic, Layers, Plus, Trash2, Save, RefreshCw, Send, X, CheckCircle2, AlertTriangle, ArrowUp,
@@ -35,7 +36,7 @@ const TABS: { id: Tab; label: string; icon: any; hint: string }[] = [
 /* ------------------------------------------------------------------ */
 export function ServerToolsView({ communityId }: { communityId: string }) {
   const api = useApi(communityId);
-  const [tab, setTab] = useState<Tab>('recruit');
+  const [tab, setTab] = useState<Tab>(() => takeOpenTab(['recruit', 'tickets', 'warnings', 'roles', 'rooms', 'bulk'] as const, 'recruit'));
   const [config, setConfig] = useState<any>(null);
   const [res, setRes] = useState<Resources | null>(null);
   const [error, setError] = useState('');

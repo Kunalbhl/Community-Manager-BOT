@@ -71,6 +71,9 @@ export const secureGate = {
     if (!me?.permissions.has(PermissionFlagsBits.ManageChannels)) problems.push('The bot needs the **Manage Channels** permission.');
     const memberRole = gate.memberRoleId ? guild.roles.cache.get(gate.memberRoleId) : null;
     if (memberRole && me && memberRole.position >= me.roles.highest.position) problems.push(`Move the bot’s role above **${memberRole.name}** (Server Settings → Roles).`);
+    if (/Missing Permissions/i.test(gate.job?.error || '') && !me?.permissions.has(PermissionFlagsBits.Administrator)) {
+      problems.push('Discord blocked some channel changes. Give **Community Manager** the **Administrator** permission (Server Settings → Roles), run Lock again, then you may remove it.');
+    }
     const humans = guild.members.cache.filter((m: any) => !m.user.bot).size;
     return { gate, connected: true, visible, leaks, problems, memberCount: guild.memberCount, cachedHumans: humans, botOk: problems.length === 0 };
   },
