@@ -28,7 +28,7 @@ log() { echo "[update] $(date -u +%FT%TZ) $*"; }
 active_bot() { docker ps --format '{{.Names}}' | grep -E '^(cm-bot-blue|cm-bot-green|community-manager-bot)$' | head -1 || true; }
 
 # Probe a container's own health endpoint from inside it (no ports needed).
-probe() { docker exec "$1" wget -qO- "http://localhost:3000$2" >/dev/null 2>&1; }
+probe() { docker exec "$1" wget -qO- "http://127.0.0.1:3000$2" >/dev/null 2>&1; }
 wait_for() { # container path seconds
   local i=0
   while [ $i -lt "$3" ]; do probe "$1" "$2" && return 0; sleep 2; i=$((i + 2)); done
