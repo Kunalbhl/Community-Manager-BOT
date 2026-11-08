@@ -140,6 +140,15 @@ export function startReminderScheduler() {
       if (ticks % 10 === 1) await moderationSchedulerService.processScheduledPass(); // expire warnings, blacklists, restrictions
       const { reviewRooms } = await import('./toolkit/reviewRooms.service.js');
       await reviewRooms.housekeeping(); // empty voice rooms + expired review rooms
+      const { giveaways, birthdays } = await import('./features/community.service.js');
+      await giveaways.tick(); // end giveaways whose time is up
+      if (ticks % 5 === 1) {
+        const { discordService } = await import('../integrations/discord/discord.service.js');
+        const { communityForGuild } = await import('./toolkit/toolkitConfig.js');
+        for (const gid of Array.from((discordService.client as any)?.guilds?.cache?.keys?.() || []) as string[]) {
+          await birthdays.tick(await communityForGuild(gid)).catch(() => undefined);
+        }
+      }
     } catch (err: any) {
       logger.warn(`[Reminders] Scheduler pass failed: ${err?.message}`);
     }

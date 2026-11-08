@@ -6,8 +6,8 @@ import {
 /* ------------------------------------------------------------------ */
 /* Types + API                                                         */
 /* ------------------------------------------------------------------ */
-interface Opt { id: string; name: string; color?: string }
-interface Resources { connected: boolean; roles: Opt[]; textChannels: Opt[]; categories: Opt[] }
+export interface Opt { id: string; name: string; color?: string }
+export interface Resources { connected: boolean; roles: Opt[]; textChannels: Opt[]; categories: Opt[] }
 type Tab = 'tickets' | 'warnings' | 'roles' | 'rooms' | 'bulk';
 
 function useApi(communityId: string) {
@@ -93,13 +93,13 @@ export function ServerToolsView({ communityId }: { communityId: string }) {
 /* ------------------------------------------------------------------ */
 /* Shared bits                                                         */
 /* ------------------------------------------------------------------ */
-function Banner({ tone, children }: { tone: 'error' | 'warn' | 'ok'; children: React.ReactNode }) {
+export function Banner({ tone, children }: { tone: 'error' | 'warn' | 'ok'; children: React.ReactNode }) {
   const c = tone === 'error' ? 'border-rose-200 bg-rose-50 text-rose-700' : tone === 'warn' ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800';
   const I = tone === 'ok' ? CheckCircle2 : AlertTriangle;
   return <div className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${c}`}><I className="mt-0.5 h-4 w-4 shrink-0" /><div>{children}</div></div>;
 }
 
-function Card({ title, desc, children, right }: { title: string; desc?: string; children: React.ReactNode; right?: React.ReactNode }) {
+export function Card({ title, desc, children, right }: { title: string; desc?: string; children: React.ReactNode; right?: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
@@ -111,11 +111,11 @@ function Card({ title, desc, children, right }: { title: string; desc?: string; 
   );
 }
 
-const input = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
-const btn = 'inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50';
-const ghost = 'inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50';
+export const input = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
+export const btn = 'inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50';
+export const ghost = 'inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50';
 
-function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
+export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <label className="flex cursor-pointer items-center gap-3 text-sm font-medium text-slate-700">
       <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className={`relative h-6 w-11 rounded-full transition ${on ? 'bg-indigo-600' : 'bg-slate-300'}`}>
@@ -126,7 +126,7 @@ function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
   );
 }
 
-function Pick({ options, value, onChange, placeholder }: { options: Opt[]; value?: string; onChange: (v: string) => void; placeholder: string }) {
+export function Pick({ options, value, onChange, placeholder }: { options: Opt[]; value?: string; onChange: (v: string) => void; placeholder: string }) {
   return (
     <select className={input} value={value || ''} onChange={(e) => onChange(e.target.value)}>
       <option value="">{placeholder}</option>
@@ -135,7 +135,7 @@ function Pick({ options, value, onChange, placeholder }: { options: Opt[]; value
   );
 }
 
-function MultiPick({ options, value, onChange, placeholder, prefix = '' }: { options: Opt[]; value: string[]; onChange: (v: string[]) => void; placeholder: string; prefix?: string }) {
+export function MultiPick({ options, value, onChange, placeholder, prefix = '' }: { options: Opt[]; value: string[]; onChange: (v: string[]) => void; placeholder: string; prefix?: string }) {
   const byId = useMemo(() => new Map(options.map((o) => [o.id, o])), [options]);
   return (
     <div className="space-y-2">
@@ -156,7 +156,7 @@ function MultiPick({ options, value, onChange, placeholder, prefix = '' }: { opt
   );
 }
 
-function SaveBar({ onSave }: { onSave: () => Promise<void> }) {
+export function SaveBar({ onSave }: { onSave: () => Promise<void> }) {
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [err, setErr] = useState('');
   return (
@@ -171,7 +171,7 @@ function SaveBar({ onSave }: { onSave: () => Promise<void> }) {
   );
 }
 
-const fmtDate = (s?: string) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '');
+export const fmtDate = (s?: string) => (s ? new Date(s).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '');
 
 /* ------------------------------------------------------------------ */
 /* Tickets                                                             */

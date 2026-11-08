@@ -4,6 +4,7 @@ import { Sidebar } from './components/layout/Sidebar.js';
 import { NotificationDrawer } from './components/layout/NotificationDrawer.js';
 import { ContactPage } from './components/site/ContactPage.js';
 import { DiscordRedirect } from './components/site/DiscordRedirect.js';
+import { CommunityFeaturesView } from './components/views/community/CommunityFeaturesView.js';
 import { ServerToolsView } from './components/views/community/ServerToolsView.js';
 import { AccessDeniedView } from './components/views/AccessDeniedView.js';
 import { ApplicantPortalView } from './components/views/ApplicantPortalView.js';
@@ -473,6 +474,8 @@ export default function App() {
         return <ApplicationsView communityId={selectedCommunity} currentRole={currentRole} initialTab="overview" />;
       case 'moderation':
         return <ModerationView communityId={selectedCommunity} initialTab="warnings" />;
+      case 'community-features':
+        return <CommunityFeaturesView communityId={selectedCommunity} />;
       case 'server-tools':
         return <ServerToolsView communityId={selectedCommunity} />;
       case 'events-automation':

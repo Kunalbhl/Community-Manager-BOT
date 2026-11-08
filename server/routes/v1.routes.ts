@@ -211,6 +211,7 @@ import {
 import { recruiterRecordsController } from '../controllers/recruiterRecords.controller.js';
 import { getPublicContact, postPublicContact } from '../controllers/publicContact.controller.js';
 import * as Toolkit from '../controllers/toolkit.controller.js';
+import * as Features from '../controllers/features.controller.js';
 import { getSocialCordStatus, setSocialCordEnabled } from '../controllers/socialcord.controller.js';
 import { requirePermission, requirePlatformOwner, requireTenantAccess, requirePermissionOrApplicant } from '../middleware/auth.js';
 import { AiCommunityManagerController } from '../controllers/aiCommunityManager.controller.js';
@@ -354,6 +355,24 @@ router.get('/communities/:communityId/discord/members', DiscordResourcesControll
 
 // Community Persistent Discord Settings
 // SocialCord Notifier add-on (separate bot; this only stores the on/off choice and links).
+// Community features: levels, giveaways, button roles, verification, logs, starboard, birthdays, custom commands
+const ft = '/communities/:communityId/features';
+const view = [requireTenantAccess(), requirePermission('community.view')];
+const manage = [requireTenantAccess(), requirePermission('settings.manage')];
+router.get(ft, ...view, Features.getFeaturesHandler);
+router.put(`${ft}/settings/:section`, ...manage, Features.saveFeatureSectionHandler);
+router.get(`${ft}/leaderboard`, ...view, Features.leaderboardHandler);
+router.post(`${ft}/levels/xp`, ...manage, Features.setXpHandler);
+router.post(`${ft}/verification/panel`, ...manage, Features.postVerifyPanelHandler);
+router.get(`${ft}/birthdays`, ...view, Features.listBirthdaysHandler);
+router.get(`${ft}/button-roles`, ...view, Features.listPanelsHandler);
+router.post(`${ft}/button-roles`, ...manage, Features.savePanelHandler);
+router.delete(`${ft}/button-roles/:panelId`, ...manage, Features.deletePanelHandler);
+router.get(`${ft}/giveaways`, ...view, Features.listGiveawaysHandler);
+router.post(`${ft}/giveaways`, ...manage, Features.startGiveawayHandler);
+router.post(`${ft}/giveaways/:giveawayId/end`, ...manage, Features.endGiveawayHandler);
+router.post(`${ft}/giveaways/:giveawayId/cancel`, ...manage, Features.cancelGiveawayHandler);
+
 // Server toolkit: tickets, warning policy, role rules, review rooms, bulk tools
 const tk = '/communities/:communityId/toolkit';
 router.get(tk, requireTenantAccess(), requirePermission('community.view'), Toolkit.getToolkitHandler);
