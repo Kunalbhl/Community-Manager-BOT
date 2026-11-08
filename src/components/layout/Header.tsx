@@ -210,7 +210,7 @@ export const Header: React.FC<HeaderProps> = ({
               </a>
 
               {showCommunityDropdown && (
-                <div className="absolute left-0 mt-2 w-64 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg z-50">
+                <div className="absolute left-0 top-full mt-2 w-64 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg z-50">
                   <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Discord Communities (Tenants)
                   </div>
