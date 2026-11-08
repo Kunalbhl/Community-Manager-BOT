@@ -126,6 +126,7 @@ export const secureGate = {
         // 2. Hide everything except the public channels from newcomers; Member keeps access.
         const channels = Array.from(guild.channels.cache.values()).filter((c: any) => VISIBLE_TYPES.has(c.type)) as any[];
         const everyone = guild.roles.everyone;
+        const keptForOnboarding: string[] = [];
         let i = 0;
         for (const c of channels) {
           i++;
@@ -137,7 +138,12 @@ export const secureGate = {
           // Children of a public category stay hidden unless they are public themselves.
           if (c.permissionsFor(everyone)?.has(PermissionFlagsBits.ViewChannel) || c.type === ChannelType.GuildCategory) {
             const memberCanSee = c.permissionsFor(memberRole)?.has(PermissionFlagsBits.ViewChannel);
-            await c.permissionOverwrites.edit(everyone, { ViewChannel: false }, { reason: 'Secure Setup: hidden from newcomers' }).catch(note(`#${c.name}`));
+            const hidden = await c.permissionOverwrites.edit(everyone, { ViewChannel: false }, { reason: 'Secure Setup: hidden from newcomers' }).then(() => true).catch((e: any) => {
+              // Discord forces Onboarding channels to stay readable by everyone: keep it public instead of failing.
+              if (/onboarding/i.test(e?.message || '')) { publicIds.push(c.id); keptForOnboarding.push(c.name); return false; }
+              note(`#${c.name}`)(e); return false;
+            });
+            if (!hidden && publicIds.includes(c.id)) continue;
             if (memberCanSee !== false) await c.permissionOverwrites.edit(memberRole, { ViewChannel: true }, { reason: 'Secure Setup: members keep access' }).catch(note(`#${c.name} (member)`));
           }
           if (i % 10 === 0) await saveGate(communityId, { job: { status: 'RUNNING', step: 'Locking channels', done: i, total: channels.length, at: new Date().toISOString() } });
@@ -147,7 +153,8 @@ export const secureGate = {
 
         const leaks = newcomerVisible(guild).filter((c) => !publicIds.includes(c.id));
         await saveGate(communityId, {
-          job: { status: leaks.length ? 'FAILED' : 'DONE', step: leaks.length ? `${leaks.length} channel(s) are still visible to newcomers` : 'Server locked', done: channels.length, total: channels.length, at: new Date().toISOString(), error: leaks.length ? `${errors.size ? `Discord said: ${[...errors].join(' | ')}. ` : ''}Still visible: ${leaks.map((l) => l.name).join(', ')}` : undefined },
+          publicChannelIds: publicIds,
+          job: { status: leaks.length ? 'FAILED' : 'DONE', step: leaks.length ? `${leaks.length} channel(s) are still visible to newcomers` : `Server locked${keptForOnboarding.length ? `. Kept public because Discord Onboarding uses them: ${keptForOnboarding.map((n) => '#' + n).join(', ')}` : ''}`, done: channels.length, total: channels.length, at: new Date().toISOString(), error: leaks.length ? `${errors.size ? `Discord said: ${[...errors].join(' | ')}. ` : ''}Still visible: ${leaks.map((l) => l.name).join(', ')}` : undefined },
           lastCheck: { at: new Date().toISOString(), leaks: leaks.map((l) => ({ id: l.id, name: l.name })) },
         });
       } catch (err: any) {
