@@ -38,7 +38,7 @@ let lastHandoff: { previousStoppedAt: string; tookOverAt: string; gapMs: number 
 const handoffFlags = () => import('../repositories/firestore.repository.js').then((m) => new m.FirestoreRepository<any>('platformFlags'));
 
 export function getLeadershipStatus() {
-  return { holderId, priority, isLeader, lastError, leaseBacked: isPostgresEnabled(), startedAt, leaderSince, lastHandoff, version: process.env.GIT_SHA };
+  return { holderId, priority, isLeader, lastError, leaseBacked: isPostgresEnabled(), startedAt, leaderSince, lastHandoff, version: process.env.GIT_SHA, uptimeSec: Math.round(process.uptime()) };
 }
 
 export async function startLeadership(hooks: LeadershipHooks): Promise<void> {
