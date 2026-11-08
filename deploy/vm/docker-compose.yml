@@ -1,5 +1,7 @@
 # Community Manager — always-on bot engine on the Oracle Always Free VM.
 # Runs next to SocialCord's container; shares nothing with it except the machine.
+# The bot itself is started by update.sh as cm-bot-blue / cm-bot-green so updates hand over
+# without downtime. The `bot` service below is kept only to build the image (and for first installs).
 name: community-manager
 services:
   bot:
@@ -41,15 +43,15 @@ services:
     image: caddy:2-alpine
     container_name: community-manager-caddy
     restart: unless-stopped
-    depends_on: [bot]
     ports:
       - "80:80"
       - "443:443"
     environment:
       PUBLIC_API_HOST: 137-23-46-177.sslip.io
-    command: ["sh", "-c", "caddy reverse-proxy --from \"$${PUBLIC_API_HOST}\" --to bot:3000"]
+    command: ["caddy", "run", "--adapter", "caddyfile", "--config", "/etc/caddy/Caddyfile"]
     volumes:
       - caddy-data:/data
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
     mem_limit: 64m
     logging:
       driver: json-file
