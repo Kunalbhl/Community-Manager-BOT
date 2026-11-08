@@ -172,12 +172,59 @@ export async function getUserGuilds(req: Request, res: Response, next: NextFunct
         botStatus,
         connectionStatus,
         setupStatus,
+        yourRole: (g as any).owner ? 'Owner' : 'Admin',
       };
     });
 
+    // Server details from the bot (members, channels, permissions, setup progress) for servers it is in.
+    const detailed = await Promise.all(mappedGuilds.map(async (m) => {
+      const guild: any = m.botStatus === 'CONNECTED' ? discordService.getGuild(m.guildId) : null;
+      if (!guild) return m;
+      try {
+        const { AUTHORITATIVE_INSTALL_PERMISSION_BITFIELD } = await import('../services/discordPermissionEngine.service.js');
+        const me = guild.members.me;
+        const { PermissionsBitField } = await import('discord.js');
+        const needed = new PermissionsBitField(BigInt(AUTHORITATIVE_INSTALL_PERMISSION_BITFIELD)).toArray();
+        const missing = me?.permissions?.has?.(8n) ? [] : needed.filter((name) => !me?.permissions?.has?.(name as any)).map((n) => String(n).replace(/([a-z])([A-Z])/g, '$1 $2'));
+        const { getToolkit } = await import('../services/toolkit/toolkitConfig.js');
+        const { getGate } = await import('../services/recruitment/secureGate.service.js');
+        const { getFeatures } = await import('../services/features/featuresConfig.js');
+        const [t, gate, f] = await Promise.all([getToolkit(m.communityId), getGate(m.communityId), getFeatures(m.communityId)]);
+        const modules = [
+          ['Recruitment', gate.verified && Boolean((t.recruitment as any).panelPostedAt)],
+          ['Secure Setup', gate.verified],
+          ['Tickets', t.tickets.enabled && Boolean((t.tickets as any).panelPostedAt)],
+          ['Warnings', t.warnings.enabled],
+          ['Levels', f.levels.enabled],
+          ['Logs', f.logs.enabled && Boolean(f.logs.channelId)],
+        ].filter(([, on]) => on).map(([n]) => n);
+        const chans = Array.from(guild.channels.cache.values()) as any[];
+        return {
+          ...m,
+          details: {
+            memberCount: guild.memberCount,
+            textChannels: chans.filter((c) => c.type === 0 || c.type === 5).length,
+            voiceChannels: chans.filter((c) => c.type === 2 || c.type === 13).length,
+            roles: guild.roles.cache.size - 1,
+            boostTier: guild.premiumTier || 0,
+            boosts: guild.premiumSubscriptionCount || 0,
+            createdAt: guild.createdAt?.toISOString?.(),
+            botJoinedAt: me?.joinedAt?.toISOString?.(),
+            botRole: me?.roles?.highest?.name,
+            botAdmin: Boolean(me?.permissions?.has?.(8n)),
+            missingPermissions: missing,
+            secureSetup: gate.verified ? 'Locked' : gate.memberRoleId ? 'Needs attention' : 'Not set up',
+            activeModules: modules,
+          },
+        };
+      } catch {
+        return m;
+      }
+    }));
+
     res.json({
       success: true,
-      data: mappedGuilds,
+      data: detailed,
       count: mappedGuilds.length,
       requestId: req.id,
     });

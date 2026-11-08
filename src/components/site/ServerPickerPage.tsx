@@ -9,6 +9,12 @@ interface ServerEntry {
   communityId?: string;
   botStatus: 'CONNECTED' | 'BOT_INSTALLED' | 'BOT_MISSING' | 'PERMISSION_REQUIRED';
   setupStatus: 'READY' | 'SETUP_REQUIRED' | 'INSTALL_REQUIRED' | 'PERMISSION_REQUIRED';
+  yourRole?: string;
+  details?: {
+    memberCount: number; textChannels: number; voiceChannels: number; roles: number; boostTier: number; boosts: number;
+    createdAt?: string; botJoinedAt?: string; botRole?: string; botAdmin: boolean; missingPermissions: string[];
+    secureSetup: string; activeModules: string[];
+  };
 }
 
 type LoadState = 'loading' | 'ready' | 'signed-out' | 'error';
@@ -114,17 +120,8 @@ export function ServerPickerPage() {
 
         {state === 'ready' && servers.length > 0 && (
           <>
-            <ul className="mt-10 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-              {servers.map((s) => (
-                <li key={s.guildId} className="flex flex-wrap items-center gap-4 rounded-2xl border border-[var(--site-line)] bg-[var(--site-panel)] px-5 py-5 transition hover:border-[var(--site-signal)] sm:flex-nowrap">
-                  <ServerIcon server={s} />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-lg font-semibold">{s.name}</div>
-                    <div className="text-[15px] text-[var(--site-muted)]">{statusText(s)}</div>
-                  </div>
-                  <ServerAction server={s} onOpen={open} />
-                </li>
-              ))}
+            <ul className="mt-10 grid gap-5 lg:grid-cols-2 2xl:grid-cols-3">
+              {servers.map((s) => <ServerCard key={s.guildId} server={s} onOpen={open} />)}
             </ul>
             <button onClick={load} className="mt-5 inline-flex items-center gap-2 text-[15px] text-[var(--site-muted)] hover:text-[var(--site-text)]">
               <RefreshCw className="h-4 w-4" aria-hidden /> Refresh list (after adding the bot)
@@ -136,11 +133,6 @@ export function ServerPickerPage() {
   );
 }
 
-function statusText(s: ServerEntry): string {
-  if (s.botStatus !== 'CONNECTED') return 'Bot not added yet';
-  if (s.setupStatus === 'SETUP_REQUIRED') return 'Bot added. Setup not finished';
-  return 'Ready to manage';
-}
 
 function ServerAction({ server: s, onOpen }: { server: ServerEntry; onOpen: (s: ServerEntry, onboarding: boolean) => void }) {
   if (s.botStatus !== 'CONNECTED') {
@@ -164,4 +156,65 @@ function ServerIcon({ server: s }: { server: ServerEntry }) {
       {initials}
     </div>
   );
+}
+
+const fmtN = (n?: number) => (n == null ? '—' : n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
+const since = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '—');
+
+function ServerCard({ server: s, onOpen }: { server: ServerEntry; onOpen: (s: ServerEntry, onboarding: boolean) => void }) {
+  const d = s.details;
+  const connected = s.botStatus === 'CONNECTED';
+  const missing = d?.missingPermissions || [];
+  return (
+    <li className="flex flex-col rounded-2xl border border-[var(--site-line)] bg-[var(--site-panel)] p-5 transition hover:border-[var(--site-signal)]">
+      <div className="flex items-center gap-4">
+        <ServerIcon server={s} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-lg font-semibold" title={s.name}>{s.name}</div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[13px] text-[var(--site-muted)]">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-semibold ${connected ? 'bg-[var(--site-mint)]/15 text-[var(--site-mint)]' : 'bg-white/5 text-[var(--site-muted)]'}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${connected ? 'bg-[var(--site-mint)]' : 'bg-[var(--site-muted)]'}`} />{connected ? 'Bot online' : 'Bot not added'}
+            </span>
+            {s.yourRole && <span>You: {s.yourRole}</span>}
+          </div>
+        </div>
+      </div>
+
+      {connected && d ? (
+        <>
+          <dl className="mt-5 grid grid-cols-4 gap-2 text-center">
+            {[['Members', fmtN(d.memberCount)], ['Text', d.textChannels], ['Voice', d.voiceChannels], ['Roles', d.roles]].map(([l, v]) => (
+              <div key={l as string} className="rounded-xl bg-[var(--site-night)] px-2 py-2.5">
+                <dd className="cm-display text-xl font-bold">{v as any}</dd>
+                <dt className="text-[11px] uppercase tracking-wider text-[var(--site-muted)]">{l as string}</dt>
+              </div>
+            ))}
+          </dl>
+          <div className="mt-4 space-y-2 text-[13px]">
+            <Row label="Bot permissions">
+              {d.botAdmin ? <span className="text-[#FFC46B]">Administrator</span>
+                : missing.length ? <span className="text-[#FFC46B]" title={missing.join(', ')}>{missing.length} missing · {missing.slice(0, 2).join(', ')}{missing.length > 2 ? '…' : ''}</span>
+                : <span className="text-[var(--site-mint)]">All required ✓</span>}
+            </Row>
+            <Row label="Secure Setup"><span className={d.secureSetup === 'Locked' ? 'text-[var(--site-mint)]' : d.secureSetup === 'Needs attention' ? 'text-[#FFC46B]' : 'text-[var(--site-muted)]'}>{d.secureSetup}</span></Row>
+            <Row label="Active modules">{d.activeModules.length ? d.activeModules.join(' · ') : <span className="text-[var(--site-muted)]">None yet</span>}</Row>
+            <Row label="Bot role"><span className="text-[var(--site-muted)]">@{d.botRole || '—'}</span></Row>
+            <Row label="Server since"><span className="text-[var(--site-muted)]">{since(d.createdAt)}{d.boosts ? ` · ${d.boosts} boosts (level ${d.boostTier})` : ''}</span></Row>
+          </div>
+        </>
+      ) : (
+        <p className="mt-5 text-[14px] text-[var(--site-muted)]">
+          {connected ? 'Connected. Details load in a moment.' : 'Add Community Manager to see members, channels, permissions and setup status here.'}
+        </p>
+      )}
+
+      <div className="mt-5 flex justify-end border-t border-[var(--site-line)] pt-4">
+        <ServerAction server={s} onOpen={onOpen} />
+      </div>
+    </li>
+  );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return <div className="flex items-start justify-between gap-3"><span className="shrink-0 text-[var(--site-muted)]">{label}</span><span className="text-right">{children}</span></div>;
 }
