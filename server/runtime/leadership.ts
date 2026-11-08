@@ -31,9 +31,14 @@ let timer: NodeJS.Timeout | null = null;
 let stopped = false;
 let lastError: string | undefined;
 let lastLeaseOkAt = Date.now();
+const startedAt = new Date().toISOString();
+let leaderSince: string | undefined;
+/** Gap between the previous bot stepping down and this one taking over (measured on handoff). */
+let lastHandoff: { previousStoppedAt: string; tookOverAt: string; gapMs: number } | undefined;
+const handoffFlags = () => import('../repositories/firestore.repository.js').then((m) => new m.FirestoreRepository<any>('platformFlags'));
 
 export function getLeadershipStatus() {
-  return { holderId, priority, isLeader, lastError, leaseBacked: isPostgresEnabled() };
+  return { holderId, priority, isLeader, lastError, leaseBacked: isPostgresEnabled(), startedAt, leaderSince, lastHandoff, version: process.env.GIT_SHA };
 }
 
 export async function startLeadership(hooks: LeadershipHooks): Promise<void> {
@@ -45,8 +50,18 @@ export async function startLeadership(hooks: LeadershipHooks): Promise<void> {
   const become = async () => {
     if (isLeader) return;
     isLeader = true;
+    leaderSince = new Date().toISOString();
     logger.info(`[Leadership] ${holderId} is now the ACTIVE bot (leader, priority ${priority}).`);
     try { await hooks.onBecomeLeader(); } catch (err: any) { logger.error(`[Leadership] onBecomeLeader failed: ${err?.message}`); }
+    // Record how long the bot was unattended during this handoff (after Discord is back).
+    handoffFlags().then(async (f) => {
+      const prev = await f.getById('botHandoff').catch(() => null);
+      if (prev?.stoppedAt && !prev.measured) {
+        lastHandoff = { previousStoppedAt: prev.stoppedAt, tookOverAt: new Date().toISOString(), gapMs: Date.now() - new Date(prev.stoppedAt).getTime() };
+        await f.update('botHandoff', { ...prev, measured: true, ...lastHandoff });
+        logger.info(`[Leadership] Handoff complete: bot was unattended for ${lastHandoff.gapMs} ms.`);
+      }
+    }).catch(() => undefined);
   };
   const lose = async (reason: string) => {
     if (!isLeader) return;
@@ -93,4 +108,14 @@ export async function stopLeadership(): Promise<void> {
     try { await postgresStore.releaseLease(LEASE_NAME, holderId); } catch { /* best effort */ }
   }
   isLeader = false;
+}
+
+/** Called first on shutdown (before Discord disconnects) so the next bot can measure the real gap. */
+export async function noteShutdownStarting(): Promise<void> {
+  if (!isLeader || !isPostgresEnabled()) return;
+  try {
+    const f = await handoffFlags();
+    const doc = { id: 'botHandoff', stoppedAt: new Date().toISOString(), stoppedBy: holderId, measured: false };
+    if (await f.getById('botHandoff').catch(() => null)) await f.update('botHandoff', doc); else await f.create('botHandoff', doc);
+  } catch { /* best effort */ }
 }
