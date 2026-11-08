@@ -21,6 +21,26 @@ import {
 import { UserRole } from '../../../shared/types/rbac.js';
 import { PortalMode } from '../../types/ui.js';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.js';
+import { getTheme, setTheme, ThemeChoice } from '../../lib/theme.js';
+import { Monitor, Moon, Sun } from 'lucide-react';
+
+function ThemeSwitch() {
+  const [t, setT] = useState<ThemeChoice>(getTheme());
+  const opts: { v: ThemeChoice; label: string; Icon: any }[] = [{ v: 'system', label: 'System', Icon: Monitor }, { v: 'light', label: 'Light', Icon: Sun }, { v: 'dark', label: 'Dark', Icon: Moon }];
+  return (
+    <div className="px-3 py-2">
+      <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Theme</div>
+      <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
+        {opts.map(({ v, label, Icon }) => (
+          <button key={v} type="button" role="radio" aria-checked={t === v} onClick={() => { setTheme(v); setT(v); }}
+            className={`flex items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs font-semibold transition ${t === v ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+            <Icon className="h-3.5 w-3.5" />{label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 import { getAddToDiscordUrl, getDiscordClientId } from '../../lib/discordUrls.js';
 
 interface HeaderProps {
@@ -417,6 +437,8 @@ export const Header: React.FC<HeaderProps> = ({
                   </span>
                 </div>
               </div>
+
+              <ThemeSwitch />
 
               {/* Standard Actions */}
               <div className="py-1.5 space-y-0.5">

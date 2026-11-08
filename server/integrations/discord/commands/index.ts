@@ -8,6 +8,7 @@ import { referralCommand } from './referral.command.js';
 import { blacklistCommand } from './blacklist.command.js';
 import { recruiterBenefitsCommand } from './recruiterBenefits.command.js';
 import { rulesCommand } from './rules.command.js';
+import { sheetCommand } from './sheet.command.js';
 import { supportCommand } from './support.command.js';
 import { helpCommand } from './help.command.js';
 import { userStatusCommand } from './userStatus.command.js';
@@ -49,6 +50,7 @@ export const discordCommands: SlashCommandDefinition[] = [
   birthdayCommand,              // /birthday
   giveawayCommand,              // /giveaway
   helpCommand,                  // /help
+  sheetCommand,                 // /sheet
 ];
 
 const ROLE_ORDER: Record<string, number> = {

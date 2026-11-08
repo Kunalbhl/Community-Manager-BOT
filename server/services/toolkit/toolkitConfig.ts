@@ -45,6 +45,9 @@ export interface RecruitmentDiscordConfig {
   notifyRecruiter: boolean;
   sheetWebhookUrl?: string;
   sheetToken?: string;
+  /** Link to open the Google Sheet (shown only to sheetRoleIds via /sheet). */
+  sheetViewUrl?: string;
+  sheetRoleIds?: string[];
   sheetLastSync?: { at: string; ok: boolean; error?: string };
   panelPostedAt?: string;
   pingRoleIds: string[];

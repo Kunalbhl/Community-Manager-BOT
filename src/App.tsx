@@ -9,6 +9,7 @@ import { TeamAccessView } from './components/views/community/TeamAccessView.js';
 import { SetupGuideView } from './components/views/community/SetupGuideView.js';
 import { HomeToday } from './components/views/community/HomeToday.js';
 import { ServerToolsView } from './components/views/community/ServerToolsView.js';
+import { CapabilitiesView } from './components/views/community/CapabilitiesView.js';
 import { AccessDeniedView } from './components/views/AccessDeniedView.js';
 import { ApplicantPortalView } from './components/views/ApplicantPortalView.js';
 import { RecruiterPortalView } from './components/views/RecruiterPortalView.js';
@@ -522,6 +523,8 @@ export default function App() {
         return <TeamAccessView communityId={selectedCommunity} canEdit={currentRole === 'OWNER' || currentRole === 'PLATFORM_OWNER'} />;
       case 'setup-guide':
         return <SetupGuideView communityId={selectedCommunity} onNavigate={(s) => setActiveCommunitySection(s as CommunitySection)} />;
+      case 'capabilities':
+        return <CapabilitiesView />;
       case 'community-features':
         return <CommunityFeaturesView communityId={selectedCommunity} />;
       case 'server-tools':

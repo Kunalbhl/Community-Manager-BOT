@@ -761,7 +761,7 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
         </Card>
       </div>
 
-      <SheetsCard api={api} />
+      <SheetsCard api={api} res={res} />
 
       <div className="grid gap-6 2xl:grid-cols-2">
         <Card title="Apply panel" desc="Post it in a public channel like #apply or #join-us.">
@@ -896,12 +896,14 @@ function SecureSetupCard({ api, res }: { api: any; res: Resources }) {
 /* ------------------------------------------------------------------ */
 /* Google Sheets                                                       */
 /* ------------------------------------------------------------------ */
-function SheetsCard({ api }: { api: any }) {
+function SheetsCard({ api, res }: { api: any; res: Resources }) {
   const [d, setD] = useState<any>(null);
+  const [viewUrl, setViewUrl] = useState('');
+  const [roleIds, setRoleIds] = useState<string[]>([]);
   const [url, setUrl] = useState('');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { api('/sheets').then((x: any) => { setD(x); setUrl(x.url || ''); }).catch((e: any) => setMsg(e.message)); }, [api]);
+  useEffect(() => { api('/sheets').then((x: any) => { setD(x); setUrl(x.url || ''); setViewUrl(x.viewUrl || ''); setRoleIds(x.roleIds || []); }).catch((e: any) => setMsg(e.message)); }, [api]);
   const steps = [
     'Create a Google Sheet (sheets.new).',
     'Open Extensions → Apps Script, delete what is there, paste the script below and save.',
@@ -923,6 +925,16 @@ function SheetsCard({ api }: { api: any }) {
         <input className={`${input} min-w-[280px] flex-1`} placeholder="https://script.google.com/macros/s/…/exec" value={url} onChange={(e) => setUrl(e.target.value)} />
         <button className={btn} disabled={busy} onClick={async () => { setBusy(true); setMsg(''); try { const r = await api('/sheets/connect', 'POST', { url }); setMsg(r.connected ? `Connected. ${r.rows} application(s) written to your sheet.` : 'Disconnected.'); } catch (e: any) { setMsg(e.message); } setBusy(false); }}>Connect & sync</button>
         {d?.url && <button className={ghost} disabled={busy} onClick={async () => { setBusy(true); setMsg(''); try { const r = await api('/sheets/resync', 'POST'); setMsg(`Synced ${r.rows} application(s).`); } catch (e: any) { setMsg(e.message); } setBusy(false); }}><RefreshCw className="h-4 w-4" /> Sync now</button>}
+      </div>
+      <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="font-bold text-slate-900">🔒 Who can see the sheet</div>
+        <p className="mt-1 text-sm text-slate-600">The bot never posts the sheet in your server. Members and applicants can’t see it. In Google, keep the sheet’s Share setting on <b>Restricted</b> and add only your staff’s Google emails. Pick the roles below to let them get the link privately with <code>/sheet</code> in Discord.</p>
+        <input className={`${input} mt-3`} placeholder="https://docs.google.com/spreadsheets/d/…" value={viewUrl} onChange={(e) => setViewUrl(e.target.value)} />
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {roleIds.map((id) => <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">@{res.roles.find((r) => r.id === id)?.name || id}<button type="button" aria-label="Remove role" onClick={() => setRoleIds(roleIds.filter((x) => x !== id))}>×</button></span>)}
+        </div>
+        <div className="mt-2"><Pick options={res.roles.filter((r) => !roleIds.includes(r.id))} value="" onChange={(v) => v && setRoleIds([...roleIds, v])} placeholder="Add a role that can use /sheet" /></div>
+        <button className={`${btn} mt-3`} onClick={async () => { try { await api('/sheets/access', 'POST', { viewUrl, roleIds }); setMsg('Sheet access saved.'); } catch (e: any) { setMsg(e.message); } }}>Save access</button>
       </div>
       {msg && <p className="mt-3 text-sm text-slate-600">{msg}</p>}
     </Card>

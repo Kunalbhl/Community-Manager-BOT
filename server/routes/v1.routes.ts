@@ -403,6 +403,7 @@ router.post(`${tk}/gate/undo`, requireTenantAccess(), requirePermission('setting
 router.post(`${tk}/gate/confirm`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateConfirmHandler);
 router.get(`${tk}/sheets`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.sheetScriptHandler);
 router.post(`${tk}/sheets/connect`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.sheetConnectHandler);
+router.post(`${tk}/sheets/access`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.sheetAccessHandler);
 router.post(`${tk}/sheets/resync`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.sheetResyncHandler);
 router.post(`${tk}/recruitment/panel`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.postApplyPanelHandler);
 router.get('/communities/:communityId/discord/member-search', requireTenantAccess(), requirePermission('community.view'), Toolkit.searchMembersHandler);
