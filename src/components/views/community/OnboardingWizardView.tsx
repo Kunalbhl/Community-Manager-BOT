@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChannelSelect } from '../../common/DiscordPickers.js';
 import {
   Bot,
   ShieldCheck,
@@ -993,11 +994,7 @@ export function OnboardingWizardView({ communityId, onComplete }: OnboardingWiza
                       ))}
                     </select>
                   ) : (
-                    <input
-                      type="text"
-                      placeholder="e.g. #welcome"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-white text-xs font-medium focus:outline-none focus:border-indigo-500"
-                    />
+                    <ChannelSelect value={welcomeChannelId} onChange={setWelcomeChannelId} placeholder="Choose the welcome channel" />
                   )}
                 </div>
 
@@ -1020,11 +1017,7 @@ export function OnboardingWizardView({ communityId, onComplete }: OnboardingWiza
                       ))}
                     </select>
                   ) : (
-                    <input
-                      type="text"
-                      placeholder="e.g. #announcements"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-white text-xs font-medium focus:outline-none focus:border-indigo-500"
-                    />
+                    <ChannelSelect value={alertsChannelId} onChange={setAlertsChannelId} placeholder="Choose the alerts channel" />
                   )}
                 </div>
               </div>

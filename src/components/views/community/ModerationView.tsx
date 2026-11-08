@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { MemberSelect } from '../../common/DiscordPickers.js';
 import {
   ShieldAlert,
   UserCheck,
@@ -571,14 +572,7 @@ export const ModerationView: React.FC<ModerationViewProps> = ({ communityId, ini
             <form onSubmit={handleIssueWarning} className="mt-4 space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase">Target Discord ID</label>
-                <input
-                  type="text"
-                  value={targetUserId}
-                  onChange={(e) => setTargetUserId(e.target.value)}
-                  placeholder="E.g. 123456789012345678"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:border-indigo-500 focus:ring-indigo-500"
-                  required
-                />
+                <div className="mt-1"><MemberSelect value={targetUserId} onChange={(id) => setTargetUserId(id)} /></div>
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase">Severity Level</label>
@@ -1121,14 +1115,7 @@ export const ModerationView: React.FC<ModerationViewProps> = ({ communityId, ini
             <form onSubmit={handleCreateRestriction} className="mt-4 space-y-4">
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase">Target Discord User ID</label>
-                <input
-                  type="text"
-                  value={restrictionTargetId}
-                  onChange={(e) => setRestrictionTargetId(e.target.value)}
-                  placeholder="123456789012345678"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs"
-                  required
-                />
+                <div className="mt-1"><MemberSelect value={restrictionTargetId} onChange={(id) => setRestrictionTargetId(id)} /></div>
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-slate-700 uppercase">Restriction Type</label>

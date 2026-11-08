@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChannelSelect } from '../../common/DiscordPickers.js';
 import {
   Award,
   CheckCircle2,
@@ -661,13 +662,7 @@ export function RecruiterRecordsView({ communityId }: RecruiterRecordsViewProps)
                 <label className="block text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2">
                   Target Discord Channel ID
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 123456789012345678"
-                  value={configChannelId}
-                  onChange={(e) => setConfigChannelId(e.target.value)}
-                  className="w-full bg-stone-950 border border-stone-700 rounded-lg px-3.5 py-2 text-sm text-stone-200 font-mono focus:outline-none focus:border-emerald-500"
-                />
+                <ChannelSelect value={configChannelId} onChange={setConfigChannelId} />
               </div>
 
               <div>

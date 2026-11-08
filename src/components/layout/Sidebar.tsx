@@ -209,12 +209,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         {/* Brand header */}
         <div className="flex h-16 items-center justify-between border-b border-slate-800 px-5">
-          <BrandLogo
-            variant="full"
-            theme="dark"
-            size="sm"
-            subtitle={isPlatformMode ? 'Platform owner console' : 'Command center'}
-          />
+          <a href="/" title="Go to the Community Manager website" className="rounded-lg transition hover:opacity-80">
+            <BrandLogo
+              variant="full"
+              theme="dark"
+              size="sm"
+              subtitle={isPlatformMode ? 'Platform owner console' : 'Command center'}
+            />
+          </a>
           <button
             onClick={onClose}
             className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden"

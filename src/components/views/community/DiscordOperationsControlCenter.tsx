@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { MultiMemberSelect } from '../../common/DiscordPickers.js';
 import {
   Server,
   Shield,
@@ -1020,13 +1021,7 @@ export const DiscordOperationsControlCenter: React.FC<DiscordOperationsControlCe
               <label className="text-xs font-semibold text-slate-600">
                 Target Member / Discord User Snowflake IDs (One per line or comma-separated)
               </label>
-              <textarea
-                value={bulkMemberIdsInput}
-                onChange={(e) => setBulkMemberIdsInput(e.target.value)}
-                rows={5}
-                placeholder="123456789012345678&#10;987654321098765432"
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg font-mono mt-1"
-              />
+              <MultiMemberSelect onChange={(ids) => setBulkMemberIdsInput(ids.join('\n'))} />
             </div>
 
             <div className="flex items-center justify-between pt-4 border-t border-slate-100">

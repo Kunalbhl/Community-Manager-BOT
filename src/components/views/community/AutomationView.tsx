@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ChannelSelect, RoleSelect, MemberSelect } from '../../common/DiscordPickers.js';
 import {
   Cpu,
   Play,
@@ -561,13 +562,7 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ communityId }) =
                       {/* Custom inputs based on action type */}
                       {act.type === 'SEND_DISCORD_MESSAGE' && (
                         <div className="space-y-1.5">
-                          <input
-                            type="text"
-                            placeholder="Target Channel ID (or leave empty for DM)"
-                            value={act.config.channelId || ''}
-                            onChange={e => handleActionConfigChange(i, 'channelId', e.target.value)}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-[11px]"
-                          />
+                          <ChannelSelect value={act.config.channelId || ''} placeholder="Choose a channel (empty = DM)" onChange={(v) => handleActionConfigChange(i, 'channelId', v)} />
                           <div className="flex items-center gap-2">
                             <input
                               type="checkbox"
@@ -589,21 +584,8 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ communityId }) =
 
                       {(act.type === 'ASSIGN_DISCORD_ROLE' || act.type === 'REMOVE_DISCORD_ROLE') && (
                         <div className="space-y-1.5">
-                          <input
-                            type="text"
-                            placeholder="Discord Role ID"
-                            value={act.config.roleId || ''}
-                            onChange={e => handleActionConfigChange(i, 'roleId', e.target.value)}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-[11px]"
-                            required
-                          />
-                          <input
-                            type="text"
-                            placeholder="Target User Discord ID (optional, defaults to actor)"
-                            value={act.config.discordUserId || ''}
-                            onChange={e => handleActionConfigChange(i, 'discordUserId', e.target.value)}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-[11px]"
-                          />
+                          <RoleSelect value={act.config.roleId || ''} onChange={(v) => handleActionConfigChange(i, 'roleId', v)} />
+                          <MemberSelect value={act.config.discordUserId || ''} placeholder="Target member (optional, defaults to the member who triggered it)" onChange={(id) => handleActionConfigChange(i, 'discordUserId', id)} />
                         </div>
                       )}
 
@@ -649,13 +631,7 @@ export const AutomationView: React.FC<AutomationViewProps> = ({ communityId }) =
                             onChange={e => handleActionConfigChange(i, 'eventId', e.target.value)}
                             className="w-full rounded border border-slate-300 px-2 py-1 text-[11px]"
                           />
-                          <input
-                            type="text"
-                            placeholder="Discord Channel ID"
-                            value={act.config.channelId || ''}
-                            onChange={e => handleActionConfigChange(i, 'channelId', e.target.value)}
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-[11px]"
-                          />
+                          <ChannelSelect value={act.config.channelId || ''} placeholder="Choose a channel (empty = DM)" onChange={(v) => handleActionConfigChange(i, 'channelId', v)} />
                         </div>
                       )}
                     </div>
