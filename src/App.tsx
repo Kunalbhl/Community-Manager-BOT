@@ -155,7 +155,9 @@ export default function App() {
   // Navigation & Scope State
   const [portalMode, setPortalMode] = useState<PortalMode>('COMMUNITY_DASHBOARD');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
-  const [activeCommunitySection, setActiveCommunitySection] = useState<CommunitySection>('dashboard');
+  const [activeCommunitySection, setActiveCommunitySection] = useState<CommunitySection>(
+    () => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('application') ? 'applications' : 'dashboard') as CommunitySection
+  );
   const [activePlatformSection, setActivePlatformSection] = useState<PlatformSection>('overview');
 
   // Tenant / Community & Workspace Context

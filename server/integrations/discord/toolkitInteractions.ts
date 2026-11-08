@@ -8,6 +8,7 @@ import { reviewRooms, reviewRoomsRepository } from '../../services/toolkit/revie
 import { communityForGuild, getToolkit } from '../../services/toolkit/toolkitConfig.js';
 import { warnAutocomplete } from './commands/toolkit.command.js';
 import { verification, buttonRoles, giveaways } from '../../services/features/community.service.js';
+import { discordRecruitment } from '../../services/recruitment/discordRecruitment.service.js';
 
 export async function handleToolkitInteraction(interaction: any): Promise<boolean> {
   if (interaction.isAutocomplete?.()) {
@@ -21,6 +22,23 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
   const id: string = interaction.customId || '';
   if (!id.startsWith('cm:')) return false;
   const [, area, action, arg] = id.split(':');
+
+  // ---------- recruitment: apply ----------
+  if (area === 'apply') {
+    if (action === 'start') { await discordRecruitment.start(interaction); return true; }
+    if (action === 'next') { await discordRecruitment.next(interaction, Number(arg) || 0); return true; }
+    if (action === 'page' && interaction.isModalSubmit()) { await discordRecruitment.pageSubmitted(interaction, Number(arg) || 0); return true; }
+  }
+
+  // ---------- recruitment: review post buttons ----------
+  if (area === 'rv') {
+    if (action === 'approve') { await discordRecruitment.decide(interaction, arg, true); return true; }
+    if (action === 'reject') { await interaction.showModal(discordRecruitment.rejectModal(arg)); return true; }
+    if (action === 'rejectreason' && interaction.isModalSubmit()) {
+      await discordRecruitment.decide(interaction, arg, false, interaction.fields.getTextInputValue('reason'));
+      return true;
+    }
+  }
 
   // ---------- tickets ----------
   if (area === 'ticket' && action === 'pick' && interaction.isStringSelectMenu()) {

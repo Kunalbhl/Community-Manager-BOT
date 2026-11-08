@@ -91,6 +91,20 @@ export async function saveToolkitSectionHandler(req: Request, res: Response) {
       const tiers = (Array.isArray(b.tiers) ? b.tiers : []).slice(0, 6).map((t: any) => ({ name: str(t.name, 40) || 'Reviewers', roleIds: ids(t.roleIds) }));
       if (!tiers.length) throw new Error('Add at least one reviewer rank.');
       patch = { reviewRooms: { enabled: Boolean(b.enabled), categoryId: isSnowflake(b.categoryId) ? b.categoryId : undefined, applicantCanSee: Boolean(b.applicantCanSee), tiers, deleteAfterHours: int(b.deleteAfterHours, 1, 720, 24) } };
+    } else if (section === 'recruitment') {
+      const m = b.messages || {};
+      const cur = current.recruitment;
+      patch = { recruitment: {
+        applyEnabled: Boolean(b.applyEnabled), askRecruiterCode: Boolean(b.askRecruiterCode), dmOnReceived: Boolean(b.dmOnReceived),
+        reviewChannelId: isSnowflake(b.reviewChannelId) ? b.reviewChannelId : undefined,
+        announceChannelId: isSnowflake(b.announceChannelId) ? b.announceChannelId : undefined,
+        pingRoleIds: ids(b.pingRoleIds), reviewerRoleIds: ids(b.reviewerRoleIds),
+        messages: {
+          received: str(m.received, 1500) || cur.messages.received, approved: str(m.approved, 1500) || cur.messages.approved,
+          rejected: str(m.rejected, 1500) || cur.messages.rejected, announce: str(m.announce, 1000) || cur.messages.announce,
+          panelTitle: str(m.panelTitle, 200) || cur.messages.panelTitle, panelText: str(m.panelText, 2000) || cur.messages.panelText,
+        },
+      } };
     } else {
       return fail(res, 'Unknown section', 404);
     }
@@ -129,7 +143,11 @@ export async function closeTicketHandler(req: Request, res: Response) {
 
 // ---------- warnings ----------
 export async function listWarningsHandler(req: Request, res: Response) {
-  try { ok(res, await warningPolicy.recent(req.params.communityId)); }
+  try {
+    const list: any[] = await warningPolicy.recent(req.params.communityId);
+    const guild = await guildFor(req.params.communityId);
+    ok(res, list.map((w) => ({ ...w, memberName: guild?.members?.cache?.get(w.discordUserId)?.displayName || null, moderatorName: guild?.members?.cache?.get(w.moderatorId)?.displayName || null })));
+  }
   catch (err) { fail(res, err, 500); }
 }
 
@@ -200,4 +218,39 @@ export async function bulkListHandler(req: Request, res: Response) {
 export async function bulkCancelHandler(req: Request, res: Response) {
   try { bulkTools.cancel(req.params.jobId); ok(res, { cancelled: true }); }
   catch (err) { fail(res, err); }
+}
+
+// ---------- recruitment in Discord ----------
+export async function postApplyPanelHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const guild = await guildFor(communityId);
+    if (!guild) throw new Error('The bot is not connected to this server right now.');
+    const channel = isSnowflake(req.body?.channelId) ? guild.channels.cache.get(req.body.channelId) : null;
+    if (!channel) throw new Error('Pick a channel for the Apply panel.');
+    const { discordRecruitment } = await import('../services/recruitment/discordRecruitment.service.js');
+    await discordRecruitment.postPanel(communityId, channel);
+    ok(res, { posted: true });
+  } catch (err) { fail(res, err); }
+}
+
+/** Search server members by name for pickers (no typing IDs). */
+export async function searchMembersHandler(req: Request, res: Response) {
+  try {
+    const guild = await guildFor(req.params.communityId);
+    if (!guild) return ok(res, []);
+    const q = str(req.query.q, 50);
+    let members: any[] = [];
+    if (isSnowflake(q)) {
+      const m = await guild.members.fetch(q).catch(() => null);
+      members = m ? [m] : [];
+    } else if (q) {
+      members = Array.from((await guild.members.search({ query: q, limit: 20 }).catch(() => new Map())).values());
+    } else {
+      members = Array.from(guild.members.cache.values()).slice(0, 20);
+    }
+    ok(res, members.filter((m: any) => !m.user.bot || req.query.bots === '1').map((m: any) => ({
+      id: m.id, name: m.displayName, username: m.user.username, avatar: m.user.displayAvatarURL({ size: 64 }),
+    })));
+  } catch (err) { fail(res, err, 500); }
 }

@@ -32,8 +32,30 @@ export interface ToolkitConfig {
   warnings: { enabled: boolean; expiryDays: number; dmMember: boolean; reasons: WarningReason[]; thresholds: WarningThreshold[] };
   roleRules: { enabled: boolean; rules: RoleRule[] };
   reviewRooms: { enabled: boolean; categoryId?: string; applicantCanSee: boolean; tiers: ReviewTier[]; deleteAfterHours: number };
+  recruitment: RecruitmentDiscordConfig;
   updatedAt: string;
 }
+
+/** How recruitment runs inside Discord: where people apply, where staff review, and the messages sent. */
+export interface RecruitmentDiscordConfig {
+  applyEnabled: boolean;
+  askRecruiterCode: boolean;
+  reviewChannelId?: string;
+  pingRoleIds: string[];
+  reviewerRoleIds: string[];
+  dmOnReceived: boolean;
+  announceChannelId?: string;
+  messages: { received: string; approved: string; rejected: string; announce: string; panelTitle: string; panelText: string };
+}
+
+export const DEFAULT_RECRUITMENT_MESSAGES = {
+  received: '📥 Hi {applicant}, we received your application to **{server}**. Our team will review it soon and you will hear from us here.',
+  approved: '🎉 Congratulations {applicant}! Your application to **{server}** was approved by {reviewer}. Welcome aboard!',
+  rejected: 'Hi {applicant}, thank you for applying to **{server}**. This time your application was not approved.\nReason: {reason}',
+  announce: '🎉 Please welcome {mention} to the team!',
+  panelTitle: '📋 Join our team',
+  panelText: 'Press **Apply** to fill in a short application. It only takes a few minutes, and you will get a DM when it is reviewed.',
+};
 
 export const toolkitRepository = new FirestoreRepository<ToolkitConfig>('serverToolkitConfigs');
 
@@ -74,6 +96,7 @@ export function defaultToolkit(communityId: string): ToolkitConfig {
     },
     roleRules: { enabled: true, rules: [] },
     reviewRooms: { enabled: false, applicantCanSee: true, tiers: [{ name: 'Recruiters', roleIds: [] }, { name: 'Senior staff', roleIds: [] }, { name: 'Leadership', roleIds: [] }], deleteAfterHours: 24 },
+    recruitment: { applyEnabled: true, askRecruiterCode: true, pingRoleIds: [], reviewerRoleIds: [], dmOnReceived: true, messages: { ...DEFAULT_RECRUITMENT_MESSAGES } },
     updatedAt: new Date().toISOString(),
   };
 }
@@ -89,6 +112,7 @@ export async function getToolkit(communityId: string): Promise<ToolkitConfig> {
     warnings: { ...d.warnings, ...(saved.warnings || {}) },
     roleRules: { ...d.roleRules, ...(saved.roleRules || {}) },
     reviewRooms: { ...d.reviewRooms, ...(saved.reviewRooms || {}) },
+    recruitment: { ...d.recruitment, ...((saved as any).recruitment || {}), messages: { ...d.recruitment.messages, ...((saved as any).recruitment?.messages || {}) } },
   };
 }
 
