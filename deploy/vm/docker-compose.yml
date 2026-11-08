@@ -26,7 +26,7 @@ services:
       - "127.0.0.1:3101:3000"   # local health checks only; never exposed publicly
     mem_limit: 450m
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health/live"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health/live"]
       interval: 60s
       timeout: 5s
       retries: 3
