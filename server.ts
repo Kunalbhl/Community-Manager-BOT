@@ -14,7 +14,7 @@ import { getHealth, getLiveness, getReadiness, getExternalDependenciesHealth, ve
 import { discordService } from './server/integrations/discord/discord.service.js';
 import { DEFAULT_ROLE_PERMISSIONS } from './shared/types/rbac.js';
 import { ProductionRuntimeActivationService } from './server/services/productionRuntimeActivation.service.js';
-import { startLeadership, stopLeadership, getLeadershipStatus } from './server/runtime/leadership.js';
+import { startLeadership, stopLeadership, getLeadershipStatus, noteShutdownStarting } from './server/runtime/leadership.js';
 import { leaderProxy } from './server/runtime/leaderProxy.js';
 import { EngagementSchedulerService } from './server/services/engagement.service.js';
 import { startReminderScheduler, stopReminderScheduler } from './server/services/reviewReminders.service.js';
@@ -156,6 +156,7 @@ async function startServer() {
     try {
       EngagementSchedulerService.stopScheduler();
       stopReminderScheduler();
+      await noteShutdownStarting();
       await discordService.disconnect();
       await stopLeadership();
       // 3. Flush log buffers and telemetry
