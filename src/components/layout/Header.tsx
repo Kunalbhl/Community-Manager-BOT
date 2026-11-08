@@ -17,8 +17,7 @@ import {
   Bot,
   LogOut,
   LogIn,
-  FileCode2,
-} from 'lucide-react';
+  FileCode2, RefreshCw } from 'lucide-react';
 import { UserRole } from '../../../shared/types/rbac.js';
 import { PortalMode } from '../../types/ui.js';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.js';
@@ -194,7 +193,7 @@ export const Header: React.FC<HeaderProps> = ({
               />
             )}
 
-            <div className="relative" ref={communityDropdownRef}>
+            <div className="relative flex items-center" ref={communityDropdownRef}>
               <button
                 onClick={() => setShowCommunityDropdown(!showCommunityDropdown)}
                 className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
@@ -206,6 +205,9 @@ export const Header: React.FC<HeaderProps> = ({
                 </span>
                 <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
               </button>
+              <a href="/servers" className="ml-2 hidden items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 sm:inline-flex" title="See all your servers">
+                <RefreshCw className="h-3.5 w-3.5" /> Switch server
+              </a>
 
               {showCommunityDropdown && (
                 <div className="absolute left-0 mt-2 w-64 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg z-50">
