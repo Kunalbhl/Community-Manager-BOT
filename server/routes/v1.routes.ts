@@ -456,6 +456,8 @@ router.post('/community/members/:discordUserId/notify', notifyMember);
 // Protected strictly by requirePlatformOwner
 // ==========================================
 router.get('/platform/overview', requirePlatformOwner, getPlatformOverview);
+router.get('/platform/demo-records', requirePlatformOwner, (req, res) => import('../controllers/demoCleanup.controller.js').then((m) => m.listDemoRecords(req, res)));
+router.post('/platform/demo-records/delete', requirePlatformOwner, (req, res) => import('../controllers/demoCleanup.controller.js').then((m) => m.deleteDemoRecords(req, res)));
 router.get('/platform/servers', requirePlatformOwner, listPlatformServers);
 router.get('/platform/servers/:id', requirePlatformOwner, getPlatformServer);
 router.patch('/platform/servers/:id/status', requirePlatformOwner, updatePlatformServerStatus);
