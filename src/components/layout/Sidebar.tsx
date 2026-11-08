@@ -64,6 +64,12 @@ const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
     label: 'Home',
     icon: LayoutDashboard,
     matchingSections: ['home', 'dashboard', 'overview'],
+  },  {
+    id: 'setup-guide',
+    label: 'Setup guide',
+    icon: ListChecks,
+    requiredPermission: 'community.view',
+    matchingSections: ['setup-guide'],
   },
   {
     id: 'community',
@@ -104,13 +110,7 @@ const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
     icon: ShieldCheck,
     matchingSections: ['moderation', 'warnings', 'community-config', 'blacklist'],
   },
-  {
-    id: 'setup-guide',
-    label: 'Setup guide',
-    icon: ListChecks,
-    requiredPermission: 'community.view',
-    matchingSections: ['setup-guide'],
-  },
+
   {
     id: 'community-features',
     label: 'Community features',
