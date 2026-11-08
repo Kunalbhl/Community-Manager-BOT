@@ -124,6 +124,7 @@ async function startServer() {
       await connectDiscordBot();
       EngagementSchedulerService.startScheduler();
       startReminderScheduler();
+      setTimeout(() => { import('./server/services/brandSync.service.js').then((m) => m.syncBrandToDiscord()).catch(() => undefined); }, 90_000);
     },
     onLoseLeadership: async () => {
       EngagementSchedulerService.stopScheduler();

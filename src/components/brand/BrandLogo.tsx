@@ -13,54 +13,23 @@ export const BrandMark: React.FC<{ size?: number; className?: string }> = ({
   size = 32,
   className = '',
 }) => {
+  const id = React.useId().replace(/:/g, '');
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 48 48"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      className={`shrink-0 ${className}`}
-      aria-label="Community Manager Icon"
-    >
+    <svg width={size} height={size} viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" className={className} role="img" aria-label="Community Manager">
       <defs>
-        <linearGradient id="cm_bg_grad" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#4F46E5" />
-          <stop offset="1" stopColor="#312E81" />
-        </linearGradient>
-        <linearGradient id="cm_glow_grad" x1="16" y1="12" x2="32" y2="36" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#A5B4FC" />
-          <stop offset="1" stopColor="#6366F1" />
-        </linearGradient>
+        <linearGradient id={`bg${id}`} x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse"><stop stopColor="#1C2350" /><stop offset="1" stopColor="#0C1029" /></linearGradient>
+        <linearGradient id={`rg${id}`} x1="96" y1="96" x2="416" y2="416" gradientUnits="userSpaceOnUse"><stop stopColor="#A7B0FF" /><stop offset=".55" stopColor="#7C8CFF" /><stop offset="1" stopColor="#FF5C8A" /></linearGradient>
       </defs>
-      
-      {/* Background squircle frame */}
-      <rect x="2" y="2" width="44" height="44" rx="12" fill="url(#cm_bg_grad)" />
-      <rect x="2" y="2" width="44" height="44" rx="12" stroke="#6366F1" strokeWidth="1.5" strokeOpacity="0.4" />
-      
-      {/* Hexagonal orchestrator network */}
-      <path
-        d="M24 10L36 17V31L24 38L12 31V17L24 10Z"
-        stroke="url(#cm_glow_grad)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      
-      {/* Central network connections */}
-      <path d="M24 10V24M36 31L24 24M12 31L24 24" stroke="#C7D2FE" strokeWidth="2" strokeLinecap="round" />
-      
-      {/* Central hub node */}
-      <circle cx="24" cy="24" r="4" fill="#FFFFFF" />
-      <circle cx="24" cy="24" r="2" fill="#4F46E5" />
-      
-      {/* Perimeter nodes */}
-      <circle cx="24" cy="10" r="2.5" fill="#C7D2FE" />
-      <circle cx="36" cy="17" r="2.5" fill="#818CF8" />
-      <circle cx="36" cy="31" r="2.5" fill="#818CF8" />
-      <circle cx="24" cy="38" r="2.5" fill="#C7D2FE" />
-      <circle cx="12" cy="31" r="2.5" fill="#818CF8" />
-      <circle cx="12" cy="17" r="2.5" fill="#818CF8" />
+      <rect width="512" height="512" rx="120" fill={`url(#bg${id})`} />
+      <path d="M256 92 L398 174 V338 L256 420 L114 338 V174 Z" fill="none" stroke={`url(#rg${id})`} strokeWidth="30" strokeLinejoin="round" />
+      <g stroke="#E7E9FF" strokeWidth="18" strokeLinecap="round" opacity=".9">
+        <line x1="256" y1="256" x2="256" y2="168" /><line x1="256" y1="256" x2="332" y2="300" /><line x1="256" y1="256" x2="180" y2="300" />
+      </g>
+      <circle cx="256" cy="160" r="30" fill="#A7B0FF" />
+      <circle cx="340" cy="306" r="30" fill="#7C8CFF" />
+      <circle cx="172" cy="306" r="30" fill="#7C8CFF" />
+      <circle cx="256" cy="256" r="44" fill="#FF5C8A" />
+      <circle cx="256" cy="256" r="18" fill="#0C1029" />
     </svg>
   );
 };
