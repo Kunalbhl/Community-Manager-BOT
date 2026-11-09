@@ -1,3 +1,4 @@
+import { RewardsView } from '../views/community/RewardsView.js';
 import React, { useEffect, useState } from 'react';
 import {
   ClipboardList, Inbox, Mic, MessageSquareText, DoorOpen, Gift, Settings as SettingsIcon, Activity,
@@ -36,7 +37,7 @@ export const MODULES: Record<string, ModuleDef> = {
       { id: 'discord', label: 'Discord flow', icon: MessageSquareText, hint: 'Apply panel, rules, rules quiz, Secure Setup, messages, log channel and Google Sheets.', render: (c) => <ServerToolsView communityId={c.communityId} only="recruit" /> },
       { id: 'rooms', label: 'Review rooms', icon: DoorOpen, hint: 'A private chat per application, a temporary voice room and escalation by rank.', render: (c) => <ServerToolsView communityId={c.communityId} only="rooms" /> },
       { id: 'recruiters', label: 'Recruiters & codes', icon: ClipboardList, hint: 'Recruiter codes, naming series, import and export, and each code’s history.', render: (c) => <RecruiterCodesManager communityId={c.communityId} /> },
-      { id: 'rewards', label: 'Rewards', icon: Gift, hint: 'Benefits recruiters earn for members they bring in.', render: (c) => <ApplicationsView embedded communityId={c.communityId} currentRole={c.currentRole} initialTab="benefits" /> },
+      { id: 'rewards', label: 'Rewards', icon: Gift, hint: 'Milestones, repeating rewards, streaks and top recruiter: roles, XP, messages or hand-out prizes for members recruiters bring in.', render: (c) => <RewardsView communityId={c.communityId} /> },
       { id: 'settings', label: 'Settings', icon: SettingsIcon, hint: 'Open or close applications, recruiter codes on the form, the quiz pass mark and the recruiter credit announcement.', render: (c) => <RecruitmentSettingsView communityId={c.communityId} /> },
     ],
   },

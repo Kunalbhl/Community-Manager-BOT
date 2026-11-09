@@ -313,6 +313,11 @@ export class RecruiterRecordService {
       logger.warn(`[RecruiterRecordService] Sheets sync failed for record ${record.id}: ${(err as Error).message}`);
     }
 
+    // 9. Invite rewards: give whatever this recruiter has now earned.
+    import('./rewards/inviteRewards.service.js')
+      .then(({ inviteRewards }) => inviteRewards.evaluate(communityId, recruiterDiscordUserId))
+      .catch((err) => logger.warn(`[RecruiterRecordService] invite rewards check failed: ${err?.message}`));
+
     return record;
   }
 
