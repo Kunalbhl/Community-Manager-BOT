@@ -158,6 +158,8 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
       const t = await ticketService.open({
         communityId, guild: interaction.guild, member: interaction.member, typeKey: arg,
         subject: interaction.fields.getTextInputValue('subject'), details: interaction.fields.getTextInputValue('details'),
+        involvedIds: (() => { try { return Array.from((interaction.fields.getSelectedUsers('members') as any)?.keys?.() || []).filter((id: any) => id !== interaction.user.id) as string[]; } catch { return []; } })(),
+        outsideNames: (() => { try { return interaction.fields.getTextInputValue('outside') || ''; } catch { return ''; } })(),
       });
       await interaction.editReply({ content: `✅ Your ticket is open: <#${t.channelId}>` });
     } catch (err: any) {
