@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Award, CheckCircle2, Clock, Gift, Pencil, Plus, RefreshCw, Trash2, Trophy, Undo2, X, XCircle } from 'lucide-react';
+import { Award, Wallet, CheckCircle2, Clock, Gift, Pencil, Plus, RefreshCw, Trash2, Trophy, Undo2, X, XCircle } from 'lucide-react';
 import { ChannelSelect, MemberName, MemberSelect, RoleSelect, useDiscordResources } from '../../common/DiscordPickers.js';
 import { TemplateField, TemplateVar } from '../../common/TemplateField.js';
 import { Card, useApi } from './ServerToolsView.js';
+import { RewardWallet } from './RewardWallet.js';
 
 /** Variables reward messages understand. */
 const REWARD_VARS: TemplateVar[] = [
@@ -15,8 +16,9 @@ const REWARD_VARS: TemplateVar[] = [
   { token: 'manualReward', label: 'Hand-out reward', sample: 'Discord Nitro (1 month)' },
 ];
 
-type Trigger = 'MILESTONE' | 'EVERY' | 'IN_PERIOD' | 'TOP_RECRUITER';
+type Trigger = 'EACH_INVITE' | 'MILESTONE' | 'EVERY' | 'IN_PERIOD' | 'TOP_RECRUITER';
 const TRIGGERS: { id: Trigger; title: string; hint: string; icon: string }[] = [
+  { id: 'EACH_INVITE', title: 'Every member they bring', hint: 'Each recruit earns it, e.g. 1 Modded Heist per member. Best with a wallet item, so it adds up and can be used later.', icon: '➕' },
   { id: 'MILESTONE', title: 'Milestone', hint: 'Once, when a recruiter reaches a total. Good for rank roles like Bronze, Silver, Gold.', icon: '🏅' },
   { id: 'EVERY', title: 'Every N invites', hint: 'Repeats: every 3rd, 6th, 9th invite and so on. Good for XP or small perks.', icon: '🔁' },
   { id: 'IN_PERIOD', title: 'Streak in a week or month', hint: 'N invites inside one week or month. Rewards bursts of activity; resets each period.', icon: '🔥' },
@@ -27,12 +29,13 @@ const BLANK = {
   name: '', emoji: '🎁', description: '', enabled: true,
   trigger: { type: 'MILESTONE' as Trigger, count: 5, period: 'MONTH' },
   countWhen: { mode: 'STAYED', stayDays: 7 },
-  actions: { addRoleIds: [] as string[], removeRoleIds: [] as string[], roleDays: 0, xp: 0, dmMessage: '', announceChannelId: '', announceMessage: '', manualReward: '' },
+  actions: { addRoleIds: [] as string[], removeRoleIds: [] as string[], roleDays: 0, xp: 0, dmMessage: '', announceChannelId: '', announceMessage: '', manualReward: '', credit: { itemId: '', amount: 1 } },
   approval: 'AUTO', onLeave: 'REVOKE', maxPerRecruiter: 0,
 };
 
 /** Ready-made rewards to start from; every field can be changed before saving. */
 const PRESETS: { label: string; rule: any }[] = [
+  { label: '➕ 1 wallet item per recruit (e.g. Modded Heist)', rule: { ...BLANK, name: 'Reward per recruit', emoji: '➕', trigger: { type: 'EACH_INVITE', count: 1, period: 'MONTH' }, countWhen: { mode: 'STAYED', stayDays: 3 }, onLeave: 'REVOKE', actions: { ...BLANK.actions, dmMessage: '➕ Thanks {recruiter}! {recruitName} joined, so you earned 1 more. You now have **{balance}**. Use them with /reward use.' } } },
   { label: '🙌 First invite thank-you', rule: { ...BLANK, name: 'First invite', emoji: '🙌', trigger: { type: 'MILESTONE', count: 1, period: 'MONTH' }, countWhen: { mode: 'JOINED', stayDays: 7 }, onLeave: 'KEEP', actions: { ...BLANK.actions, dmMessage: 'Thank you {recruiter}! Your first invite just joined **{server}**. Keep going, there are more rewards ahead. Type /myrewards to see them.' } } },
   { label: '🥈 Rank role at 15 invites', rule: { ...BLANK, name: 'Silver Recruiter', emoji: '🥈', trigger: { type: 'MILESTONE', count: 15, period: 'MONTH' }, actions: { ...BLANK.actions, announceMessage: '🎉 {recruiter} just earned **{reward}** for bringing {count} members to {server}!' } } },
   { label: '⭐ 250 XP every 3 invites', rule: { ...BLANK, name: 'Invite XP', emoji: '⭐', trigger: { type: 'EVERY', count: 3, period: 'MONTH' }, actions: { ...BLANK.actions, xp: 250, dmMessage: '⭐ You got 250 XP for {count} invites. Thank you!' } } },
@@ -54,7 +57,7 @@ const btn = 'inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-
 const primary = `${btn} bg-indigo-600 text-white hover:bg-indigo-700`;
 const ghost = `${btn} border border-slate-300 bg-white text-slate-700 hover:bg-slate-50`;
 
-type Sub = 'rules' | 'queue' | 'board' | 'history';
+type Sub = 'rules' | 'wallet' | 'queue' | 'board' | 'history';
 
 export function RewardsView({ communityId }: { communityId: string }) {
   const api = useApi(communityId);
@@ -79,6 +82,7 @@ export function RewardsView({ communityId }: { communityId: string }) {
   if (!data) return <div className="h-64 animate-pulse rounded-2xl bg-slate-200/60" />;
   const tabs: { id: Sub; label: string; icon: any; n?: number }[] = [
     { id: 'rules', label: 'Rewards', icon: Gift, n: data.rules.length },
+    { id: 'wallet', label: 'Wallet & balances', icon: Wallet },
     { id: 'queue', label: 'Needs action', icon: Clock, n: waiting.length },
     { id: 'board', label: 'Leaderboard', icon: Trophy },
     { id: 'history', label: 'History', icon: Award },
@@ -119,6 +123,7 @@ export function RewardsView({ communityId }: { communityId: string }) {
                 <div className="mt-3 flex flex-wrap gap-1.5 text-xs font-semibold">
                   {r.actions.addRoleIds.map((id: string) => <span key={id} className="rounded-full bg-indigo-50 px-2 py-0.5 text-indigo-700">+ @{roleName(id)}{r.actions.roleDays ? ` for ${r.actions.roleDays}d` : ''}</span>)}
                   {r.actions.removeRoleIds.map((id: string) => <span key={id} className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">− @{roleName(id)}</span>)}
+                  {r.actions.credit?.itemId && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">+{r.actions.credit.amount} to wallet</span>}
                   {r.actions.xp > 0 && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">+{r.actions.xp} XP</span>}
                   {r.actions.dmMessage && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700">DM</span>}
                   {r.actions.announceChannelId && <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700">Announce in #{res?.textChannels?.find((c: any) => c.id === r.actions.announceChannelId)?.name || 'channel'}</span>}
@@ -144,6 +149,8 @@ export function RewardsView({ communityId }: { communityId: string }) {
       )}
 
       {sub === 'board' && <Leaderboard data={data} communityId={communityId} api={api} reload={load} flash={flash} />}
+
+      {sub === 'wallet' && <RewardWallet communityId={communityId} api={api} />}
 
       {sub === 'history' && (
         <Card title="History" desc="Every reward earned, given, taken back or ended, newest first.">
@@ -294,6 +301,7 @@ function RuleEditor({ communityId, rule, onClose, onSaved, api }: any) {
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+              {t === 'EACH_INVITE' && <span className="text-slate-600">Each recruit counts once. If it is taken back when they leave, the wallet shows it as a separate line.</span>}
               {t === 'MILESTONE' && <>At <input type="number" min={1} className={`${input} w-24`} value={r.trigger.count} onChange={(e) => set('trigger.count', Number(e.target.value))} /> invites in total</>}
               {t === 'EVERY' && <>Every <input type="number" min={1} className={`${input} w-24`} value={r.trigger.count} onChange={(e) => set('trigger.count', Number(e.target.value))} /> invites, at most <input type="number" min={0} className={`${input} w-24`} value={r.maxPerRecruiter} onChange={(e) => set('maxPerRecruiter', Number(e.target.value))} /> times per recruiter (0 = no limit)</>}
               {t === 'IN_PERIOD' && <><input type="number" min={1} className={`${input} w-24`} value={r.trigger.count} onChange={(e) => set('trigger.count', Number(e.target.value))} /> invites within one <PeriodPick v={r.trigger.period} on={(v) => set('trigger.period', v)} />, at most <input type="number" min={0} className={`${input} w-24`} value={r.maxPerRecruiter} onChange={(e) => set('maxPerRecruiter', Number(e.target.value))} /> times in total (0 = every period)</>}
@@ -311,6 +319,8 @@ function RuleEditor({ communityId, rule, onClose, onSaved, api }: any) {
           </Section>
 
           <Section n={4} title="What does the recruiter get?" hint="Pick one or more.">
+            <WalletPick api={api} credit={r.actions.credit || { itemId: '', amount: 1 }} onChange={(c: any) => set('actions.credit', c)} />
+            {t === 'EACH_INVITE' && !r.id && <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={!!r.includePast} onChange={(e) => set('includePast', e.target.checked)} />Also pay for members recruited before today</label>}
             <div className="grid gap-3 md:grid-cols-2">
               <label className="text-sm font-semibold text-slate-700">Give roles<div className="mt-1"><RoleChips communityId={communityId} ids={r.actions.addRoleIds} onChange={(l) => set('actions.addRoleIds', l)} placeholder="Add a role" /></div></label>
               <label className="text-sm font-semibold text-slate-700">Remove roles <span className="font-normal text-slate-500">· e.g. the previous rank</span><div className="mt-1"><RoleChips communityId={communityId} ids={r.actions.removeRoleIds} onChange={(l) => set('actions.removeRoleIds', l)} placeholder="Remove a role" /></div></label>
@@ -352,3 +362,21 @@ const PeriodPick = ({ v, on }: { v: string; on: (v: string) => void }) => (
 const Choice = ({ on, onClick, title, disabled }: { on: boolean; onClick: () => void; title: string; disabled?: boolean }) => (
   <button type="button" disabled={disabled} onClick={onClick} className={`rounded-xl border px-3 py-2 text-sm font-semibold transition disabled:opacity-50 ${on ? 'border-indigo-500 bg-indigo-50 text-indigo-800 ring-2 ring-indigo-200' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}>{title}</button>
 );
+
+/** Pick a wallet item and how many each time; links to the Wallet tab to create one. */
+function WalletPick({ api, credit, onChange }: any) {
+  const [items, setItems] = useState<any[] | null>(null);
+  useEffect(() => { api('/rewards/wallet').then((w: any) => setItems(w.items.filter((i: any) => i.active))).catch(() => setItems([])); }, [api]);
+  if (!items) return null;
+  if (!items.length) return <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">💡 For countable rewards (like 1 Modded Heist per recruit) first create an item on the <b>Wallet & balances</b> tab, then pick it here.</p>;
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+      <div className="text-sm font-semibold text-slate-700">Add to their wallet <span className="font-normal text-slate-500">· a balance they spend later; every gain and use is recorded</span></div>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+        <input type="number" min={1} className={`${input} w-24`} value={credit.amount} onChange={(e) => onChange({ ...credit, amount: Number(e.target.value) })} aria-label="How many" />
+        <span>×</span>
+        <select className={`${input} w-auto`} value={credit.itemId} onChange={(e) => onChange({ ...credit, itemId: e.target.value })}><option value="">Nothing</option>{items.map((i) => <option key={i.id} value={i.id}>{i.emoji} {i.name}</option>)}</select>
+      </div>
+    </div>
+  );
+}

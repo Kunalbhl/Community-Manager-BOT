@@ -1,5 +1,7 @@
 /** Dashboard API for invite rewards (rules, the ledger, the leaderboard and bonus credits). */
 import type { Request, Response } from 'express';
+import { wallet, balancesFrom } from '../services/rewards/wallet.service.js';
+import { guildFor } from '../services/toolkit/toolkitConfig.js';
 import { inviteRewards, rewardRulesRepository, rewardGrantsRepository, inviteCreditsRepository, sanitizeRule, describeRule } from '../services/rewards/inviteRewards.service.js';
 
 const ok = (res: Response, data: unknown) => res.json({ success: true, data });
@@ -91,4 +93,46 @@ export async function creditHandler(req: Request, res: Response) {
 
 export async function evaluateHandler(req: Request, res: Response) {
   try { ok(res, await inviteRewards.evaluate(req.params.communityId)); } catch (err) { fail(res, err); }
+}
+
+/* ------------------------------ Reward wallet ------------------------------ */
+
+export async function walletHandler(req: Request, res: Response) {
+  try {
+    const c = req.params.communityId;
+    const [items, txs] = await Promise.all([wallet.items(c), wallet.txs(c)]);
+    ok(res, { items, balances: balancesFrom(txs).sort((a, b) => b.available - a.available), txs: txs.slice(0, 500), pending: txs.filter((t) => t.kind === 'CLAIM' && t.status === 'PENDING') });
+  } catch (err) { fail(res, err); }
+}
+export async function saveItemHandler(req: Request, res: Response) {
+  try { ok(res, await wallet.saveItem(req.params.communityId, req.body, req.params.itemId)); } catch (err) { fail(res, err); }
+}
+export async function adjustHandler(req: Request, res: Response) {
+  try { ok(res, await wallet.adjust(req.params.communityId, { ...req.body, by: who(req) })); } catch (err) { fail(res, err); }
+}
+export async function useHandler(req: Request, res: Response) {
+  try {
+    const b = req.body || {};
+    const ids: string[] = (Array.isArray(b.memberIds) ? b.memberIds : [b.memberId]).filter((x: any) => /^\d{15,22}$/.test(String(x))).slice(0, 25);
+    if (!ids.length) throw new Error('Pick at least one member.');
+    const results = [];
+    for (const memberId of ids) {
+      try { const r = await wallet.claim(req.params.communityId, { itemId: b.itemId, memberId, amount: b.amount, forEvent: b.forEvent, by: who(req), byStaff: true }); results.push({ memberId, ok: true, left: r.left }); }
+      catch (e: any) { results.push({ memberId, ok: false, error: e.message }); }
+    }
+    ok(res, results);
+  } catch (err) { fail(res, err); }
+}
+export async function decideHandler(req: Request, res: Response) {
+  try { if (!['approve', 'deny'].includes(req.params.action)) throw new Error('Unknown action.'); ok(res, await wallet.decide(req.params.communityId, req.params.txId, req.params.action === 'approve', who(req))); } catch (err) { fail(res, err); }
+}
+export async function panelHandler(req: Request, res: Response) {
+  try {
+    const item = await wallet.item(req.params.communityId, req.params.itemId);
+    const guild: any = await guildFor(req.params.communityId);
+    const ch: any = guild?.channels.cache.get(String(req.body?.channelId || ''));
+    if (!ch?.send) throw new Error('Pick the channel to post in.');
+    await ch.send(wallet.panel(item, String(req.body?.forEvent || '').trim().slice(0, 60)));
+    ok(res, { posted: true, channel: ch.name });
+  } catch (err) { fail(res, err); }
 }

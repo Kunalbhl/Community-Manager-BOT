@@ -19,7 +19,10 @@ export const myRewardsCommand: SlashCommandDefinition = {
     if (prog.length) lines.push('', '**Next rewards**', ...prog.slice(0, 6).map((p) => `${p.emoji} ${p.name}: ${bar(p.have, p.target)} ${Math.min(p.have, p.target)}/${p.target}${p.waiting ? ` (${p.waiting} still counting)` : ''}`));
     const got = mine.filter((g) => g.status === 'GRANTED' || g.status === 'PENDING_APPROVAL');
     if (got.length) lines.push('', '**Earned**', ...got.slice(0, 8).map((g) => `${g.emoji} ${g.ruleName} · ${g.status === 'GRANTED' ? 'given' : 'waiting for staff'}`));
-    if (!rules.length) lines.push('', 'This server has no invite rewards yet.');
+    const { wallet } = await import('../../../services/rewards/wallet.service.js');
+    const wl = await wallet.describeBalances(c, interaction.user.id).catch(() => [] as string[]);
+    if (wl.length) lines.push('', '**Wallet** · use with `/reward use`', ...wl);
+    if (!rules.length && !wl.length) lines.push('', 'This server has no invite rewards yet.');
     await interaction.reply({ content: lines.join('\n').slice(0, 1900), ephemeral: true });
   },
 };

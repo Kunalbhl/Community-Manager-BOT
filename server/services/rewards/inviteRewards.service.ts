@@ -12,7 +12,7 @@ import { recruiterRecordsRepository, recruiterBenefitsRepository } from '../../r
 import { guildFor } from '../toolkit/toolkitConfig.js';
 import { logger } from '../../logging/logger.js';
 
-export type TriggerType = 'MILESTONE' | 'EVERY' | 'IN_PERIOD' | 'TOP_RECRUITER';
+export type TriggerType = 'EACH_INVITE' | 'MILESTONE' | 'EVERY' | 'IN_PERIOD' | 'TOP_RECRUITER';
 export type Period = 'WEEK' | 'MONTH';
 
 export interface RewardRule {
@@ -35,11 +35,15 @@ export interface RewardRule {
     announceMessage: string;
     /** Something staff give by hand (Nitro, merch, a shout-out). Always needs approval. */
     manualReward: string;
+    /** Countable reward added to the recruiter's wallet (e.g. 1 Modded Heist). */
+    credit?: { itemId: string; amount: number };
   };
   approval: 'AUTO' | 'STAFF';
   onLeave: 'KEEP' | 'REVOKE';
   /** For repeating rewards: most times one recruiter can get it (0 = no limit). */
   maxPerRecruiter: number;
+  /** Per-invite rewards: also pay for recruits from before the rule was made. */
+  includePast?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,6 +68,9 @@ export interface RewardGrant {
   decidedBy?: string;
   decidedAt?: string;
   manualReward?: string;
+  recruiterCode?: string;
+  recruitId?: string;
+  recruitName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,16 +99,17 @@ const periodLabel = (p: Period) => (p === 'WEEK' ? 'week' : 'month');
 
 /** Cleans a rule coming from the dashboard. */
 export function sanitizeRule(b: any, cur?: Partial<RewardRule>): Omit<RewardRule, 'id' | 'communityId' | 'createdAt' | 'updatedAt'> {
-  const type: TriggerType = ['MILESTONE', 'EVERY', 'IN_PERIOD', 'TOP_RECRUITER'].includes(b?.trigger?.type) ? b.trigger.type : 'MILESTONE';
+  const type: TriggerType = ['EACH_INVITE', 'MILESTONE', 'EVERY', 'IN_PERIOD', 'TOP_RECRUITER'].includes(b?.trigger?.type) ? b.trigger.type : 'MILESTONE';
   const a = b?.actions || {};
   const name = txt(b?.name, 80);
   if (!name) throw new Error('Give the reward a name.');
   const actions = {
     addRoleIds: ids(a.addRoleIds), removeRoleIds: ids(a.removeRoleIds), roleDays: clampInt(a.roleDays, 0, 365, 0), xp: clampInt(a.xp, 0, 1_000_000, 0),
     dmMessage: txt(a.dmMessage, 1500), announceChannelId: snow(a.announceChannelId) ? a.announceChannelId : '', announceMessage: txt(a.announceMessage, 1500), manualReward: txt(a.manualReward, 200),
+    credit: a.credit?.itemId && Number(a.credit.amount) > 0 ? { itemId: txt(a.credit.itemId, 64), amount: clampInt(a.credit.amount, 1, 1000, 1) } : undefined,
   };
-  if (!actions.addRoleIds.length && !actions.removeRoleIds.length && !actions.xp && !actions.dmMessage && !actions.announceMessage && !actions.manualReward)
-    throw new Error('Choose at least one thing the recruiter gets (a role, XP, a message or a reward staff hand out).');
+  if (!actions.addRoleIds.length && !actions.removeRoleIds.length && !actions.xp && !actions.dmMessage && !actions.announceMessage && !actions.manualReward && !actions.credit)
+    throw new Error('Choose at least one thing the recruiter gets (a wallet reward, a role, XP, a message or a reward staff hand out).');
   if (actions.announceMessage && !actions.announceChannelId) throw new Error('Pick the channel for the announcement.');
   return {
     name, emoji: txt(b?.emoji, 16) || '🎁', description: txt(b?.description, 300), enabled: b?.enabled !== false,
@@ -111,6 +119,7 @@ export function sanitizeRule(b: any, cur?: Partial<RewardRule>): Omit<RewardRule
     approval: b?.approval === 'STAFF' || actions.manualReward ? 'STAFF' : 'AUTO',
     onLeave: b?.onLeave === 'REVOKE' ? 'REVOKE' : 'KEEP',
     maxPerRecruiter: clampInt(b?.maxPerRecruiter, 0, 1000, 0),
+    includePast: !!b?.includePast,
     ...(cur ? {} : {}),
   };
 }
@@ -119,7 +128,7 @@ export function sanitizeRule(b: any, cur?: Partial<RewardRule>): Omit<RewardRule
 export function describeRule(r: Pick<RewardRule, 'trigger' | 'countWhen'>): string {
   const n = r.trigger.count;
   const inv = (k: number) => `${k} invite${k === 1 ? '' : 's'}`;
-  const when = r.trigger.type === 'MILESTONE' ? `When a recruiter reaches ${inv(n)}`
+  const when = r.trigger.type === 'EACH_INVITE' ? 'For every member they bring in' : r.trigger.type === 'MILESTONE' ? `When a recruiter reaches ${inv(n)}`
     : r.trigger.type === 'EVERY' ? `Every ${inv(n)}`
       : r.trigger.type === 'IN_PERIOD' ? `${inv(n)} within one ${periodLabel(r.trigger.period)}`
         : `Top recruiter of each ${periodLabel(r.trigger.period)}${n > 1 ? ` (at least ${inv(n)})` : ''}`;
@@ -127,7 +136,7 @@ export function describeRule(r: Pick<RewardRule, 'trigger' | 'countWhen'>): stri
   return when + counts + '.';
 }
 
-type Rec = { recruiterDiscordUserId: string; recruiterDisplayNameSnapshot?: string; recruiterUsernameSnapshot?: string; joinedAt?: string; recruitmentSuccessfulAt?: string; leftAt?: string };
+type Rec = { id?: string; recruiterCode?: string; applicantDiscordUserId?: string; applicantDisplayNameSnapshot?: string; applicantUsernameSnapshot?: string; recruiterDiscordUserId: string; recruiterDisplayNameSnapshot?: string; recruiterUsernameSnapshot?: string; joinedAt?: string; recruitmentSuccessfulAt?: string; leftAt?: string };
 const joinedMs = (r: Rec) => Date.parse(r.joinedAt || r.recruitmentSuccessfulAt || '') || 0;
 const counts = (r: Rec, rule: RewardRule, now: number) => !r.leftAt && (rule.countWhen.mode === 'JOINED' || now - joinedMs(r) >= rule.countWhen.stayDays * DAY);
 
@@ -190,7 +199,7 @@ export const inviteRewards = {
     const now = Date.now();
     let granted = 0;
     for (const rule of rules) {
-      const due: { recruiterId: string; name: string; occurrence: string; reason: string; count: number }[] = [];
+      const due: { recruiterId: string; name: string; occurrence: string; reason: string; count: number; code?: string; recruitId?: string; recruitName?: string }[] = [];
       if (rule.trigger.type === 'TOP_RECRUITER') {
         // Decided once the period is over: look at the previous week or month.
         const prev = new Date(rule.trigger.period === 'WEEK' ? now - 7 * DAY : Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 0, 12));
@@ -208,7 +217,14 @@ export const inviteRewards = {
           if (onlyRecruiter && e.id !== onlyRecruiter) continue;
           const valid = e.recs.filter((r) => counts(r, rule, now));
           const total = valid.length + e.bonus;
-          if (rule.trigger.type === 'MILESTONE') {
+          if (rule.trigger.type === 'EACH_INVITE') {
+            const from = rule.includePast ? 0 : Date.parse(rule.createdAt) - 60_000;
+            for (const r of valid) {
+              if (!r.id || joinedMs(r) < from) continue;
+              const nm = r.applicantDisplayNameSnapshot || r.applicantUsernameSnapshot || r.applicantDiscordUserId || 'a member';
+              due.push({ recruiterId: e.id, name: e.name, occurrence: `inv:${r.id}`, reason: `Recruited ${nm}${r.recruiterCode && r.recruiterCode !== 'NONE' ? ` (code ${r.recruiterCode})` : ''}`, count: total, code: r.recruiterCode && r.recruiterCode !== 'NONE' ? r.recruiterCode : undefined, recruitId: r.applicantDiscordUserId, recruitName: nm });
+            }
+          } else if (rule.trigger.type === 'MILESTONE') {
             if (total >= rule.trigger.count) due.push({ recruiterId: e.id, name: e.name, occurrence: 'once', reason: `Reached ${rule.trigger.count} invite${rule.trigger.count === 1 ? '' : 's'}`, count: total });
           } else if (rule.trigger.type === 'EVERY') {
             let k = Math.floor(total / rule.trigger.count);
@@ -231,7 +247,7 @@ export const inviteRewards = {
         const g = await rewardGrantsRepository.create({
           id: gid,
           communityId, ruleId: rule.id, ruleName: rule.name, emoji: rule.emoji, recruiterId: d.recruiterId, recruiterName: d.name,
-          reason: d.reason, occurrence: d.occurrence, inviteCount: d.count, manualReward: rule.actions.manualReward || undefined,
+          reason: d.reason, occurrence: d.occurrence, inviteCount: d.count, manualReward: rule.actions.manualReward || undefined, recruiterCode: d.code, recruitId: d.recruitId, recruitName: d.recruitName,
           status: rule.approval === 'STAFF' ? 'PENDING_APPROVAL' : 'GRANTED', createdAt: nowIso(), updatedAt: nowIso(),
         } as any).catch(() => null);
         if (!g) continue; // created by another pass already
@@ -252,6 +268,11 @@ export const inviteRewards = {
       let need = rule.trigger.count;
       if (g.occurrence.startsWith('every:')) need = Number(g.occurrence.slice(6)) * rule.trigger.count;
       if (g.occurrence.startsWith('period:')) continue; // a period reward was earned at the time; keep it
+      if (g.occurrence.startsWith('inv:')) {
+        const rec = e?.recs.find((r: Rec) => r.id === g.occurrence.slice(4));
+        if (!rec || rec.leftAt) await this.revoke(g, rule, `${g.recruitName || 'The recruit'} left the server, so this reward was taken back.`, 'system');
+        continue;
+      }
       if (total < need) await this.revoke(g, rule, 'Recruits left the server, so this reward was taken back.', 'system');
     }
   },
@@ -263,6 +284,15 @@ export const inviteRewards = {
     const guild: any = await guildFor(g.communityId);
     const member: any = guild ? await guild.members.fetch(g.recruiterId).catch(() => null) : null;
     const given: string[] = [];
+    let credited = false;
+    if (rule.actions.credit?.itemId) {
+      try {
+        const { wallet } = await import('./wallet.service.js');
+        await wallet.earn({ communityId: g.communityId, itemId: rule.actions.credit.itemId, amount: rule.actions.credit.amount, grantId: g.id, memberId: g.recruiterId, memberName: member?.displayName || g.recruiterName, ruleName: rule.name, recruiterCode: g.recruiterCode, recruitId: g.recruitId, recruitName: g.recruitName });
+        credited = true;
+      } catch (e: any) { problems.push(`could not add to the wallet (${e?.message})`); }
+    }
+    const needsMember = rule.actions.addRoleIds.length > 0 || rule.actions.removeRoleIds.length > 0 || rule.actions.xp > 0 || !!rule.actions.dmMessage;
     if (!guild) problems.push('the bot is not connected to the server');
     else if (!member) problems.push('the recruiter is no longer in the server');
     else {
@@ -271,7 +301,8 @@ export const inviteRewards = {
       if (rule.actions.xp) {
         try { const { levels } = await import('../features/levels.service.js'); await levels.grant(g.communityId, member, rule.actions.xp, null, 'message'); } catch { problems.push('could not add XP'); }
       }
-      const vars = { recruiter: `<@${g.recruiterId}>`, recruiterName: member.displayName || g.recruiterName, reward: `${rule.emoji} ${rule.name}`, count: String(g.inviteCount), reason: g.reason, server: guild.name, manualReward: rule.actions.manualReward || '' };
+      const bal = credited ? await import('./wallet.service.js').then(({ wallet }) => wallet.balance(g.communityId, g.recruiterId, rule!.actions.credit!.itemId)).catch(() => null) : null;
+      const vars = { balance: bal ? String(bal.available) : '', recruit: g.recruitId ? `<@${g.recruitId}>` : '', recruitName: g.recruitName || '', code: g.recruiterCode || '', recruiter: `<@${g.recruiterId}>`, recruiterName: member.displayName || g.recruiterName, reward: `${rule.emoji} ${rule.name}`, count: String(g.inviteCount), reason: g.reason, server: guild.name, manualReward: rule.actions.manualReward || '' };
       if (rule.actions.dmMessage) await member.send({ content: render(rule.actions.dmMessage, vars).slice(0, 2000) }).catch(() => problems.push('could not DM the recruiter (their DMs are closed)'));
       if (rule.actions.announceMessage && rule.actions.announceChannelId) {
         const ch: any = guild.channels.cache.get(rule.actions.announceChannelId);
@@ -279,7 +310,7 @@ export const inviteRewards = {
         else await ch.send({ content: render(rule.actions.announceMessage, vars).slice(0, 2000), allowedMentions: { users: [g.recruiterId] } }).catch(() => problems.push(`could not post in #${ch.name}`));
       }
     }
-    const fatal = !guild || !member || (rule.actions.addRoleIds.length > 0 && !given.length);
+    const fatal = (needsMember && (!guild || !member)) || (rule.actions.addRoleIds.length > 0 && !given.length) || (!!rule.actions.credit?.itemId && !credited);
     return rewardGrantsRepository.update(g.id, {
       status: fatal ? 'FAILED' : 'GRANTED', error: problems.length ? problems.join('; ') : '', roleIdsGiven: given,
       expiresAt: given.length && rule.actions.roleDays ? new Date(Date.now() + rule.actions.roleDays * DAY).toISOString() : undefined,
@@ -290,6 +321,7 @@ export const inviteRewards = {
   async revoke(g: RewardGrant, rule: RewardRule | null, why: string, by: string, status: GrantStatus = 'REVOKED') {
     const guild: any = await guildFor(g.communityId);
     const member: any = guild ? await guild.members.fetch(g.recruiterId).catch(() => null) : null;
+    if (status === 'REVOKED') await import('./wallet.service.js').then(({ wallet }) => wallet.reverse(g.communityId, g.id, why)).catch(() => undefined);
     if (member) for (const id of g.roleIdsGiven || []) await member.roles.remove(id, `Invite reward ${status.toLowerCase()}: ${g.ruleName}`).catch(() => undefined);
     if (member && status === 'REVOKED' && rule) await member.send({ content: `ℹ️ Your reward **${g.emoji} ${g.ruleName}** in **${guild.name}** was taken back. ${why}` }).catch(() => undefined);
     return rewardGrantsRepository.update(g.id, { status, error: why, decidedBy: by, decidedAt: nowIso(), updatedAt: nowIso() } as any);
@@ -331,7 +363,7 @@ export const inviteRewards = {
   /** Progress for one recruiter, used by the leaderboard and /myrewards. */
   progress(rules: RewardRule[], e: { recs: Rec[]; bonus: number }, grants: RewardGrant[], recruiterId: string) {
     const now = Date.now();
-    return rules.filter((r) => r.enabled && r.trigger.type !== 'TOP_RECRUITER').map((rule) => {
+    return rules.filter((r) => r.enabled && r.trigger.type !== 'TOP_RECRUITER' && r.trigger.type !== 'EACH_INVITE').map((rule) => {
       const valid = e.recs.filter((r) => counts(r, rule, now));
       const waiting = e.recs.filter((r) => !r.leftAt && !counts(r, rule, now)).length;
       let have = valid.length + e.bonus;
