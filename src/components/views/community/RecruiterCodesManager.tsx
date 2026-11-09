@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Download, Upload, Search, Pencil, Trash2, History, Send, X, CheckCircle2, AlertTriangle, Hash } from 'lucide-react';
 import { MemberSelect, MemberName } from '../../common/DiscordPickers.js';
 import { Card, useApi } from './ServerToolsView.js';
+import { buildCode, nameWords } from '../../../../shared/utils/nameWords.js';
 
 /**
  * Recruiter codes in one place: naming series, create (optionally DM the code), import / export
@@ -139,22 +140,11 @@ function Dialog({ title, onClose, children }: { title: string; onClose: () => vo
 }
 
 /** Same rules as the server (toolkit.controller seriesCode) so the preview matches real codes. */
-function previewSeries(s: any, name: string) {
-  const words = String(name || '').normalize('NFKD').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
-  const letters = words.join('');
-  const n = Math.max(1, Math.min(8, Number(s.firstN) || 3));
-  const m = Math.max(1, Math.min(8, Number(s.lastM) || 2));
-  const part = s.mode === 'INITIALS' ? words.map((w) => w[0]).join('').slice(0, 6) || 'X'
-    : s.mode === 'FIRST' ? letters.slice(0, n) || 'X'
-    : s.mode === 'FIRST_LAST' ? (letters.length <= n + m ? letters || 'X' : letters.slice(0, n) + letters.slice(-m)) : '';
-  const num = String(Number(s.next) || 1).padStart(Math.max(1, Math.min(8, Number(s.padding) || 3)), '0');
-  const mid = s.mode && s.mode !== 'FIXED' ? `${part}${s.separator ?? '-'}` : '';
-  return `${s.prefix || ''}${mid}${num}${s.suffix || ''}`.toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 32);
-}
+function previewSeries(s: any, name: string) { return buildCode(s, Number(s.next) || 1, name); }
 
 const MODES = [
   { v: 'FIXED', l: 'Fixed text', d: 'Same text for everyone, then a number.' },
-  { v: 'INITIALS', l: 'Initials', d: 'First letter of each word in the name.' },
+  { v: 'INITIALS', l: 'Initials', d: 'First letter of each word. Understands MrTechnicalGamer, dots, underscores and styled letters; ignores numbers and symbols.' },
   { v: 'FIRST', l: 'First letters', d: 'The first few letters of the name.' },
   { v: 'FIRST_LAST', l: 'First + last letters', d: 'Some letters from the start and some from the end.' },
 ];
@@ -191,6 +181,7 @@ function SeriesCard({ api, series, dmOnCreate, codeForNewMembers, onSaved, onErr
         </div>
         <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm">
           {s.mode !== 'FIXED' && <label className="text-xs font-semibold text-slate-600">Try a name<input className="ml-2 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm" value={sample} onChange={(e) => setSample(e.target.value)} /></label>}
+          {s.mode !== 'FIXED' && <span className="text-xs text-slate-500">Read as: <b className="text-slate-700">{nameWords(sample).join(' · ') || '—'}</b></span>}
           <span className="text-slate-500">Next code:</span><b className="font-mono text-lg text-indigo-700">{previewSeries(s, sample)}</b>
         </div>
       </div>

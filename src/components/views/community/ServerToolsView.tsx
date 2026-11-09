@@ -1,4 +1,5 @@
 import { takeOpenTab, goTo } from './SetupGuideView.js';
+import { MemberName } from '../../common/DiscordPickers.js';
 import { TemplateField, RECRUIT_VARS } from '../../common/TemplateField.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -86,7 +87,7 @@ export function ServerToolsView({ communityId, only }: { communityId: string; on
           {tab === 'tickets' && <TicketsTab api={api} cfg={config.tickets} res={res} onSave={(v) => save('tickets', v)} />}
           {tab === 'warnings' && <WarningsTab communityId={communityId} api={api} cfg={config.warnings} onSave={(v) => save('warnings', v)} />}
           {tab === 'roles' && <RoleRulesTab cfg={config.roleRules} res={res} onSave={(v) => save('roleRules', v)} />}
-          {tab === 'rooms' && <ReviewRoomsTab api={api} cfg={config.reviewRooms} res={res} onSave={(v) => save('reviewRooms', v)} />}
+          {tab === 'rooms' && <ReviewRoomsTab communityId={communityId} api={api} cfg={config.reviewRooms} res={res} onSave={(v) => save('reviewRooms', v)} />}
           {tab === 'bulk' && <BulkTab communityId={communityId} api={api} res={res} />}
         </>
       )}
@@ -411,10 +412,16 @@ function RoleRulesTab({ cfg, res, onSave }: { cfg: any; res: Resources; onSave: 
 /* ------------------------------------------------------------------ */
 /* Review rooms                                                        */
 /* ------------------------------------------------------------------ */
-function ReviewRoomsTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Resources; onSave: (v: any) => Promise<void> }) {
-  const [c, setC] = useState(cfg);
+function ReviewRoomsTab({ communityId, api, cfg, res, onSave }: { communityId: string; api: any; cfg: any; res: Resources; onSave: (v: any) => Promise<void> }) {
+  const [c, setC] = useState<any>({ ...cfg, specialMembers: (cfg.specialMemberIds || []).map((id: string) => ({ id, name: '…', username: '' })) });
   const [rooms, setRooms] = useState<any[] | null>(null);
-  useEffect(() => { api('/review-rooms').then(setRooms).catch(() => setRooms([])); }, [api]);
+  const reloadRooms = useCallback(() => api('/review-rooms').then(setRooms).catch(() => setRooms([])), [api]);
+  useEffect(() => { reloadRooms(); }, [reloadRooms]);
+  // Show names for saved special-access members.
+  useEffect(() => {
+    (cfg.specialMemberIds || []).forEach((id: string) => fetch(`/api/v1/communities/${encodeURIComponent(communityId)}/discord/member-search?q=${id}`, { credentials: 'include', headers: { 'x-community-id': communityId } })
+      .then((r) => r.json()).then((j) => { const m = j?.data?.[0]; if (m) setC((cur: any) => ({ ...cur, specialMembers: (cur.specialMembers || []).map((x: any) => (x.id === id ? m : x)) })); }).catch(() => undefined));
+  }, [communityId]); // eslint-disable-line react-hooks/exhaustive-deps
   const setTier = (i: number, p: any) => setC({ ...c, tiers: c.tiers.map((t: any, n: number) => (n === i ? { ...t, ...p } : t)) });
 
   return (
@@ -460,19 +467,37 @@ function ReviewRoomsTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Re
               </div>
             ))}
           </div>
-          <div className="mt-5"><SaveBar onSave={() => onSave(c)} /></div>
+          <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+            <div className="font-semibold text-slate-900">Special access members</div>
+            <p className="text-xs text-slate-600">People outside the ranks who join every application chat and staff thread, for example an advisor. Reviewers can also invite someone to one application from Discord (➕ Invite member), and higher ranks can remove them.</p>
+            <div className="mt-2"><MembersPick communityId={communityId} value={(c.specialMembers || [])} onChange={(v) => setC({ ...c, specialMembers: v, specialMemberIds: v.map((m: any) => m.id) })} /></div>
+          </div>
+          <div className="mt-5"><SaveBar onSave={() => { const { specialMembers, ...rest } = c; return onSave(rest); }} /></div>
         </Card>
       </div>
       <Card title="Open rooms">
         {!rooms ? <div className="h-32 animate-pulse rounded-xl bg-slate-100" /> : !rooms.length ? <p className="text-sm text-slate-500">No review rooms yet.</p> : (
           <ul className="divide-y divide-slate-100">
             {rooms.slice(0, 30).map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
                 <div><div className="font-semibold text-slate-900">{r.applicantName}</div><div className="text-xs text-slate-500">{fmtDate(r.createdAt)}{r.voiceChannelId ? ' · voice room open' : ''}</div></div>
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-bold text-indigo-700"><ArrowUp className="h-3 w-3" />{c.tiers[r.tier]?.name || `Rank ${r.tier + 1}`}</span>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${r.status === 'OPEN' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{r.decision || r.status}</span>
                 </div>
+                {r.status === 'OPEN' && !!(r.invited || []).length && (
+                  <div className="basis-full">
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                      <span className="font-semibold text-slate-500">Special access:</span>
+                      {(r.invited || []).map((id: string) => (
+                        <span key={id} className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">
+                          <MemberName id={id} communityId={communityId} />
+                          <button aria-label="Remove access" title="Remove access" onClick={() => api(`/rooms/${r.id}/access/${id}`, 'DELETE').then(reloadRooms)}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

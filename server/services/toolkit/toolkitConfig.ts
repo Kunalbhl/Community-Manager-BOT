@@ -31,7 +31,7 @@ export interface ToolkitConfig {
   tickets: { enabled: boolean; categoryId?: string; logChannelId?: string; staffRoleIds: string[]; types: TicketType[]; counter: number; panelPostedAt?: string };
   warnings: { enabled: boolean; expiryDays: number; dmMember: boolean; reasons: WarningReason[]; thresholds: WarningThreshold[] };
   roleRules: { enabled: boolean; rules: RoleRule[] };
-  reviewRooms: { enabled: boolean; categoryId?: string; applicantCanSee: boolean; tiers: ReviewTier[]; deleteAfterHours: number };
+  reviewRooms: { enabled: boolean; categoryId?: string; applicantCanSee: boolean; tiers: ReviewTier[]; deleteAfterHours: number; specialMemberIds?: string[] };
   recruitment: RecruitmentDiscordConfig;
   updatedAt: string;
 }

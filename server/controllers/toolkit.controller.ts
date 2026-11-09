@@ -4,6 +4,7 @@
  */
 import { Request, Response } from 'express';
 import { getToolkit, saveToolkit, guildFor, isSnowflake, ToolkitConfig } from '../services/toolkit/toolkitConfig.js';
+import { buildCode } from '../../shared/utils/nameWords.js';
 import { ticketService } from '../services/toolkit/tickets.service.js';
 import { warningPolicy } from '../services/toolkit/warningPolicy.service.js';
 import { bulkTools, BulkAction } from '../services/toolkit/bulk.service.js';
@@ -95,7 +96,7 @@ export async function saveToolkitSectionHandler(req: Request, res: Response) {
     } else if (section === 'reviewRooms') {
       const tiers = (Array.isArray(b.tiers) ? b.tiers : []).slice(0, 6).map((t: any) => ({ name: str(t.name, 40) || 'Reviewers', roleIds: ids(t.roleIds) }));
       if (!tiers.length) throw new Error('Add at least one reviewer rank.');
-      patch = { reviewRooms: { enabled: Boolean(b.enabled), categoryId: isSnowflake(b.categoryId) ? b.categoryId : undefined, applicantCanSee: Boolean(b.applicantCanSee), tiers, deleteAfterHours: int(b.deleteAfterHours, 1, 720, 24) } };
+      patch = { reviewRooms: { enabled: Boolean(b.enabled), categoryId: isSnowflake(b.categoryId) ? b.categoryId : undefined, applicantCanSee: Boolean(b.applicantCanSee), tiers, deleteAfterHours: int(b.deleteAfterHours, 1, 720, 24), specialMemberIds: ids(b.specialMemberIds, 25) } };
     } else if (section === 'recruitment') {
       const m = b.messages || {};
       const cur = current.recruitment;
@@ -475,21 +476,7 @@ async function codeLog(communityId: string, codeId: string, code: string, action
  *  FIRST_LAST  first N + last M letters      e.g. KU + EK -> KUEK-007
  * An optional fixed text can go before the name part, and a suffix after the number.
  */
-function namePart(s: any, name: string) {
-  const words = String(name || '').normalize('NFKD').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
-  const letters = words.join('');
-  const n = Math.max(1, Math.min(8, Number(s.firstN) || 3));
-  const m = Math.max(1, Math.min(8, Number(s.lastM) || 2));
-  if (s.mode === 'INITIALS') return words.map((w) => w[0]).join('').slice(0, 6) || 'X';
-  if (s.mode === 'FIRST') return letters.slice(0, n) || 'X';
-  if (s.mode === 'FIRST_LAST') return letters.length <= n + m ? letters || 'X' : letters.slice(0, n) + letters.slice(-m);
-  return '';
-}
-function seriesCode(s: any, n: number, name = '') {
-  const num = String(n).padStart(Math.max(1, Math.min(8, Number(s.padding) || 3)), '0');
-  const mid = s.mode && s.mode !== 'FIXED' ? `${namePart(s, name)}${s.separator ?? '-'}` : '';
-  return `${s.prefix || ''}${mid}${num}${s.suffix || ''}`.toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 32);
-}
+function seriesCode(s: any, n: number, name = '') { return buildCode(s, n, name); }
 
 async function nextSeriesCode(communityId: string, name = '') {
   const t = await getToolkit(communityId);
@@ -767,5 +754,13 @@ export async function botRoleHandler(req: Request, res: Response) {
     const botRoleId = isSnowflake(req.body?.botRoleId) ? req.body.botRoleId : undefined;
     await saveToolkit(req.params.communityId, { roleRules: { ...t.roleRules, botRoleId } } as any);
     ok(res, { botRoleId: botRoleId || '' });
+  } catch (err) { fail(res, err); }
+}
+
+/** Remove one member's special access from an open review room (dashboard). */
+export async function roomUninviteHandler(req: Request, res: Response) {
+  try {
+    const { reviewRooms } = await import('../services/toolkit/reviewRooms.service.js');
+    ok(res, await reviewRooms.removeAccessFromDashboard(req.params.communityId, req.params.roomId, req.params.userId, (req as any).user?.userId));
   } catch (err) { fail(res, err); }
 }
