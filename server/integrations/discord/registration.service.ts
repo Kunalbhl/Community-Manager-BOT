@@ -117,13 +117,15 @@ export async function registerSlashCommands(guildId?: string): Promise<CommandRe
         return lastSyncResult;
       }
 
+      // Global commands already cover every server; a server copy would show each command twice.
       await rest.put(
         Routes.applicationGuildCommands(applicationId, guildId),
-        { body: commandData }
+        { body: [] }
       );
+      await rest.put(Routes.applicationCommands(applicationId), { body: commandData });
 
       const verifiedRemote = (await rest.get(
-        Routes.applicationGuildCommands(applicationId, guildId)
+        Routes.applicationCommands(applicationId)
       )) as any[];
 
       const registeredNames = Array.isArray(verifiedRemote) ? verifiedRemote.map((cmd: any) => cmd.name) : [];
@@ -152,24 +154,20 @@ export async function registerSlashCommands(guildId?: string): Promise<CommandRe
 
       const registeredNames = Array.isArray(verifiedRemote) ? verifiedRemote.map((cmd: any) => cmd.name) : [];
 
-      // Check if there are connected/linked real guilds to also ensure guild-level instant registration
+      // Commands are global only. Older versions also registered a copy per server, which made
+      // every command show twice; remove those server copies.
       try {
-        const linkedCommunities = await communitiesRepository.list({});
-        for (const comm of linkedCommunities) {
-          if (comm.guildId && comm.guildId !== 'DEV_GUILD_ID' && comm.connectionStatus === 'CONNECTED') {
-            try {
-              await rest.put(
-                Routes.applicationGuildCommands(applicationId, comm.guildId),
-                { body: commandData }
-              );
-              logger.info(`[DiscordSlash] Synchronized ${commandData.length} guild-scoped commands to active community guild ${comm.guildId}`);
-            } catch (gErr: any) {
-              logger.warn(`[DiscordSlash] Guild command sync warning for ${comm.guildId}: ${gErr.message}`);
-            }
+        const { discordService } = await import('./discord.service.js');
+        const guildIds = Array.from(((discordService as any).client?.guilds?.cache?.keys?.() || []) as Iterable<string>);
+        for (const gid of guildIds) {
+          const existing = (await rest.get(Routes.applicationGuildCommands(applicationId, gid)).catch(() => [])) as any[];
+          if (Array.isArray(existing) && existing.length) {
+            await rest.put(Routes.applicationGuildCommands(applicationId, gid), { body: [] }).catch(() => undefined);
+            logger.info(`[DiscordSlash] Removed ${existing.length} duplicate server-only commands in ${gid}`);
           }
         }
-      } catch (dbErr: any) {
-        logger.warn(`[DiscordSlash] Database lookup notice during command sync: ${dbErr.message}`);
+      } catch (gErr: any) {
+        logger.warn(`[DiscordSlash] Could not clear server-only command copies: ${gErr.message}`);
       }
 
       logger.info(`[DiscordSlash] Successfully registered and verified ${registeredNames.length} global slash commands`);

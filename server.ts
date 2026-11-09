@@ -64,6 +64,21 @@ async function startServer() {
     const ok = getLeadershipStatus().isLeader && discordService.isReady();
     res.status(ok ? 200 : 503).json({ active: ok });
   });
+  // Platform-owner diagnostics: DB latency, connection pool use and the slowest recent requests.
+  app.get('/api/v1/platform/perf', async (req: Request, res: Response) => {
+    try {
+      const { getPoolStats, pingDb } = await import('./server/repositories/postgres.store.js');
+      const sess = (req as any).session || {};
+      const owner = process.env.PLATFORM_OWNER_DISCORD_ID || process.env.PLATFORM_OWNER_USER_ID;
+      if (!owner || (sess.discordUserId || sess.userId) !== owner) {
+        // fall back to the normal auth middleware result when available
+        const u = (req as any).user;
+        if (!u?.isPlatformOwner) return res.status(403).json({ success: false, error: 'Platform owner only' });
+      }
+      res.json({ success: true, data: { db: await pingDb(), pool: getPoolStats(), slow: (globalThis as any).__cmSlow || [], uptimeSec: Math.round(process.uptime()), memoryMb: Math.round(process.memoryUsage().rss / 1048576) } });
+    } catch (err: any) { res.status(500).json({ success: false, error: err.message }); }
+  });
+
   app.get('/health/leader', (_req: Request, res: Response) => {
     res.json({ ...getLeadershipStatus(), discord: discordService.getDiagnostics?.() });
   });
@@ -76,7 +91,10 @@ async function startServer() {
     (res as any).writeHead = function (this: Response, ...args: any[]) {
       const ms = Number(process.hrtime.bigint() - start) / 1e6;
       try { this.setHeader('Server-Timing', `app;dur=${ms.toFixed(0)}`); } catch { /* headers already sent */ }
-      if (ms > 1500) console.warn(`[Slow API] ${req.method} ${req.originalUrl.split('?')[0]} ${ms.toFixed(0)} ms`);
+      if (ms > 1500) {
+        console.warn(`[Slow API] ${req.method} ${req.originalUrl.split('?')[0]} ${ms.toFixed(0)} ms`);
+        (globalThis as any).__cmSlow = [{ at: new Date().toISOString(), method: req.method, path: req.originalUrl.split('?')[0], ms: Math.round(ms), status: res.statusCode }, ...((globalThis as any).__cmSlow || [])].slice(0, 50);
+      }
       return (writeHead as any).apply(this, args);
     };
     next();
