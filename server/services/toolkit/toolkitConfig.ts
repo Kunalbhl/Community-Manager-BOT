@@ -40,6 +40,8 @@ export interface ToolkitConfig {
 export interface RecruitmentDiscordConfig {
   applyEnabled: boolean;
   askRecruiterCode: boolean;
+  /** When asking for a code, applicants must enter one. */
+  codeRequired?: boolean;
   reviewChannelId?: string;
   logChannelId?: string;
   notifyRecruiter: boolean;

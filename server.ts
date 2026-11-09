@@ -69,6 +69,18 @@ async function startServer() {
   });
 
   // Standby instances forward API calls to the active bot (must run before body parsing).
+  // Response timing: Server-Timing header on every API call, and a log line for slow ones.
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    const start = process.hrtime.bigint();
+    const writeHead = res.writeHead;
+    (res as any).writeHead = function (this: Response, ...args: any[]) {
+      const ms = Number(process.hrtime.bigint() - start) / 1e6;
+      try { this.setHeader('Server-Timing', `app;dur=${ms.toFixed(0)}`); } catch { /* headers already sent */ }
+      if (ms > 1500) console.warn(`[Slow API] ${req.method} ${req.originalUrl.split('?')[0]} ${ms.toFixed(0)} ms`);
+      return (writeHead as any).apply(this, args);
+    };
+    next();
+  });
   app.use('/api', sameOriginGuard);
   app.use('/api', leaderProxy());
 
