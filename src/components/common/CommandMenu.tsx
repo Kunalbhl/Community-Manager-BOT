@@ -1,3 +1,4 @@
+import { MODULES } from '../modules/ModuleView.js';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Search,
@@ -67,6 +68,23 @@ const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string
 };
 
 const RECENT_SEARCHES_KEY = 'cr_universal_search_recents_v1';
+
+/** Every module tab is searchable by its name and description (e.g. "blacklist", "birthday", "codes"). */
+function pageMatches(q: string): SearchResultItem[] {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const out: SearchResultItem[] = [];
+  for (const m of Object.values(MODULES)) {
+    for (const t of m.tabs) {
+      const hay = `${m.title} ${t.label} ${t.hint}`.toLowerCase();
+      if (words.every((w) => hay.includes(w))) {
+        const inTitle = words.every((w) => `${m.title} ${t.label}`.toLowerCase().includes(w));
+        out.push({ id: `page:${m.id}:${t.id}`, resourceId: `${m.id}:${t.id}`, type: 'NAVIGATION' as any, category: 'Navigation' as any, title: `${m.title} → ${t.label}`, subtitle: t.hint, route: m.id, score: inTitle ? 100 : 60, metadata: { moduleTab: t.id } });
+      }
+    }
+  }
+  return out.sort((a, b) => b.score - a.score).slice(0, 8);
+}
 
 export const CommandMenu: React.FC<CommandMenuProps> = ({
   isOpen,
@@ -146,7 +164,8 @@ export const CommandMenu: React.FC<CommandMenuProps> = ({
 
     setLoading(true);
 
-    const isPlatformSearch = portalMode === 'PLATFORM_ADMIN' || currentRole === 'PLATFORM_OWNER';
+    // Search the open server; only the platform admin area searches across the platform.
+    const isPlatformSearch = portalMode === 'PLATFORM_ADMIN' || !communityId;
     const endpoint = isPlatformSearch
       ? `/api/v1/platform/search?q=${encodeURIComponent(query)}&limit=35`
       : `/api/v1/search?q=${encodeURIComponent(query)}&communityId=${encodeURIComponent(communityId)}&limit=35`;
@@ -163,8 +182,9 @@ export const CommandMenu: React.FC<CommandMenuProps> = ({
         .then((res) => res.json())
         .then((data: SearchResponse) => {
           if (data && Array.isArray(data.results)) {
-            setSearchResults(data.results);
-            setGroupedResults((data.groupedResults as any) || {});
+            const pages = isPlatformSearch ? [] : pageMatches(query);
+            setSearchResults([...pages, ...data.results]);
+            setGroupedResults(pages.length ? { Navigation: [...pages, ...(((data.groupedResults as any) || {}).Navigation || [])], ...Object.fromEntries(Object.entries((data.groupedResults as any) || {}).filter(([k]) => k !== 'Navigation')) } : (data.groupedResults as any) || {});
             setAvailableCategories(data.categories || []);
             setSearchTimeMs(data.searchTimeMs || null);
             setSelectedIndex(0);
@@ -239,6 +259,7 @@ export const CommandMenu: React.FC<CommandMenuProps> = ({
       if (item.category === 'Platform' && onNavigatePlatform) {
         onNavigatePlatform(item.route as PlatformSection);
       } else {
+        if (item.metadata?.moduleTab) { try { sessionStorage.setItem('cm_open_tab', item.metadata.moduleTab); } catch { /* ignore */ } }
         onNavigate(item.route as CommunitySection);
       }
 

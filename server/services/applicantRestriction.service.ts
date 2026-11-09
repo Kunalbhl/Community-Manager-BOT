@@ -46,6 +46,22 @@ export class ApplicantRestrictionService {
     usernameCandidate?: string,
     gameAliases?: string[]
   ): Promise<RiskEvaluationResult> {
+    // 0. Moderation → Blacklist (the list staff manage in the dashboard). Active, unexpired entries block applying.
+    if (discordUserId && discordUserId.trim()) {
+      try {
+        const { blacklistEntriesRepository } = await import('../repositories/index.js');
+        const entry: any = await (blacklistEntriesRepository as any).getById(`${communityId}_${discordUserId.trim()}`).catch(() => null);
+        if (entry && entry.status === 'ACTIVE' && (!entry.expiresAt || new Date(entry.expiresAt) > new Date())) {
+          return {
+            riskStatus: 'BLACKLISTED',
+            matchType: 'EXACT_DISCORD_ID',
+            alertBanner: `BLACKLIST USER ALERT: This person is on the server blacklist${entry.expiresAt ? ` until ${new Date(entry.expiresAt).toDateString()}` : ''}. Reason: ${entry.reason}`,
+            restriction: entry,
+          } as any;
+        }
+      } catch { /* fall through to restriction checks */ }
+    }
+
     // 1. Authoritative check on Discord User ID within tenant
     if (discordUserId && discordUserId.trim()) {
       const exactMatches = await applicantRestrictionsRepository.list({

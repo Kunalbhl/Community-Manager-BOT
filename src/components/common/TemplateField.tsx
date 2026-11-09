@@ -1,5 +1,6 @@
-import React, { useRef } from 'react';
-import { MessageComposer } from './MessageComposer.js';
+import React from 'react';
+import { MessageComposer, mentionsToNames } from './MessageComposer.js';
+import { useDiscordResources } from './DiscordPickers.js';
 
 export interface TemplateVar { token: string; label: string; sample: string }
 
@@ -10,32 +11,16 @@ export interface TemplateVar { token: string; label: string; sample: string }
 export function TemplateField({ value, onChange, vars, rows = 3, label, braces = 'single' }: {
   value: string; onChange: (v: string) => void; vars: TemplateVar[]; rows?: number; label?: string; braces?: 'single' | 'double';
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const res: any = useDiscordResources();
   const wrap = (t: string) => (braces === 'double' ? `{{${t}}}` : `{${t}}`);
-  const insert = (t: string) => {
-    const el = ref.current;
-    const text = wrap(t);
-    if (!el) return onChange(`${value}${text}`);
-    const start = el.selectionStart ?? value.length;
-    const end = el.selectionEnd ?? value.length;
-    onChange(value.slice(0, start) + text + value.slice(end));
-    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(start + text.length, start + text.length); });
-  };
-  let preview = value || '';
+  let preview = mentionsToNames(value || '', res);
   for (const v of vars) preview = preview.split(wrap(v.token)).join(v.sample);
-  preview = preview.replace(/\\n/g, '\n').replace(/\*\*(.+?)\*\*/g, '$1');
+  preview = preview.replace(/\\n/g, '\n').replace(/\*\*(.+?)\*\*/g, '$1').replace(/<a?:(\w+):\d+>/g, ':$1:');
   return (
     <div>
       {label && <div className="mb-1 text-sm font-medium text-slate-700">{label}</div>}
-      <MessageComposer textareaRef={ref} rows={rows} value={value} onChange={onChange} maxLength={4000} />
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        <span className="text-xs text-slate-500">Insert:</span>
-        {vars.map((v) => (
-          <button key={v.token} type="button" onClick={() => insert(v.token)} title={`Example: ${v.sample}`}
-            className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-100">{v.label}</button>
-        ))}
-      </div>
-      <div className="mt-2 whitespace-pre-line rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"><span className="font-semibold text-slate-500">Preview: </span>{preview || '—'}</div>
+      <MessageComposer rows={rows} value={value} onChange={onChange} maxLength={4000} vars={vars.map((v) => ({ token: v.token, label: v.label, wrap: wrap(v.token) }))} />
+      <div className="mt-2 whitespace-pre-line rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"><span className="font-semibold text-slate-500">Preview with example values: </span>{preview || '—'}</div>
     </div>
   );
 }
