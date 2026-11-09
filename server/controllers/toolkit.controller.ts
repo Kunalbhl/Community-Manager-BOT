@@ -22,7 +22,7 @@ const int = (v: unknown, min: number, max: number, def: number) => {
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
 };
 const url = (v: unknown) => { const x = str(v, 500); return /^https:\/\/\S+$/i.test(x) ? x : ''; };
-function cleanPanel(p: any, cur: any) {
+function cleanPanel(p: any, cur: any): any {
   const e = p?.embed || {};
   return {
     style: p?.style === 'BUTTONS' ? 'BUTTONS' : 'DROPDOWN',
