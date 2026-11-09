@@ -1,5 +1,5 @@
 import React from 'react';
-import { useDiscordResources } from './DiscordPickers.js';
+import { useDiscordResources, normName } from './DiscordPickers.js';
 
 interface DiscordChannelPickerProps {
   id?: string; guildId?: string; communityId?: string; value?: string;
@@ -13,7 +13,7 @@ export const DiscordChannelPicker: React.FC<DiscordChannelPickerProps> = ({ id, 
   const res = useDiscordResources(communityId || (guildId ? `comm_${guildId}` : undefined));
   const list = res?.textChannels || [];
   const v = String(value || '').replace(/^#/, '');
-  const match = list.find((c) => c.id === v || c.name === v);
+  const match = list.find((c) => c.id === v || c.name === v) || list.find((c) => normName(c.name) === normName(v));
   return (
     <div className={className}>
       {label && <label htmlFor={id} className="mb-1 block text-xs font-medium text-slate-700">{label}</label>}
@@ -21,7 +21,7 @@ export const DiscordChannelPicker: React.FC<DiscordChannelPickerProps> = ({ id, 
         onChange={(e) => { const c = list.find((x) => x.id === e.target.value); onChange(c?.id || '', c?.name); }}
         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none">
         <option value="">{res ? placeholder : 'Loading channels…'}</option>
-        {value && !match && <option value="" disabled>{`#${v} (not found in server)`}</option>}
+        {value && !match && <option value="" disabled>{`#${v} (no longer in the server, pick another)`}</option>}
         {list.map((c) => <option key={c.id} value={c.id}>#{c.name}</option>)}
       </select>
     </div>

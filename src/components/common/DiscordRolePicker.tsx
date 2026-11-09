@@ -1,5 +1,5 @@
 import React from 'react';
-import { useDiscordResources } from './DiscordPickers.js';
+import { useDiscordResources, normName } from './DiscordPickers.js';
 
 interface DiscordRolePickerProps {
   id?: string; guildId?: string; communityId?: string; value?: string;
@@ -13,7 +13,7 @@ export const DiscordRolePicker: React.FC<DiscordRolePickerProps> = ({ id, guildI
   const res = useDiscordResources(communityId || (guildId ? `comm_${guildId}` : undefined));
   const list = res?.roles || [];
   const v = String(value || '').replace(/^@/, '');
-  const match = list.find((r) => r.id === v || r.name === v);
+  const match = list.find((r) => r.id === v || r.name === v) || list.find((r) => normName(r.name) === normName(v));
   return (
     <div className={className}>
       {label && <label htmlFor={id} className="mb-1 block text-xs font-medium text-slate-700">{label}</label>}

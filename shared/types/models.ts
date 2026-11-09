@@ -1836,18 +1836,33 @@ export interface MessageTemplate {
   name: string;
   content: string;
   variables: string[];
+  /** Free-form grouping, e.g. Announcement, Recruitment, Promotion. */
+  category?: string;
   createdAt: string;
   updatedAt: string;
 }
+
+export type CampaignFrequency = 'ONCE' | 'HOURLY' | 'DAILY' | 'WEEKLY' | 'MONTHLY';
 
 export interface Campaign {
   id: string;
   communityId: string;
   name: string;
-  targetAudience: 'ALL' | 'MEMBERS' | 'RECRUITERS' | 'APPLICANTS';
+  /** CHANNEL = post in a channel; ALL / ROLE / MEMBERS = private messages. */
+  targetAudience: 'ALL' | 'MEMBERS' | 'RECRUITERS' | 'APPLICANTS' | 'CHANNEL' | 'ROLE';
+  channelId?: string;
+  roleId?: string;
+  memberIds?: string[];
   message: string;
   scheduledAt?: string;
-  status: 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'COMPLETED' | 'FAILED';
+  frequency?: CampaignFrequency;
+  /** Every N units of the frequency (e.g. every 2 days). */
+  interval?: number;
+  endAt?: string;
+  maxRuns?: number;
+  runCount?: number;
+  lastRunAt?: string;
+  status: 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'PROCESSING' | 'PAUSED' | 'COMPLETED' | 'FAILED';
   deliveryAuditCount?: number;
   createdAt: string;
   updatedAt: string;
@@ -1857,7 +1872,11 @@ export interface Reminder {
   id: string;
   communityId: string;
   triggerAt: string;
+  /** MEMBER = private message to targetUser; CHANNEL = post in channelId. */
+  targetType?: 'MEMBER' | 'CHANNEL';
   targetUser: string;
+  channelId?: string;
+  recurrence?: 'ONCE' | 'DAILY' | 'WEEKLY';
   message: string;
   status: 'PENDING' | 'SENT' | 'FAILED';
   createdAt: string;
@@ -1873,6 +1892,13 @@ export interface Poll {
   votedUserIds: string[];
   channelId: string;
   durationMinutes: number;
+  /** Native Discord poll message. */
+  messageId?: string;
+  endsAt?: string;
+  allowMultiselect?: boolean;
+  /** What happens when it ends: post the result in the channel, or nothing. */
+  afterAction?: 'ANNOUNCE' | 'NONE';
+  results?: { text: string; votes: number }[];
   status: 'ACTIVE' | 'CLOSED';
   createdAt: string;
   updatedAt: string;

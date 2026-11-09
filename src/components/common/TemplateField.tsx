@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { MessageComposer } from './MessageComposer.js';
 
 export interface TemplateVar { token: string; label: string; sample: string }
 
@@ -26,7 +27,7 @@ export function TemplateField({ value, onChange, vars, rows = 3, label, braces =
   return (
     <div>
       {label && <div className="mb-1 text-sm font-medium text-slate-700">{label}</div>}
-      <textarea ref={ref} rows={rows} value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+      <MessageComposer textareaRef={ref} rows={rows} value={value} onChange={onChange} maxLength={4000} />
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
         <span className="text-xs text-slate-500">Insert:</span>
         {vars.map((v) => (

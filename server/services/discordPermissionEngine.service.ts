@@ -65,6 +65,9 @@ export const AUTHORITATIVE_BOT_PERMISSIONS = [
   PermissionFlagsBits.ModerateMembers,
   PermissionFlagsBits.ManageNicknames,
   PermissionFlagsBits.ViewAuditLog,
+  // Engagement: native Discord polls; per-server bot name
+  PermissionFlagsBits.SendPolls,
+  PermissionFlagsBits.ChangeNickname,
 ] as const;
 
 export function buildAuthoritativeInstallPermissions(): bigint {

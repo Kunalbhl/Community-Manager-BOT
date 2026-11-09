@@ -62,6 +62,8 @@ export const AUTHORITATIVE_DISCORD_PERMISSIONS = {
   ModerateMembers: 1099511627776n,
   ManageNicknames: 134217728n,
   ViewAuditLog: 128n,
+  SendPolls: 562949953421312n,
+  ChangeNickname: 67108864n,
 };
 
 export function buildAuthoritativeInstallPermissions(): string {
