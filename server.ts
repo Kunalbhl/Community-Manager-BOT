@@ -64,21 +64,6 @@ async function startServer() {
     const ok = getLeadershipStatus().isLeader && discordService.isReady();
     res.status(ok ? 200 : 503).json({ active: ok });
   });
-  // Platform-owner diagnostics: DB latency, connection pool use and the slowest recent requests.
-  app.get('/api/v1/platform/perf', async (req: Request, res: Response) => {
-    try {
-      const { getPoolStats, pingDb } = await import('./server/repositories/postgres.store.js');
-      const sess = (req as any).session || {};
-      const owner = process.env.PLATFORM_OWNER_DISCORD_ID || process.env.PLATFORM_OWNER_USER_ID;
-      if (!owner || (sess.discordUserId || sess.userId) !== owner) {
-        // fall back to the normal auth middleware result when available
-        const u = (req as any).user;
-        if (!u?.isPlatformOwner) return res.status(403).json({ success: false, error: 'Platform owner only' });
-      }
-      res.json({ success: true, data: { db: await pingDb(), pool: getPoolStats(), slow: (globalThis as any).__cmSlow || [], uptimeSec: Math.round(process.uptime()), memoryMb: Math.round(process.memoryUsage().rss / 1048576) } });
-    } catch (err: any) { res.status(500).json({ success: false, error: err.message }); }
-  });
-
   app.get('/health/leader', (_req: Request, res: Response) => {
     res.json({ ...getLeadershipStatus(), discord: discordService.getDiagnostics?.() });
   });
@@ -109,6 +94,15 @@ async function startServer() {
 
   // Authenticate request context
   app.use(authenticate);
+  // Platform-owner diagnostics: DB latency, connection pool use and the slowest recent requests.
+  app.get('/api/v1/platform/perf', async (req: Request, res: Response) => {
+    try {
+      const { getPoolStats, pingDb } = await import('./server/repositories/postgres.store.js');
+      if (!(req as any).user?.isPlatformOwner) return res.status(403).json({ success: false, error: 'Platform owner only' });
+      res.json({ success: true, data: { db: await pingDb(), pool: getPoolStats(), slow: (globalThis as any).__cmSlow || [], uptimeSec: Math.round(process.uptime()), memoryMb: Math.round(process.memoryUsage().rss / 1048576) } });
+    } catch (err: any) { res.status(500).json({ success: false, error: err.message }); }
+  });
+
 
   // Mount versioned and unversioned API routes
   app.use('/api/v1', v1Router);
