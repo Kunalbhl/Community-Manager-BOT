@@ -100,7 +100,9 @@ export async function saveToolkitSectionHandler(req: Request, res: Response) {
       const m = b.messages || {};
       const cur = current.recruitment;
       patch = { recruitment: {
+        ...cur, // keep settings this form doesn't edit (code series, sheet access, etc.)
         applyEnabled: Boolean(b.applyEnabled), askRecruiterCode: Boolean(b.askRecruiterCode), dmOnReceived: Boolean(b.dmOnReceived),
+        codeRequired: b.codeRequired !== undefined ? Boolean(b.codeRequired) : (cur as any).codeRequired,
         reviewChannelId: isSnowflake(b.reviewChannelId) ? b.reviewChannelId : undefined,
         announceChannelId: isSnowflake(b.announceChannelId) ? b.announceChannelId : undefined,
         pingRoleIds: ids(b.pingRoleIds), reviewerRoleIds: ids(b.reviewerRoleIds),
@@ -669,4 +671,18 @@ export async function integrationsStatusHandler(req: Request, res: Response) {
       ai: { configured: Boolean(process.env.GEMINI_API_KEY) },
     });
   } catch (err) { fail(res, err, 500); }
+}
+
+/** The basic recruitment switches (used by Recruitment → Settings). */
+export async function recruitmentBasicsHandler(req: Request, res: Response) {
+  try {
+    const t = await getToolkit(req.params.communityId);
+    const b = req.body || {};
+    const rec: any = { ...t.recruitment };
+    if (b.applyEnabled !== undefined) rec.applyEnabled = Boolean(b.applyEnabled);
+    if (b.askRecruiterCode !== undefined) rec.askRecruiterCode = Boolean(b.askRecruiterCode);
+    if (b.codeRequired !== undefined) rec.codeRequired = Boolean(b.codeRequired);
+    await saveToolkit(req.params.communityId, { recruitment: rec });
+    ok(res, { applyEnabled: rec.applyEnabled, askRecruiterCode: rec.askRecruiterCode, codeRequired: !!rec.codeRequired });
+  } catch (err) { fail(res, err); }
 }

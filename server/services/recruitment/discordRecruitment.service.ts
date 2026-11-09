@@ -45,7 +45,7 @@ function pagesFor(questions: any[], askCode: boolean) {
   return { pages, codePage: askCode ? pages.length - 1 : -1 };
 }
 
-function modalFor(page: number, total: number, qs: any[], withCode: boolean, prev: Session | undefined) {
+function modalFor(page: number, total: number, qs: any[], withCode: boolean, prev: Session | undefined, codeRequired = false) {
   const modal = new ModalBuilder().setCustomId(`cm:apply:page:${page}`).setTitle(clip(total > 1 ? `Application (${page + 1}/${total})` : 'Application', 45));
   for (const q of qs) {
     const options = Array.isArray(q.options) && q.options.length ? ` Options: ${q.options.join(', ')}` : '';
@@ -64,7 +64,7 @@ function modalFor(page: number, total: number, qs: any[], withCode: boolean, pre
   }
   if (withCode) {
     modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(
-      new TextInputBuilder().setCustomId('code').setLabel('Recruiter code (optional)').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(40).setPlaceholder('Leave empty if nobody referred you'),
+      new TextInputBuilder().setCustomId('code').setLabel(codeRequired ? 'Recruiter code' : 'Recruiter code (optional)').setStyle(TextInputStyle.Short).setRequired(!!codeRequired).setMaxLength(40).setPlaceholder(codeRequired ? 'The code from the person who invited you' : 'Leave empty if nobody referred you'),
     ));
   }
   return modal;
@@ -107,7 +107,7 @@ export const discordRecruitment = {
     const session: Session = prev && Date.now() - prev.at < 30 * 60_000 ? { ...prev, page: 0 } : { communityId, page: 0, answers: {}, at: Date.now() };
     sessions.set(key, session);
     const { pages, codePage } = pagesFor(qs, cfg.askRecruiterCode);
-    return interaction.showModal(modalFor(0, pages.length, pages[0], codePage === 0, session));
+    return interaction.showModal(modalFor(0, pages.length, pages[0], codePage === 0, session, !!cfg.codeRequired));
   },
 
   /** "Continue" button between pages. */
@@ -118,7 +118,7 @@ export const discordRecruitment = {
     const cfg = (await getToolkit(session.communityId)).recruitment;
     const { pages, codePage } = pagesFor(await questionsFor(session.communityId), cfg.askRecruiterCode);
     if (page >= pages.length) return interaction.reply({ content: 'Something went wrong. Press **Apply** to start again.', ephemeral: true });
-    return interaction.showModal(modalFor(page, pages.length, pages[page], codePage === page, session));
+    return interaction.showModal(modalFor(page, pages.length, pages[page], codePage === page, session, !!cfg.codeRequired));
   },
 
   /** A page was submitted: save answers, then show "Continue" or submit. */
@@ -146,6 +146,8 @@ export const discordRecruitment = {
 
     await interaction.deferReply({ ephemeral: true });
     try {
+      const rc = (await getToolkit(session.communityId)).recruitment;
+      if (rc.askRecruiterCode && rc.codeRequired && !session.code) throw new Error('A recruiter code is required in this server. Ask the person who invited you for their code.');
       const { applicationWorkflowService } = await import('../applicationWorkflow.service.js');
       const member: any = interaction.member;
       await applicationWorkflowService.submitApplication({

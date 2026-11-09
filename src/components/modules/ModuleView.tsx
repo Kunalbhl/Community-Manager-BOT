@@ -19,6 +19,7 @@ import { ConnectionCenterView } from '../views/community/ConnectionCenterView.js
 import { WelcomeRulesView } from '../views/community/WelcomeRulesView.js';
 import { ServerSettingsView } from '../views/community/ServerSettingsView.js';
 import { RecruiterCodesManager } from '../views/community/RecruiterCodesManager.js';
+import { RecruitmentSettingsView } from '../views/community/RecruitmentSettingsView.js';
 
 export interface ModuleCtx { communityId: string; currentRole: any; canEdit: boolean }
 interface TabDef { id: string; label: string; icon: any; hint: string; render: (c: ModuleCtx) => React.ReactNode }
@@ -36,7 +37,7 @@ export const MODULES: Record<string, ModuleDef> = {
       { id: 'rooms', label: 'Review rooms', icon: DoorOpen, hint: 'A private chat per application, a temporary voice room and escalation by rank.', render: (c) => <ServerToolsView communityId={c.communityId} only="rooms" /> },
       { id: 'recruiters', label: 'Recruiters & codes', icon: ClipboardList, hint: 'Recruiter codes, naming series, import and export, and each code’s history.', render: (c) => <RecruiterCodesManager communityId={c.communityId} /> },
       { id: 'rewards', label: 'Rewards', icon: Gift, hint: 'Benefits recruiters earn for members they bring in.', render: (c) => <ApplicationsView embedded communityId={c.communityId} currentRole={c.currentRole} initialTab="benefits" /> },
-      { id: 'settings', label: 'Settings', icon: SettingsIcon, hint: 'What the apply flow requires, the assistant’s name and the quiz pass mark.', render: (c) => <CommunitySettingsView communityId={c.communityId} currentRole={c.currentRole} only="recruitment" /> },
+      { id: 'settings', label: 'Settings', icon: SettingsIcon, hint: 'Open or close applications, recruiter codes on the form, the quiz pass mark and the recruiter credit announcement.', render: (c) => <RecruitmentSettingsView communityId={c.communityId} /> },
     ],
   },
   members: {
