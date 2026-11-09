@@ -935,11 +935,27 @@ export class UsageService {
   }
 }
 
+const planCache = new Map<string, { value: any; until: number }>();
+const overrideCache = new Map<string, { value: any[]; until: number }>();
+
 export class EntitlementService {
   /**
    * Resolve plan for community (default: FREE, NOT_CONFIGURED)
    */
   static async getPlan(communityId: string): Promise<CommunityPlan> {
+    // Plans change rarely; checking many features at once must not hit the database each time.
+    const hit = planCache.get(communityId);
+    if (hit && hit.until > Date.now()) return hit.value;
+    const value = await this.loadPlan(communityId);
+    planCache.set(communityId, { value, until: Date.now() + 60_000 });
+    return value;
+  }
+
+  static clearPlanCache(communityId?: string) {
+    if (communityId) { planCache.delete(communityId); overrideCache.delete(communityId); } else { planCache.clear(); overrideCache.clear(); }
+  }
+
+  private static async loadPlan(communityId: string): Promise<CommunityPlan> {
     const plans = await communityPlansRepository.listForTenant(communityId);
     if (plans.length > 0) {
       const p = plans[0];
@@ -973,7 +989,7 @@ export class EntitlementService {
       throw new BadRequestError(`Invalid plan value [${newPlan}]. Must be one of: FREE, PRO, BUSINESS, ENTERPRISE`);
     }
 
-    let planObj = await this.getPlan(communityId);
+    let planObj = { ...(await this.getPlan(communityId)) };
     planObj.plan = newPlan as PlanType;
     planObj.updatedAt = new Date().toISOString();
 
@@ -981,6 +997,7 @@ export class EntitlementService {
       plan: newPlan as PlanType,
       updatedAt: planObj.updatedAt,
     });
+    this.clearPlanCache(communityId);
 
     return planObj;
   }
@@ -1024,8 +1041,13 @@ export class EntitlementService {
     const planObj = await this.getPlan(communityId);
     const plan = planObj.plan as PlanType;
 
-    // Check custom overrides
-    const overrides = await featureEntitlementsRepository.listForTenant(communityId);
+    // Check custom overrides (cached briefly; see getPlan)
+    let ov = overrideCache.get(communityId);
+    if (!ov || ov.until < Date.now()) {
+      ov = { value: await featureEntitlementsRepository.listForTenant(communityId), until: Date.now() + 60_000 };
+      overrideCache.set(communityId, ov);
+    }
+    const overrides = ov.value;
     const override = overrides.find(o => o.featureKey === featureKey);
     if (override && !override.enabled) {
       return {
