@@ -68,7 +68,7 @@ export const rewardCommand: SlashCommandDefinition = {
           try { const r = await wallet.claim(c, { itemId: item.id, memberId: u.id, memberName: u.username, amount: interaction.options.getInteger('amount') || 1, forEvent: interaction.options.getString('for') || '', by: interaction.user.username, byStaff: true }); out.push(`✅ ${u} · ${r.left} left`); }
           catch (e: any) { out.push(`⚠️ ${u} · ${e.message}`); }
         }
-        await interaction.reply({ content: `${item.emoji} **${item.name}** used:\n${out.join('\n')}`, allowedMentions: { parse: [] } });
+        await interaction.reply({ content: `${item.emoji} **${item.name}** used:\n${out.join('\n')}`, allowedMentions: { parse: [] }, ephemeral: true });
         return;
       }
       if (sub === 'add') {
@@ -76,7 +76,7 @@ export const rewardCommand: SlashCommandDefinition = {
         const u = interaction.options.getUser('member', true);
         await wallet.adjust(c, { itemId: item.id, memberId: u.id, memberName: u.username, amount: interaction.options.getInteger('amount', true), note: interaction.options.getString('reason', true), by: interaction.user.username });
         const b = await wallet.balance(c, u.id, item.id);
-        await interaction.reply({ content: `✏️ Updated ${u}: **${b.available}× ${item.emoji} ${item.name}** available.`, allowedMentions: { parse: [] } });
+        await interaction.reply({ content: `✏️ Updated ${u}: **${b.available}× ${item.emoji} ${item.name}** available.`, allowedMentions: { parse: [] }, ephemeral: true });
         return;
       }
       if (sub === 'panel') {
