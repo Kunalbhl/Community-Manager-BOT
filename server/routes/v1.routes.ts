@@ -393,6 +393,13 @@ router.put(`${tk}/rewards/rules/:ruleId`, requireTenantAccess(), requirePermissi
 router.delete(`${tk}/rewards/rules/:ruleId`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.deleteRuleHandler);
 router.post(`${tk}/rewards/grants/:grantId/:action`, requireTenantAccess(), requirePermission('community.manage'), Rewards.grantActionHandler);
 router.post(`${tk}/rewards/credits`, requireTenantAccess(), requirePermission('community.manage'), Rewards.creditHandler);
+router.get(`${tk}/rewards/wallet`, requireTenantAccess(), requirePermission('community.view'), Rewards.walletHandler);
+router.post(`${tk}/rewards/items`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.saveItemHandler);
+router.put(`${tk}/rewards/items/:itemId`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.saveItemHandler);
+router.post(`${tk}/rewards/items/:itemId/panel`, requireTenantAccess(), requirePermission('community.manage'), Rewards.panelHandler);
+router.post(`${tk}/rewards/wallet/adjust`, requireTenantAccess(), requirePermission('community.manage'), Rewards.adjustHandler);
+router.post(`${tk}/rewards/wallet/use`, requireTenantAccess(), requirePermission('community.manage'), Rewards.useHandler);
+router.post(`${tk}/rewards/wallet/tx/:txId/:action`, requireTenantAccess(), requirePermission('community.manage'), Rewards.decideHandler);
 router.post(`${tk}/rewards/evaluate`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.evaluateHandler);
 router.put(`${tk}/settings/:section`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.saveToolkitSectionHandler);
 router.post(`${tk}/tickets/panel`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.postTicketPanelHandler);

@@ -12,6 +12,13 @@ import { discordRecruitment } from '../../services/recruitment/discordRecruitmen
 
 export async function handleToolkitInteraction(interaction: any): Promise<boolean> {
   if (interaction.isAutocomplete?.()) {
+    if (interaction.commandName === 'reward') {
+      const { wallet } = await import('../../services/rewards/wallet.service.js');
+      const q = String(interaction.options.getFocused() || '').toLowerCase();
+      const items = await wallet.items(await communityForGuild(interaction.guildId), true);
+      await interaction.respond(items.filter((i) => i.name.toLowerCase().includes(q)).slice(0, 25).map((i) => ({ name: `${i.emoji} ${i.name}`.slice(0, 100), value: i.id }))).catch(() => undefined);
+      return true;
+    }
     if (interaction.commandName === 'warn') {
       await warnAutocomplete(interaction, await communityForGuild(interaction.guildId));
       return true;
@@ -22,6 +29,40 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
   const id: string = interaction.customId || '';
   if (!id.startsWith('cm:')) return false;
   const [, area, action, arg] = id.split(':');
+
+  // ---------- reward wallet: Use buttons, balance, staff approval ----------
+  if (area === 'rw') {
+    const { wallet } = await import('../../services/rewards/wallet.service.js');
+    const communityId = await communityForGuild(interaction.guildId);
+    const rest = id.split(':').slice(3).join(':');
+    const [itemId, evRaw] = rest.split('|');
+    const forEvent = evRaw ? decodeURIComponent(evRaw) : '';
+    try {
+      if (action === 'bal') {
+        const lines = await wallet.describeBalances(communityId, interaction.user.id);
+        await interaction.reply({ content: lines.length ? `**Your rewards**\n${lines.join('\n')}` : 'No rewards yet.', ephemeral: true });
+      } else if (action === 'use1') {
+        const r = await wallet.claim(communityId, { itemId, memberId: interaction.user.id, memberName: interaction.member?.displayName || interaction.user.username, amount: 1, forEvent, by: interaction.user.username, byStaff: false });
+        await interaction.reply({ content: r.pending ? `⏳ Sent to staff for approval. **${r.left}** left after this.` : `✅ Used 1× ${r.item.emoji} ${r.item.name}. **${r.left}** left.`, ephemeral: true });
+      } else if (action === 'usen') {
+        await interaction.showModal(new ModalBuilder().setCustomId(`cm:rw:usem:${rest}`.slice(0, 100)).setTitle('Use rewards').addComponents(
+          new ActionRowBuilder<TextInputBuilder>().addComponents(new TextInputBuilder().setCustomId('n').setLabel('How many?').setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(3).setRequired(true).setValue('2'))));
+      } else if (action === 'usem' && interaction.isModalSubmit()) {
+        const n = Number(interaction.fields.getTextInputValue('n'));
+        const r = await wallet.claim(communityId, { itemId, memberId: interaction.user.id, memberName: interaction.member?.displayName || interaction.user.username, amount: n, forEvent, by: interaction.user.username, byStaff: false });
+        await interaction.reply({ content: r.pending ? `⏳ Sent ${n} to staff for approval. **${r.left}** left after this.` : `✅ Used ${n}× ${r.item.emoji} ${r.item.name}. **${r.left}** left.`, ephemeral: true });
+      } else if (action === 'ok' || action === 'no') {
+        const p = interaction.memberPermissions;
+        if (!(p?.has('ManageGuild') || p?.has('ManageRoles') || p?.has('ModerateMembers'))) { await interaction.reply({ content: '⛔ Only staff can approve.', ephemeral: true }); return true; }
+        const r = await wallet.decide(communityId, rest, action === 'ok', interaction.user.username);
+        await interaction.update({ content: `${action === 'ok' ? '✅ Approved' : '❌ Declined'} by ${interaction.user.username}. <@${r.tx.memberId}> has **${r.available}** left.`, components: [], allowedMentions: { parse: [] } });
+      } else return false;
+    } catch (e: any) {
+      const m = { content: `⚠️ ${e.message}`, ephemeral: true };
+      if (interaction.replied || interaction.deferred) await interaction.followUp(m).catch(() => undefined); else await interaction.reply(m).catch(() => undefined);
+    }
+    return true;
+  }
 
   // ---------- blacklist match alerts: Ban / Kick / Not them ----------
   if (area === 'bl' && ['ban', 'kick', 'clear'].includes(action)) {
