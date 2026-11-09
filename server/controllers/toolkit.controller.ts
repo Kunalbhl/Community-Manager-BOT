@@ -415,21 +415,37 @@ export async function importRulesHandler(req: Request, res: Response) {
     const communityId = req.params.communityId;
     const guild: any = await guildFor(communityId);
     if (!guild) throw new Error('The bot is not connected to this server.');
-    const ch: any = isSnowflake(req.body?.channelId) ? guild.channels.cache.get(req.body.channelId) : guild.rulesChannel;
-    if (!ch?.messages) throw new Error('No rules channel found. Pick the channel that has your rules.');
-    const msgs = Array.from((await ch.messages.fetch({ limit: 20 })).values()).reverse() as any[];
-    const text = msgs.map((m) => [m.content, ...m.embeds.map((e: any) => [e.title, e.description, ...(e.fields || []).map((f: any) => `${f.name}: ${f.value}`)].filter(Boolean).join('\n'))].join('\n')).join('\n');
-    const lines = text.split('\n').map((l: string) => l.replace(/^[\s>*_#`~|•\-–\d.)]+/, '').replace(/[*_`~]/g, '').trim()).filter((l: string) => l.length >= 8 && l.length <= 300);
-    if (!lines.length) throw new Error(`Couldn't find rule text in #${ch.name}.`);
+    const wanted: string[] = (Array.isArray(req.body?.channelIds) ? req.body.channelIds : [req.body?.channelId]).filter(isSnowflake).slice(0, 10);
+    const chans: any[] = wanted.length ? wanted.map((id) => guild.channels.cache.get(id)).filter(Boolean) : [guild.rulesChannel].filter(Boolean);
+    if (!chans.length) throw new Error('No rules channel found. Pick the channel that has your rules.');
+    const compText = (c: any): string[] => [c?.content, c?.data?.content, ...((c?.components || []).flatMap(compText))].filter((x) => typeof x === 'string');
+    const lines: string[] = []; let msgCount = 0; const problems: string[] = [];
+    for (const ch of chans) {
+      if (!ch?.messages) { problems.push(`#${ch?.name} is not a text channel`); continue; }
+      let msgs: any[] = [];
+      try { msgs = Array.from((await ch.messages.fetch({ limit: 50 })).values()).reverse() as any[]; }
+      catch { problems.push(`the bot can't read #${ch.name} (give it View Channel and Read Message History there)`); continue; }
+      msgCount += msgs.length;
+      const text = msgs.map((m) => [m.content, ...m.embeds.map((e: any) => [e.title, e.description, ...(e.fields || []).map((f: any) => `${f.name}: ${f.value}`)].filter(Boolean).join('\n')), ...(m.components || []).flatMap(compText)].filter(Boolean).join('\n')).join('\n');
+      for (const raw of text.split('\n')) {
+        const l = raw.replace(/<a?:\w+:\d+>/g, '').replace(/^[\s>*_#`~|•\-–\d.)]+/, '').replace(/[*_`~]/g, '').trim();
+        if (l.length < 6) continue;
+        if (l.length <= 300) lines.push(l);
+        else lines.push(...(l.match(/[^.!?]+[.!?]?/g) || []).map((x) => x.trim()).filter((x) => x.length >= 6 && x.length <= 300));
+      }
+    }
+    const names = chans.map((c) => '#' + c.name).join(', ');
+    if (!lines.length) throw new Error(problems.length ? `Couldn't import: ${problems.join('; ')}.` : msgCount ? `${names} has ${msgCount} message${msgCount === 1 ? '' : 's'} but no readable text (rules posted as images can't be read). Type them in the box instead.` : `${names} has no messages yet.`);
     const { communityQuestionsService } = await import('../services/communityQuestions.service.js');
     const existing = new Set((await communityQuestionsService.listGuidelines(communityId)).map((g: any) => g.title.toLowerCase()));
     let n = 0;
-    for (const l of lines.slice(0, 25)) {
+    for (const l of lines.slice(0, 40)) {
       const title = l.slice(0, 120);
       if (existing.has(title.toLowerCase())) continue;
+      existing.add(title.toLowerCase());
       await communityQuestionsService.addGuideline(communityId, { title, description: l.length > 120 ? l : '', category: 'RULE', order: existing.size + ++n });
     }
-    ok(res, { added: n, channel: ch.name });
+    ok(res, { added: n, channel: names.replace(/^#/, ''), skipped: problems });
   } catch (err) { fail(res, err); }
 }
 
