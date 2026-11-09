@@ -114,7 +114,7 @@ export const ticketService = {
       .addLabelComponents(
         new LabelBuilder().setLabel('Subject').setTextInputComponent(
           new TextInputBuilder().setCustomId('subject').setStyle(TextInputStyle.Short).setMaxLength(100).setRequired(true)),
-        new LabelBuilder().setLabel('Member(s) involved').setDescription('Pick from this server (optional). Only staff see who you picked.').setUserSelectMenuComponent(
+        new LabelBuilder().setLabel('Member(s) involved').setDescription('Pick members (optional). Bots and apps are ignored. Only staff see this.').setUserSelectMenuComponent(
           new UserSelectMenuBuilder().setCustomId('members').setPlaceholder('Search a member').setMinValues(0).setMaxValues(5).setRequired(false)),
         new LabelBuilder().setLabel('Not in this server?').setDescription('Any name you know: Discord name, game name, or both (optional)').setTextInputComponent(
           new TextInputBuilder().setCustomId('outside').setStyle(TextInputStyle.Short).setMaxLength(200).setRequired(false).setPlaceholder('e.g. ShadowX (in game), @shadow_x')),
