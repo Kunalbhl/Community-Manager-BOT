@@ -109,7 +109,7 @@ export class ApplicationWorkflowService {
       });
 
       throw new ForbiddenError(
-        `Application rejected: Applicant is on the community restriction list (${riskCheck.riskStatus}).`
+        'You can’t apply to this server right now. If you think this is a mistake, please contact the server staff.'
       );
     }
 

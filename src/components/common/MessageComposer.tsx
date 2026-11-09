@@ -13,6 +13,30 @@ import { MemberPick } from '../views/community/ServerToolsView.js';
  * format (<@id>, <@&id>, <#id>) so they work when the bot posts, and the preview shows names.
  */
 
+const memberNameCache = new Map<string, string>();
+const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Discord format (<#id>, <@&id>, <@id>) -> readable (#name, @role, @member). */
+export function mentionsToNames(v: string, res: any) {
+  const chans = [...(res?.textChannels || []), ...(res?.voiceChannels || [])];
+  return String(v || '')
+    .replace(/<#(\d+)>/g, (m, id) => { const c = chans.find((x: any) => x.id === id); return c ? `#${c.name}` : m; })
+    .replace(/<@&(\d+)>/g, (m, id) => { const r = res?.roles?.find((x: any) => x.id === id); return r ? `@${r.name}` : m; })
+    .replace(/<@!?(\d+)>/g, (m, id) => (memberNameCache.has(id) ? `@${memberNameCache.get(id)}` : m));
+}
+
+/** Readable -> Discord format, for every channel, role and known member name (longest names first). */
+function namesToMentions(v: string, res: any) {
+  const tokens: { text: string; raw: string }[] = [
+    ...[...(res?.textChannels || []), ...(res?.voiceChannels || [])].map((c: any) => ({ text: `#${c.name}`, raw: `<#${c.id}>` })),
+    ...(res?.roles || []).map((r: any) => ({ text: `@${r.name}`, raw: `<@&${r.id}>` })),
+    ...Array.from(memberNameCache.entries()).map(([id, n]) => ({ text: `@${n}`, raw: `<@${id}>` })),
+  ].sort((a, b) => b.text.length - a.text.length);
+  let out = v;
+  for (const t of tokens) out = out.replace(new RegExp(`${esc(t.text)}(?![\\p{L}\\p{N}_-])`, 'gu'), t.raw);
+  return out;
+}
+
 interface Template { id: string; name: string; content: string; category?: string }
 
 export function MessageComposer({
@@ -21,7 +45,7 @@ export function MessageComposer({
   value: string; onChange: (v: string) => void; communityId?: string; rows?: number; placeholder?: string;
   maxLength?: number; allowTemplates?: boolean; defaultCategory?: string; textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
   /** Optional variable buttons shown under the box, e.g. {{username}}. */
-  vars?: { token: string; label: string }[];
+  vars?: { token: string; label: string; wrap?: string }[];
 }) {
   const cid = communityId || currentCommunityId();
   const res: any = useDiscordResources(cid);
@@ -32,15 +56,25 @@ export function MessageComposer({
   const [tName, setTName] = useState('');
   const [tCat, setTCat] = useState(defaultCategory || 'General');
   const [note, setNote] = useState('');
-  const [memberNames, setMemberNames] = useState<Record<string, string>>({});
+
+  // The box shows names (#rules, @Moderator, @Aarav); what's saved and sent uses Discord's mention format.
+  const [, rerender] = useState(0);
+  useEffect(() => {
+    const ids = Array.from(String(value || '').matchAll(/<@!?(\d{15,21})>/g)).map((m) => m[1]).filter((id) => !memberNameCache.has(id));
+    if (!ids.length || !cid) return;
+    Promise.all(ids.map((id) => fetch(`/api/v1/communities/${encodeURIComponent(cid)}/discord/member-search?q=${id}`, { credentials: 'include', headers: { 'x-community-id': cid } })
+      .then((r) => r.json()).then((j) => { if (j?.data?.[0]?.name) memberNameCache.set(id, j.data[0].name); }).catch(() => undefined))).then(() => rerender((n) => n + 1));
+  }, [value, cid]);
+  const display = mentionsToNames(value, res);
+  const commit = (shown: string) => onChange(namesToMentions(shown, res).slice(0, maxLength));
 
   const insert = (text: string) => {
     const el = ref.current;
-    const start = el?.selectionStart ?? value.length;
-    const end = el?.selectionEnd ?? value.length;
-    const next = (value.slice(0, start) + text + value.slice(end)).slice(0, maxLength);
-    onChange(next);
-    requestAnimationFrame(() => { if (el) { el.focus(); const p = start + text.length; el.setSelectionRange(p, p); } });
+    const shownText = mentionsToNames(text, res);
+    const start = el?.selectionStart ?? display.length;
+    const end = el?.selectionEnd ?? display.length;
+    commit(display.slice(0, start) + shownText + display.slice(end));
+    requestAnimationFrame(() => { if (el) { el.focus(); const p = start + shownText.length; el.setSelectionRange(p, p); } });
   };
 
   const loadTemplates = () => fetch(`/api/v1/engagement/templates?communityId=${encodeURIComponent(cid)}`, { credentials: 'include', headers: { 'x-community-id': cid } })
@@ -59,13 +93,6 @@ export function MessageComposer({
     setTimeout(() => setNote(''), 4000);
   };
 
-  // Preview: show names instead of raw IDs.
-  const preview = value
-    .replace(/<@&(\d+)>/g, (_, id) => `@${res?.roles?.find((r: any) => r.id === id)?.name || 'role'}`)
-    .replace(/<@!?(\d+)>/g, (_, id) => `@${memberNames[id] || 'member'}`)
-    .replace(/<#(\d+)>/g, (_, id) => `#${[...(res?.textChannels || []), ...(res?.voiceChannels || [])].find((c: any) => c.id === id)?.name || 'channel'}`)
-    .replace(/<a?:(\w+):\d+>/g, ':$1:');
-  const hasMention = preview !== value;
 
   const btn = (key: typeof open, Icon: any, label: string) => (
     <button type="button" title={label} aria-label={label} aria-expanded={open === key}
@@ -122,7 +149,7 @@ export function MessageComposer({
           {open === 'member' && (
             <div className="pr-6">
               <p className="mb-2 text-xs text-slate-500">Search a member to mention them.</p>
-              <MemberPick communityId={cid} value={null} placeholder="Search members" onChange={(m) => { if (m) { setMemberNames((n) => ({ ...n, [m.id]: m.name })); insert(`<@${m.id}> `); setOpen(null); } }} />
+              <MemberPick communityId={cid} value={null} placeholder="Search members" onChange={(m) => { if (m) { memberNameCache.set(m.id, m.name); insert(`<@${m.id}> `); setOpen(null); } }} />
             </div>
           )}
           {(open === 'role' || open === 'channel') && (
@@ -174,20 +201,15 @@ export function MessageComposer({
         </div>
       )}
 
-      <textarea ref={ref} rows={rows} value={value} maxLength={maxLength} placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)} className="block w-full resize-y rounded-b-xl border-0 bg-transparent px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-0" />
+      <textarea ref={ref} rows={rows} value={display} placeholder={placeholder}
+        onChange={(e) => commit(e.target.value)} className="block w-full resize-y rounded-b-xl border-0 bg-transparent px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-0" />
       {!!vars?.length && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-200 px-3 py-2">
           <span className="text-xs font-semibold text-slate-500">Insert:</span>
-          {vars.map((v) => <button key={v.token} type="button" onClick={() => insert(`{{${v.token}}}`)} className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">{v.label}</button>)}
+          {vars.map((v) => <button key={v.token} type="button" onClick={() => insert(v.wrap || `{{${v.token}}}`)} className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">{v.label}</button>)}
         </div>
       )}
-      {(hasMention || note) && (
-        <div className="border-t border-slate-200 px-3 py-2 text-xs">
-          {note && <p className="mb-1 font-semibold text-emerald-700">{note}</p>}
-          {hasMention && <><span className="font-semibold text-slate-500">How it looks in Discord: </span><span className="whitespace-pre-wrap text-slate-700">{preview}</span></>}
-        </div>
-      )}
+      {note && <div className="border-t border-slate-200 px-3 py-2 text-xs font-semibold text-emerald-700">{note}</div>}
     </div>
   );
 }

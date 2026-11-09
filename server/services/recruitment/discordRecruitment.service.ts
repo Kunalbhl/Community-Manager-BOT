@@ -97,8 +97,17 @@ export const discordRecruitment = {
     const { gateRepository } = await import('./secureGate.service.js');
     const gate = await gateRepository.getById(communityId).catch(() => null);
     if (!gate?.verified) return interaction.reply({ content: '🔒 Applications open once the server owner finishes Secure Setup.', ephemeral: true });
-    const [qs, active] = await Promise.all([questionsFor(communityId), applicationsRepository.list({ where: [{ field: 'communityId', operator: '==', value: communityId }, { field: 'applicantDiscordUserId', operator: '==', value: interaction.user.id }] } as any).catch(() => [])]);
+    const { applicantRestrictionService } = await import('../applicantRestriction.service.js');
+    const [qs, active, risk] = await Promise.all([
+      questionsFor(communityId),
+      applicationsRepository.list({ where: [{ field: 'communityId', operator: '==', value: communityId }, { field: 'applicantDiscordUserId', operator: '==', value: interaction.user.id }] } as any).catch(() => []),
+      applicantRestrictionService.checkApplicantRisk(communityId, interaction.user.id, interaction.user.username).catch(() => null),
+    ]);
     if (!qs.length) return interaction.reply({ content: '⚠️ This server has not set up its application questions yet. Please tell the staff.', ephemeral: true });
+    {
+      // Blacklisted people are told before they fill the form.
+      if (risk && (risk.riskStatus === 'BLACKLISTED' || risk.riskStatus === 'DO_NOT_REAPPLY')) return interaction.reply({ content: '🚫 You can’t apply to this server right now. If you think this is a mistake, please contact the server staff.', ephemeral: true });
+    }
     const open = (active as any[]).find((a) => ['SUBMITTED', 'UNDER_REVIEW', 'ESCALATED', 'INTERVIEW_SCHEDULED', 'INTERVIEW_PENDING'].includes(a.status));
     if (open) return interaction.reply({ content: `⏳ You already have an application in review (submitted <t:${Math.floor(Date.parse(open.submittedAt || open.createdAt) / 1000)}:R>). You will get a DM when it is decided.`, ephemeral: true });
 
