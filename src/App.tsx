@@ -583,7 +583,7 @@ export default function App() {
           />
         );
       case 'rewards':
-        return <RewardsView communityId={selectedCommunity} currentRole={currentRole} />;
+        return <RewardsView communityId={selectedCommunity} />;
       case 'spreadsheet':
         return <SpreadsheetView communityId={selectedCommunity} currentRole={currentRole} />;
       case 'ai':
