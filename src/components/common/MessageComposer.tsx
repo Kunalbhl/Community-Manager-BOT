@@ -1,7 +1,8 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
-import { Smile, AtSign, Hash, Shield, FileText, Save, X } from 'lucide-react';
+import { Smile, AtSign, Hash, Shield, FileText, Save, X, Sparkles } from 'lucide-react';
+import { DecorPicker } from './DecorPicker.js';
 import { useDiscordResources, currentCommunityId } from './DiscordPickers.js';
 import { MemberPick } from '../views/community/ServerToolsView.js';
 
@@ -24,7 +25,7 @@ export function MessageComposer({
   const res: any = useDiscordResources(cid);
   const ownRef = useRef<HTMLTextAreaElement>(null);
   const ref = (textareaRef as React.RefObject<HTMLTextAreaElement>) || ownRef;
-  const [open, setOpen] = useState<null | 'emoji' | 'member' | 'role' | 'channel' | 'template' | 'save'>(null);
+  const [open, setOpen] = useState<null | 'emoji' | 'decor' | 'member' | 'role' | 'channel' | 'template' | 'save'>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [tName, setTName] = useState('');
   const [tCat, setTCat] = useState(defaultCategory || 'General');
@@ -77,6 +78,7 @@ export function MessageComposer({
     <div className="rounded-xl border border-slate-300 bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20">
       <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 px-1.5 py-1">
         {btn('emoji', Smile, 'Emoji')}
+        {btn('decor', Sparkles, 'Symbols')}
         {btn('member', AtSign, 'Member')}
         {btn('role', Shield, 'Role')}
         {btn('channel', Hash, 'Channel')}
@@ -114,6 +116,7 @@ export function MessageComposer({
               {!!res?.emojis?.length && <p className="mt-1 text-[11px] text-slate-500">Your server’s own emojis are under “Custom”. Recently used emojis appear at the top.</p>}
             </div>
           )}
+          {open === 'decor' && <DecorPicker onPick={insert} />}
           {open === 'member' && (
             <div className="pr-6">
               <p className="mb-2 text-xs text-slate-500">Search a member to mention them.</p>
