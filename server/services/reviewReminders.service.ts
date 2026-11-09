@@ -152,6 +152,16 @@ export function startReminderScheduler() {
           await levels.voiceTick(await communityForGuild(g.id), g).catch(() => undefined);
         }
       }
+      if (ticks % 15 === 3) {
+        // Invite rewards: "stayed N days", top recruiter of the period, and temporary roles that ended.
+        const { discordService } = await import('../integrations/discord/discord.service.js');
+        const { communityForGuild } = await import('./toolkit/toolkitConfig.js');
+        const { inviteRewards } = await import('./rewards/inviteRewards.service.js');
+        await inviteRewards.expireRoles().catch(() => undefined);
+        for (const gid of Array.from((discordService.client as any)?.guilds?.cache?.keys?.() || []) as string[]) {
+          await inviteRewards.evaluate(await communityForGuild(gid)).catch(() => undefined);
+        }
+      }
       if (ticks % 5 === 1) {
         const { discordService } = await import('../integrations/discord/discord.service.js');
         const { communityForGuild } = await import('./toolkit/toolkitConfig.js');

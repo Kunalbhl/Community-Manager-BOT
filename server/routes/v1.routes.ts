@@ -212,6 +212,7 @@ import { getPublicContact, postPublicContact } from '../controllers/publicContac
 import * as Team from '../controllers/team.controller.js';
 import { setupGuideHandler } from '../controllers/setupGuide.controller.js';
 import * as Toolkit from '../controllers/toolkit.controller.js';
+import * as Rewards from '../controllers/rewards.controller.js';
 import * as Features from '../controllers/features.controller.js';
 import { getSocialCordStatus, setSocialCordEnabled } from '../controllers/socialcord.controller.js';
 import { requirePermission, requirePlatformOwner, requireTenantAccess, requirePermissionOrApplicant } from '../middleware/auth.js';
@@ -377,6 +378,14 @@ router.post(`${ft}/giveaways/:giveawayId/cancel`, ...manage, Features.cancelGive
 // Server toolkit: tickets, warning policy, role rules, review rooms, bulk tools
 const tk = '/communities/:communityId/toolkit';
 router.get(tk, requireTenantAccess(), requirePermission('community.view'), Toolkit.getToolkitHandler);
+// Invite rewards
+router.get(`${tk}/rewards`, requireTenantAccess(), requirePermission('community.view'), Rewards.overviewHandler);
+router.post(`${tk}/rewards/rules`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.createRuleHandler);
+router.put(`${tk}/rewards/rules/:ruleId`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.updateRuleHandler);
+router.delete(`${tk}/rewards/rules/:ruleId`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.deleteRuleHandler);
+router.post(`${tk}/rewards/grants/:grantId/:action`, requireTenantAccess(), requirePermission('community.manage'), Rewards.grantActionHandler);
+router.post(`${tk}/rewards/credits`, requireTenantAccess(), requirePermission('community.manage'), Rewards.creditHandler);
+router.post(`${tk}/rewards/evaluate`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.evaluateHandler);
 router.put(`${tk}/settings/:section`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.saveToolkitSectionHandler);
 router.post(`${tk}/tickets/panel`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.postTicketPanelHandler);
 router.get(`${tk}/tickets`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listTicketsHandler);

@@ -58,6 +58,15 @@ export function attachFeatureHandlers(client: Client) {
     }).catch(() => undefined); // DMs closed: nothing to do
   }));
 
+  client.on(Events.GuildMemberRemove, (member: any) => safe('invite rewards leave', async () => {
+    const { inviteRewards } = await import('../../services/rewards/inviteRewards.service.js');
+    await inviteRewards.onMemberLeft(await communityOf(member.guild.id), member.id);
+  }));
+  client.on(Events.GuildMemberAdd, (member: any) => safe('invite rewards rejoin', async () => {
+    if (member.user?.bot) return;
+    const { inviteRewards } = await import('../../services/rewards/inviteRewards.service.js');
+    await inviteRewards.onMemberJoined(await communityOf(member.guild.id), member.id);
+  }));
   client.on(Events.GuildMemberRemove, (member: any) => safe('log leave', async () => {
     const c = await communityOf(member.guild.id);
     const roles = member.roles?.cache ? Array.from(member.roles.cache.values()).filter((r: any) => r.id !== member.guild.id).map((r: any) => `<@&${r.id}>`).join(' ') : '';
