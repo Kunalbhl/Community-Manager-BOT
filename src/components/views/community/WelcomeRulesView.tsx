@@ -95,7 +95,27 @@ export function WelcomeRulesView({ communityId }: { communityId: string }) {
           </div>
         </div>
       </Card>
+      <BotRoleCard communityId={communityId} />
       {res && <RulesCard api={toolkitApi} res={res} />}
     </div>
+  );
+}
+
+/** Bots are told apart from people automatically; bots that join get this role. */
+function BotRoleCard({ communityId }: { communityId: string }) {
+  const api = useApi(communityId);
+  const [roleId, setRoleId] = useState<string | null>(null);
+  const [saved, setSaved] = useState('');
+  useEffect(() => { api('').then((d: any) => setRoleId(d.config.roleRules?.botRoleId || '')).catch(() => setRoleId('')); }, [api]);
+  return (
+    <Card title="Role for new bots" desc="The bot can tell bots and people apart. Bots added to the server get this role automatically, and they never get welcome messages, XP or applicant steps.">
+      {roleId === null ? <div className="h-10 animate-pulse rounded-lg bg-slate-200/60" /> : (
+        <div className="flex max-w-xl items-end gap-3">
+          <div className="flex-1"><RoleSelect communityId={communityId} value={roleId} onChange={setRoleId} placeholder="No role (off)" /></div>
+          <button onClick={() => api('/bot-role', 'PUT', { botRoleId: roleId }).then(() => { setSaved('Saved.'); setTimeout(() => setSaved(''), 3000); })} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"><Save className="h-4 w-4" />Save</button>
+          {saved && <span className="text-sm font-semibold text-emerald-700">{saved}</span>}
+        </div>
+      )}
+    </Card>
   );
 }

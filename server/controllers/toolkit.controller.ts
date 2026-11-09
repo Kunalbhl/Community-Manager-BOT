@@ -467,27 +467,69 @@ async function codeLog(communityId: string, codeId: string, code: string, action
   await flags.create({ communityId, codeId, code, action, by, detail, at: nowIso() }).catch(() => undefined);
 }
 
-function seriesCode(s: any, n: number) {
-  return `${s.prefix || ''}${String(n).padStart(Math.max(1, Math.min(8, Number(s.padding) || 3)), '0')}${s.suffix || ''}`.toUpperCase();
+/**
+ * Code pattern. Modes:
+ *  FIXED       prefix + number              e.g. BHARAT-007
+ *  INITIALS    initials of the member's name e.g. Kunal Pareek -> KP-007
+ *  FIRST       first N letters               e.g. KUN-007
+ *  FIRST_LAST  first N + last M letters      e.g. KU + EK -> KUEK-007
+ * An optional fixed text can go before the name part, and a suffix after the number.
+ */
+function namePart(s: any, name: string) {
+  const words = String(name || '').normalize('NFKD').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  const letters = words.join('');
+  const n = Math.max(1, Math.min(8, Number(s.firstN) || 3));
+  const m = Math.max(1, Math.min(8, Number(s.lastM) || 2));
+  if (s.mode === 'INITIALS') return words.map((w) => w[0]).join('').slice(0, 6) || 'X';
+  if (s.mode === 'FIRST') return letters.slice(0, n) || 'X';
+  if (s.mode === 'FIRST_LAST') return letters.length <= n + m ? letters || 'X' : letters.slice(0, n) + letters.slice(-m);
+  return '';
+}
+function seriesCode(s: any, n: number, name = '') {
+  const num = String(n).padStart(Math.max(1, Math.min(8, Number(s.padding) || 3)), '0');
+  const mid = s.mode && s.mode !== 'FIXED' ? `${namePart(s, name)}${s.separator ?? '-'}` : '';
+  return `${s.prefix || ''}${mid}${num}${s.suffix || ''}`.toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 32);
 }
 
-async function nextSeriesCode(communityId: string) {
+async function nextSeriesCode(communityId: string, name = '') {
   const t = await getToolkit(communityId);
   const s: any = (t.recruitment as any).codeSeries || {};
   if (!s.enabled) return null;
   const { codes } = await codeRepos();
   const existing = new Set((await codes.listForTenant(communityId)).map((c: any) => c.code));
   let n = Math.max(1, Number(s.next) || 1);
-  while (existing.has(seriesCode(s, n))) n++;
+  while (existing.has(seriesCode(s, n, name))) n++;
   await saveToolkit(communityId, { recruitment: { ...t.recruitment, codeSeries: { ...s, next: n + 1 } } as any });
-  return seriesCode(s, n);
+  return seriesCode(s, n, name);
+}
+
+/**
+ * Give a newly approved member their own recruiter code (once), using the naming series, and DM it.
+ * Called when an application is approved and the member is in the server.
+ */
+export async function issueMemberCode(communityId: string, discordId: string, name: string): Promise<string | null> {
+  const t: any = await getToolkit(communityId);
+  if (!t.recruitment.codeForNewMembers) return null;
+  const { codes } = await codeRepos();
+  const mine = (await codes.listForTenant(communityId)).find((c: any) => (c.recruiterDiscordId || c.recruiterUserId) === discordId);
+  if (mine) return mine.code;
+  let code = await nextSeriesCode(communityId, name);
+  if (!code) code = seriesCode({ mode: 'FIRST', firstN: 4, padding: 3, prefix: '' }, Math.floor(100 + Math.random() * 900), name);
+  const doc = await codes.create({
+    communityId, code, recruiterUserId: discordId, recruiterDiscordId: discordId, recruiterName: String(name).slice(0, 64),
+    status: 'ACTIVE', isActive: true, totalUses: 0, source: 'AUTO_ON_APPROVAL', createdAt: nowIso(), updatedAt: nowIso(),
+  });
+  await codeLog(communityId, doc.id, code, 'CREATED', 'bot', 'Given automatically when the member was approved');
+  const sent = await dmCode(communityId, discordId, code);
+  await codeLog(communityId, doc.id, code, sent ? 'DM_SENT' : 'DM_FAILED', 'bot', sent ? 'Code sent to the member by DM' : 'The member has DMs closed');
+  return code;
 }
 
 async function dmCode(communityId: string, discordId: string, code: string) {
   try {
     const guild: any = await guildFor(communityId);
     const user = await guild?.client?.users?.fetch(discordId);
-    await user?.send(`🎟️ Your recruiter code for **${guild?.name || 'the server'}** is **${code}**.\nShare it with people you invite; they enter it when they apply, and you get credit when they join.`);
+    await user?.send(`🎟️ Your recruiter code for **${guild?.name || 'the server'}** is **${code}**.\nShare it with people you invite: they enter it when they apply, and you get credit when they join. Use \`/mycode\` in the server any time to see it again (only you can see the reply).`);
     return true;
   } catch { return false; }
 }
@@ -498,7 +540,7 @@ export async function listCodesHandler(req: Request, res: Response) {
     const { codes } = await codeRepos();
     const t = await getToolkit(communityId);
     const list = (await codes.listForTenant(communityId)).sort((a: any, b: any) => String(b.createdAt).localeCompare(String(a.createdAt)));
-    ok(res, { codes: list, series: (t.recruitment as any).codeSeries || { enabled: false, prefix: 'REC-', padding: 3, next: 1, suffix: '' }, dmOnCreate: !!(t.recruitment as any).codeDmOnCreate });
+    ok(res, { codes: list, series: (t.recruitment as any).codeSeries || { enabled: false, mode: 'FIXED', prefix: 'REC-', padding: 3, next: 1, suffix: '', separator: '-', firstN: 3, lastM: 2 }, dmOnCreate: !!(t.recruitment as any).codeDmOnCreate, codeForNewMembers: !!(t.recruitment as any).codeForNewMembers });
   } catch (err) { fail(res, err, 500); }
 }
 
@@ -508,10 +550,12 @@ export async function codeSettingsHandler(req: Request, res: Response) {
     const b = req.body || {};
     const prefix = String(b.series?.prefix || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 16);
     const suffix = String(b.series?.suffix || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 8);
-    const series = { enabled: !!b.series?.enabled, prefix, suffix, padding: Math.max(1, Math.min(8, Number(b.series?.padding) || 3)), next: Math.max(1, Number(b.series?.next) || 1) };
+    const mode = ['FIXED', 'INITIALS', 'FIRST', 'FIRST_LAST'].includes(b.series?.mode) ? b.series.mode : 'FIXED';
+    const separator = ['-', '_', ''].includes(b.series?.separator) ? b.series.separator : '-';
+    const series = { enabled: !!b.series?.enabled, mode, prefix, suffix, separator, firstN: Math.max(1, Math.min(8, Number(b.series?.firstN) || 3)), lastM: Math.max(1, Math.min(8, Number(b.series?.lastM) || 2)), padding: Math.max(1, Math.min(8, Number(b.series?.padding) || 3)), next: Math.max(1, Number(b.series?.next) || 1) };
     const t = await getToolkit(communityId);
-    await saveToolkit(communityId, { recruitment: { ...t.recruitment, codeSeries: series, codeDmOnCreate: !!b.dmOnCreate } as any });
-    ok(res, { series, dmOnCreate: !!b.dmOnCreate, example: seriesCode(series, series.next) });
+    await saveToolkit(communityId, { recruitment: { ...t.recruitment, codeSeries: series, codeDmOnCreate: !!b.dmOnCreate, codeForNewMembers: !!b.codeForNewMembers } as any });
+    ok(res, { series, dmOnCreate: !!b.dmOnCreate, codeForNewMembers: !!b.codeForNewMembers, example: seriesCode(series, series.next, 'Kunal Pareek') });
   } catch (err) { fail(res, err); }
 }
 
@@ -523,7 +567,7 @@ export async function createCodeHandler(req: Request, res: Response) {
     const { codes } = await codeRepos();
     if (!isSnowflake(b.recruiterDiscordId)) throw new Error('Pick the recruiter (Discord member) who owns this code.');
     let code = String(b.code || '').trim().toUpperCase();
-    if (!code) code = (await nextSeriesCode(communityId)) || '';
+    if (!code) code = (await nextSeriesCode(communityId, String(b.recruiterName || ''))) || '';
     if (!code) throw new Error('Type a code, or turn on a naming series to create codes automatically.');
     if (!CODE_RE.test(code)) throw new Error('Codes can use letters, numbers, - and _ (2–32 characters).');
     const all = await codes.listForTenant(communityId);
@@ -710,5 +754,18 @@ export async function membersListHandler(req: Request, res: Response) {
       roles: m.roles.cache.filter((r: any) => r.id !== guild.id).sort((a: any, b: any) => b.position - a.position).map((r: any) => ({ id: r.id, name: r.name, color: r.hexColor })),
     }));
     ok(res, { total, page, pages: Math.max(1, Math.ceil(total / 50)), rows });
+  } catch (err) { fail(res, err); }
+}
+
+/** Preview a code pattern for a sample name (dashboard live preview). */
+export function previewCode(series: any, name: string) { return seriesCode(series, Number(series?.next) || 1, name); }
+
+/** Bots that join get this role automatically (Members & onboarding). */
+export async function botRoleHandler(req: Request, res: Response) {
+  try {
+    const t: any = await getToolkit(req.params.communityId);
+    const botRoleId = isSnowflake(req.body?.botRoleId) ? req.body.botRoleId : undefined;
+    await saveToolkit(req.params.communityId, { roleRules: { ...t.roleRules, botRoleId } } as any);
+    ok(res, { botRoleId: botRoleId || '' });
   } catch (err) { fail(res, err); }
 }

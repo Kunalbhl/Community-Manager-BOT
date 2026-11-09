@@ -69,7 +69,12 @@ export function staffPanel(r: ReviewRoomDoc & { flow?: FlowState }, tierCount: n
     new ButtonBuilder().setCustomId(`cm:room:approve:${r.id}`).setLabel('Approve').setEmoji('✅').setStyle(ButtonStyle.Success).setDisabled(stage === 'DECIDED'),
     new ButtonBuilder().setCustomId(`cm:room:reject:${r.id}`).setLabel('Reject').setEmoji('✖️').setStyle(ButtonStyle.Danger).setDisabled(stage === 'DECIDED'),
   );
-  return [row1, row2];
+  const row3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`cm:room:done:${r.id}`).setLabel('Mark a rank done').setEmoji('🏁').setStyle(ButtonStyle.Secondary).setDisabled(stage === 'DECIDED' || tierCount < 2),
+    new ButtonBuilder().setCustomId(`cm:room:invite:${r.id}`).setLabel('Invite member').setEmoji('➕').setStyle(ButtonStyle.Secondary).setDisabled(stage === 'DECIDED'),
+    new ButtonBuilder().setCustomId(`cm:room:uninvite:${r.id}`).setLabel('Remove invite').setEmoji('➖').setStyle(ButtonStyle.Secondary).setDisabled(stage === 'DECIDED' || !(r as any).invited?.length),
+  );
+  return [row1, row2, row3];
 }
 
 export const applicationFlow = {

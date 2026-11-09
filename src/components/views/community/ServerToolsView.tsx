@@ -431,12 +431,32 @@ function ReviewRoomsTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Re
         <Card title="Reviewer ranks" desc="Rooms start with the first rank. “Escalate” opens the room to the next rank and pings them. Only the current rank or higher can decide."
           right={<button className={ghost} onClick={() => setC({ ...c, tiers: [...c.tiers, { name: 'New rank', roleIds: [] }] })}><Plus className="h-4 w-4" /> Add rank</button>}>
           <div className="space-y-3">
+            <p className="text-xs text-slate-500">Drag a rank by its handle to change the order (top = first to review, bottom = highest). Higher ranks can mark a lower rank’s part as done, and any reviewer can give one member special access, from the staff thread in Discord.</p>
             {c.tiers.map((t: any, i: number) => (
-              <div key={i} className="grid gap-3 rounded-xl border border-slate-200 p-4 md:grid-cols-[40px_220px_1fr_auto] md:items-start">
-                <div className="grid h-9 w-9 place-items-center rounded-full bg-indigo-50 font-bold text-indigo-700">{i + 1}</div>
+              <div key={i}
+                draggable
+                onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; }}
+                onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('ring-2', 'ring-indigo-400'); }}
+                onDragLeave={(e) => e.currentTarget.classList.remove('ring-2', 'ring-indigo-400')}
+                onDrop={(e) => {
+                  e.preventDefault(); e.currentTarget.classList.remove('ring-2', 'ring-indigo-400');
+                  const from = Number(e.dataTransfer.getData('text/plain'));
+                  if (Number.isNaN(from) || from === i) return;
+                  const next = [...c.tiers]; const [moved] = next.splice(from, 1); next.splice(i, 0, moved);
+                  setC({ ...c, tiers: next });
+                }}
+                className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 transition md:grid-cols-[56px_220px_1fr_auto] md:items-start">
+                <div className="flex items-center gap-1">
+                  <span className="cursor-grab select-none text-lg leading-none text-slate-400 active:cursor-grabbing" title="Drag to reorder" aria-hidden>⠿</span>
+                  <div className="grid h-9 w-9 place-items-center rounded-full bg-indigo-50 font-bold text-indigo-700">{i + 1}</div>
+                </div>
                 <input className={input} value={t.name} onChange={(e) => setTier(i, { name: e.target.value })} />
                 <MultiPick options={res.roles} value={t.roleIds} onChange={(v) => setTier(i, { roleIds: v })} placeholder="Add a role for this rank" prefix="@" />
-                <button className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setC({ ...c, tiers: c.tiers.filter((_: any, n: number) => n !== i) })} aria-label="Delete rank"><Trash2 className="h-4 w-4" /></button>
+                <div className="flex items-center gap-0.5">
+                  <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30" disabled={i === 0} aria-label="Move up" onClick={() => { const n = [...c.tiers]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; setC({ ...c, tiers: n }); }}><ArrowUp className="h-4 w-4" /></button>
+                  <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30" disabled={i === c.tiers.length - 1} aria-label="Move down" onClick={() => { const n = [...c.tiers]; [n[i + 1], n[i]] = [n[i], n[i + 1]]; setC({ ...c, tiers: n }); }}><ArrowUp className="h-4 w-4 rotate-180" /></button>
+                  <button className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setC({ ...c, tiers: c.tiers.filter((_: any, n: number) => n !== i) })} aria-label="Delete rank"><Trash2 className="h-4 w-4" /></button>
+                </div>
               </div>
             ))}
           </div>

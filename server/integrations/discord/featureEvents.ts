@@ -33,6 +33,14 @@ export function attachFeatureHandlers(client: Client) {
     await serverLogs.send(c, member.guild, 'memberJoin', '📥 Member joined', `<@${member.id}> · ${member.user.username}`, [{ name: 'Account created', value: ts(member.user.createdTimestamp), inline: true }, { name: 'Members', value: String(member.guild.memberCount), inline: true }]);
   }));
 
+  // Bots that join get the bot role chosen in Members & onboarding.
+  client.on(Events.GuildMemberAdd, (member: any) => safe('bot role', async () => {
+    if (!member.user.bot) return;
+    const { getToolkit } = await import('../../services/toolkit/toolkitConfig.js');
+    const roleId = ((await getToolkit(await communityOf(member.guild.id))).roleRules as any).botRoleId;
+    if (roleId && member.guild.roles.cache.has(roleId)) await member.roles.add(roleId, 'Community Manager: role for bots').catch(() => undefined);
+  }));
+
   // Optional: ask new members for their birthday in a DM (they can skip; nothing is required).
   client.on(Events.GuildMemberAdd, (member: any) => safe('birthday ask', async () => {
     if (member.user.bot) return;
