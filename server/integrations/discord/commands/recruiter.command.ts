@@ -47,7 +47,7 @@ export const recruiterCommand: SlashCommandDefinition = {
         `• **Total Referrals Tracked:** ${rec.totalReferrals || 0}\n` +
         `• **Active Codes:** ${activeCodes}\n` +
         `• **Status:** ${rec.isActive ? '🟢 Active' : '🔴 Inactive'}\n\n` +
-        `*Use \`/recruiter-benefits\` to see your milestone rewards!*`,
+        `*Use \`/myrewards\` to see your rewards and progress.*`,
       ephemeral: true,
     });
   },

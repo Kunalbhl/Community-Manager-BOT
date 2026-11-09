@@ -1,12 +1,11 @@
 import { ChatInputCommandInteraction } from 'discord.js';
 import { SlashCommandDefinition, CommandContext } from './types.js';
-import { createRecruiterCodeCommand, recruiterCodeCommand } from './recruiterCode.command.js';
+import { createRecruiterCodeCommand } from './recruiterCode.command.js';
 import { recruiterCommand } from './recruiter.command.js';
-import { applicationsCommand, applicationCommand } from './application.command.js';
+import { applicationsCommand } from './application.command.js';
 import { interviewCommand } from './interview.command.js';
 import { referralCommand } from './referral.command.js';
 import { blacklistCommand } from './blacklist.command.js';
-import { recruiterBenefitsCommand } from './recruiterBenefits.command.js';
 import { rulesCommand } from './rules.command.js';
 import { sheetCommand } from './sheet.command.js';
 import { myCodeCommand } from './mycode.command.js';
@@ -31,17 +30,14 @@ export const discordCommands: SlashCommandDefinition[] = [
   communityManagerPortalCommand, // /community-manager
   userStatusCommand,            // /user-status
   applicationsCommand,          // /applications
-  applicationCommand,           // /application (alias)
   interviewCommand,             // /interview
   approveCommand,               // /approve
   rejectCommand,                // /reject
   escalateCommand,              // /escalate
   createRecruiterCodeCommand,   // /create-recruiter-code
-  recruiterCodeCommand,         // /recruiter-code (alias)
   blacklistCommand,             // /blacklist
   recruiterCommand,             // /recruiter
   referralCommand,              // /referral
-  recruiterBenefitsCommand,     // /recruiter-benefits
   rulesCommand,                 // /rules
   supportCommand,               // /support
   ticketCommand,                // /ticket
