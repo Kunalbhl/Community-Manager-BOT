@@ -156,11 +156,17 @@ export class WelcomeOnboardingService {
       communityName?: string;
       recruiterName?: string;
       recruiterCode?: string;
+      memberId?: string;
+      recruiterId?: string;
+      memberCount?: number;
     }
   ): string {
     if (!template) return '';
 
     let rendered = template;
+    rendered = rendered.replace(/\{\{member\}\}/g, vars.memberId ? `<@${vars.memberId}>` : vars.memberName || 'Member');
+    rendered = rendered.replace(/\{\{recruiter\}\}/g, vars.recruiterId ? `<@${vars.recruiterId}>` : vars.recruiterName || '');
+    rendered = rendered.replace(/\{\{memberCount\}\}/g, vars.memberCount ? String(vars.memberCount) : '');
     rendered = rendered.replace(/\{\{memberName\}\}/g, vars.memberName || 'Member');
     rendered = rendered.replace(/\{\{communityName\}\}/g, vars.communityName || 'the community');
     rendered = rendered.replace(/\{\{recruiterName\}\}/g, vars.recruiterName || '');
@@ -215,11 +221,19 @@ export class WelcomeOnboardingService {
       }
     }
 
+    let memberCount: number | undefined;
+    try {
+      const comm: any = await communitiesRepository.getById(communityId);
+      memberCount = discordService.getGuild(comm?.discordGuildId || comm?.guildId)?.memberCount;
+    } catch { /* optional */ }
     const templateVars = {
       memberName: applicantUsername,
       communityName,
       recruiterName,
       recruiterCode: recruiterCode || '',
+      memberId: applicantDiscordUserId,
+      recruiterId: (params as any).recruiterDiscordUserId,
+      memberCount,
     };
 
     const auditRecords: WelcomeAuditRecord[] = [];

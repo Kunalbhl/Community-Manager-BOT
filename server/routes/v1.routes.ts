@@ -384,6 +384,14 @@ router.post(`${tk}/tickets/:ticketId/close`, requireTenantAccess(), requirePermi
 router.get(`${tk}/warnings`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listWarningsHandler);
 router.post(`${tk}/warnings`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.issueWarningHandler);
 router.post(`${tk}/warnings/:strikeId/revoke`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.revokeWarningHandler);
+router.get(`${tk}/codes`, requireTenantAccess(), requirePermission('recruiterCodes.view'), Toolkit.listCodesHandler);
+router.put(`${tk}/codes/settings`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.codeSettingsHandler);
+router.post(`${tk}/codes`, requireTenantAccess(), requirePermission('recruiterCodes.create'), Toolkit.createCodeHandler);
+router.post(`${tk}/codes/import`, requireTenantAccess(), requirePermission('recruiterCodes.create'), Toolkit.importCodesHandler);
+router.put(`${tk}/codes/:codeId`, requireTenantAccess(), requirePermission('recruiterCodes.create'), Toolkit.updateCodeHandler);
+router.delete(`${tk}/codes/:codeId`, requireTenantAccess(), requirePermission('recruiterCodes.revoke'), Toolkit.deleteCodeHandler);
+router.get(`${tk}/codes/:codeId/history`, requireTenantAccess(), requirePermission('recruiterCodes.view'), Toolkit.codeHistoryHandler);
+router.get(`${tk}/integrations`, requireTenantAccess(), requirePermission('community.view'), Toolkit.integrationsStatusHandler);
 router.post(`${tk}/bot-nickname`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.botNicknameHandler);
 router.get(`${tk}/recruitment/rules`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listRulesHandler);
 router.post(`${tk}/recruitment/rules`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.addRuleHandler);

@@ -60,7 +60,7 @@ interface PrimaryNavModule {
 
 /** Each area gets its own colour so it is easy to spot. */
 const NAV_TONE: Record<string, string> = {
-  home: 'bg-sky-500/15 text-sky-300', 'setup-guide': 'bg-emerald-500/15 text-emerald-300', community: 'bg-violet-500/15 text-violet-300',
+  home: 'bg-sky-500/15 text-sky-300', 'setup-guide': 'bg-emerald-500/15 text-emerald-300', members: 'bg-violet-500/15 text-violet-300',
   engagement: 'bg-orange-500/15 text-orange-300', recruitment: 'bg-pink-500/15 text-pink-300', moderation: 'bg-red-500/15 text-red-300',
   'team-access': 'bg-amber-500/15 text-amber-300', capabilities: 'bg-yellow-400/15 text-yellow-300', 'community-features': 'bg-fuchsia-500/15 text-fuchsia-300',
   'server-tools': 'bg-cyan-500/15 text-cyan-300', 'events-automation': 'bg-teal-500/15 text-teal-300', 'insights-ai': 'bg-indigo-400/20 text-indigo-200',
@@ -68,110 +68,14 @@ const NAV_TONE: Record<string, string> = {
 };
 
 const PRIMARY_COMMUNITY_NAV: PrimaryNavModule[] = [
-  {
-    id: 'home',
-    label: 'Home',
-    icon: LayoutDashboard,
-    matchingSections: ['home', 'dashboard', 'overview'],
-  },  {
-    id: 'setup-guide',
-    label: 'Setup guide',
-    icon: ListChecks,
-    requiredPermission: 'community.view',
-    matchingSections: ['setup-guide'],
-  },
-  {
-    id: 'community',
-    label: 'Community',
-    icon: Users,
-    matchingSections: ['community', 'members', 'permissions', 'channels', 'welcome-onboarding', 'notifications', 'discord-ops', 'server-hygiene'],
-  },
-  {
-    id: 'engagement',
-    label: 'Engagement',
-    icon: Megaphone,
-    matchingSections: ['engagement', 'announcements', 'campaigns', 'polls', 'templates'],
-  },
-  {
-    id: 'recruitment',
-    label: 'Recruitment',
-    icon: ClipboardList,
-    matchingSections: [
-      'recruitment',
-      'applications',
-      'candidates',
-      'interviews',
-      'recruiters',
-      'recruiter-codes',
-      'recruiter-records',
-      'referrals',
-      'recruitment-trust',
-      'campaign-workspace',
-      'lifecycle-intelligence',
-      'recruitment-command-center',
-      'recruitment-settings',
-      'onboarding-interview',
-    ],
-  },
-  {
-    id: 'moderation',
-    label: 'Moderation & safety',
-    icon: ShieldCheck,
-    matchingSections: ['moderation', 'warnings', 'community-config', 'blacklist'],
-  },
-
-  {
-    id: 'team-access',
-    label: 'Team & access',
-    icon: UserCog,
-    requiredPermission: 'users.view',
-    matchingSections: ['team-access'],
-  },
-  {
-    id: 'capabilities',
-    label: 'All features',
-    icon: LayoutGrid,
-    requiredPermission: 'community.view',
-    matchingSections: ['capabilities'],
-  },
-  {
-    id: 'community-features',
-    label: 'Community features',
-    icon: PartyPopper,
-    requiredPermission: 'community.view',
-    matchingSections: ['community-features'],
-  },
-  {
-    id: 'server-tools',
-    label: 'Server tools',
-    icon: Wrench,
-    requiredPermission: 'community.view',
-    matchingSections: ['server-tools'],
-  },
-  {
-    id: 'events-automation',
-    label: 'Events & automation',
-    icon: CalendarClock,
-    matchingSections: ['events-automation', 'events', 'automation'],
-  },
-  {
-    id: 'insights-ai',
-    label: 'Insights & AI',
-    icon: BrainCircuit,
-    matchingSections: ['insights-ai', 'insights-dashboard', 'ai', 'reports'],
-  },
-  {
-    id: 'integrations',
-    label: 'Integrations',
-    icon: Plug,
-    matchingSections: ['integrations', 'spreadsheet', 'google-calendar', 'discord-gateway'],
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: Settings,
-    matchingSections: ['settings', 'pricing-trust'],
-  },
+  { id: 'home', label: 'Home', icon: LayoutDashboard, matchingSections: ['home', 'dashboard', 'overview'] },
+  { id: 'setup-guide', label: 'Setup guide', icon: ListChecks, requiredPermission: 'community.view', matchingSections: ['setup-guide'] },
+  { id: 'recruitment', label: 'Recruitment', icon: ClipboardList, matchingSections: ['recruitment', 'recruitment-trust', 'campaign-workspace', 'lifecycle-intelligence', 'recruiter-records'] },
+  { id: 'members', label: 'Members & onboarding', icon: Users, matchingSections: ['members', 'permissions', 'channels', 'discord-ops', 'server-hygiene'] },
+  { id: 'engagement', label: 'Engagement', icon: Megaphone, matchingSections: ['engagement', 'automation'] },
+  { id: 'moderation', label: 'Moderation', icon: ShieldCheck, matchingSections: ['moderation', 'incidents', 'automod', 'restrictions', 'security-audit'] },
+  { id: 'insights-ai', label: 'Insights & AI', icon: BrainCircuit, matchingSections: ['insights-ai', 'insights-dashboard', 'ai', 'reports'] },
+  { id: 'settings', label: 'Settings', icon: Settings, matchingSections: ['settings', 'discord-gateway'] },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({

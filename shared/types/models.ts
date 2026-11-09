@@ -1444,6 +1444,8 @@ export interface WelcomeOnboardingConfig {
   serverWelcomeMessage: string;
   welcomeChannelId?: string;
   welcomeChannelNameSnapshot?: string;
+  /** Where the server's rules are posted (shown to new members and linked in messages). */
+  rulesChannelId?: string;
   newMemberRoleId?: string;
   newMemberRoleNameSnapshot?: string;
   enablePersonalDm: boolean;

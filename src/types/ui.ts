@@ -24,6 +24,7 @@ export type PlatformSection =
 
 export type PrimaryModuleSection =
   | 'home'
+  | 'members'
   | 'community'
   | 'engagement'
   | 'recruitment'

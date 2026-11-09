@@ -81,12 +81,15 @@ interface ApplicationsViewProps {
   communityId: string;
   currentRole: UserRole;
   initialTab?: 'overview' | 'applications' | 'candidates' | 'recruiters' | 'interviews' | 'referrals' | 'benefits' | 'analytics' | 'settings';
+  /** Inside a module tab: no page header or workspace menu, just this tab's content. */
+  embedded?: boolean;
 }
 
 export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
   communityId,
   currentRole,
   initialTab = 'overview',
+  embedded = false,
 }) => {
   // 9 Workspaces Navigation Tab
   const [activeTab, setActiveTab] = useState<
@@ -1145,7 +1148,7 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
   return (
     <div id="recruitment-hub-view" className="space-y-6">
       {/* Banner Page Header */}
-      <PageHeader
+      {!embedded && <PageHeader
         title="Recruitment Operations Center"
         description="Flagship candidate funnel, automatic recruiter code attribution, verification matrix, and rewards portal."
         badge="FLAGSHIP PORTAL"
@@ -1168,10 +1171,10 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
             icon: RefreshCw,
           },
         ]}
-      />
+      />}
 
       {/* Metrics strip */}
-      <MetricStrip metrics={metricStripData} />
+      {(!embedded || activeTab === 'overview') && <MetricStrip metrics={metricStripData} />}
 
       {/* Synchronous alerts */}
       {feedbackMsg && (
@@ -1196,7 +1199,7 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         
         {/* Workspace navigation sidebar */}
-        <div className="lg:col-span-1 rounded-xl border border-slate-200 bg-white p-4 h-fit space-y-4">
+        <div className={`${embedded ? 'hidden' : ''} lg:col-span-1 rounded-xl border border-slate-200 bg-white p-4 h-fit space-y-4">
           <div className="pb-2 border-b border-slate-100">
             <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Recruitment Workspaces</h3>
             <p className="text-xs text-slate-500">Coordinated operator views</p>
@@ -1253,7 +1256,7 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
         </div>
 
         {/* Workspace Canvas Container */}
-        <div className="lg:col-span-3 space-y-6">
+        <div className={`${embedded ? 'lg:col-span-4' : 'lg:col-span-3'} space-y-6`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
