@@ -28,6 +28,10 @@ export interface ReviewRoomDoc {
   status: 'OPEN' | 'CLOSED' | 'ARCHIVED';
   decision?: 'APPROVED' | 'REJECTED';
   history: { at: string; by: string; event: string }[];
+  /** Ranks whose part is finished: they no longer see the room. */
+  doneTiers?: number[];
+  /** Members given special access by a reviewer. */
+  invited?: string[];
   createdAt: string;
   closedAt?: string;
 }
@@ -153,6 +157,76 @@ export const reviewRooms = {
       components: thread ? staffPanel(updated as any, cfg.tiers.length) : buttons(updated as any, cfg.tiers.length),
     });
     return `Escalated to ${cfg.tiers[next].name}.`;
+  },
+
+  /** Lower ranks the actor may mark as done (below the actor's own rank, already in the room, not done yet). */
+  async doneOptions(roomId: string, actor: any) {
+    const room = await reviewRoomsRepository.getById(roomId);
+    if (!room || room.status !== 'OPEN') throw new Error('This review room is closed.');
+    const cfg = (await getToolkit(room.communityId)).reviewRooms;
+    const actorTier = await this.memberTier(room.communityId, actor);
+    if (actorTier < 1) throw new Error('Only a higher rank can mark a lower rank’s part as done.');
+    return cfg.tiers.map((t, i) => ({ i, name: t.name })).filter((t) => t.i < actorTier && t.i <= room.tier && !(room.doneTiers || []).includes(t.i));
+  },
+
+  /** A higher rank marks lower ranks' work as done: those roles lose access to the room and the staff thread. */
+  async markDone(roomId: string, actor: any, tiers: number[]): Promise<string> {
+    const room = await reviewRoomsRepository.getById(roomId);
+    if (!room || room.status !== 'OPEN') throw new Error('This review room is closed.');
+    const cfg = (await getToolkit(room.communityId)).reviewRooms;
+    const actorTier = await this.memberTier(room.communityId, actor);
+    const pick = tiers.filter((i) => i < actorTier && i <= room.tier && cfg.tiers[i]);
+    if (!pick.length) throw new Error('Pick a rank below yours.');
+    const guild: any = await guildFor(room.communityId);
+    const channel: any = guild?.channels.cache.get(room.channelId);
+    const done = [...new Set([...(room.doneTiers || []), ...pick])];
+    // Roles still needed = ranks not done (up to the current rank).
+    const keep = new Set(cfg.tiers.slice(0, room.tier + 1).flatMap((t, i) => (done.includes(i) ? [] : t.roleIds)));
+    const remove = [...new Set(pick.flatMap((i) => cfg.tiers[i].roleIds))].filter((id) => !keep.has(id));
+    for (const id of remove) await channel?.permissionOverwrites.delete(id).catch(() => undefined);
+    if (room.voiceChannelId) { const vc: any = guild?.channels.cache.get(room.voiceChannelId); for (const id of remove) await vc?.permissionOverwrites.delete(id).catch(() => undefined); }
+    const { applicationFlow } = await import('../recruitment/applicationFlow.service.js');
+    const thread: any = await applicationFlow.staffThread(roomId);
+    if (thread) {
+      const members = await thread.members.fetch().catch(() => null);
+      for (const tm of members?.values?.() || []) {
+        const m = tm.guildMember || guild.members.cache.get(tm.id);
+        if (!m || m.user?.bot || (room.invited || []).includes(m.id) || m.permissions?.has?.(PermissionFlagsBits.ManageGuild)) continue;
+        const stillNeeded = [...keep].some((id) => m.roles.cache.has(id));
+        if (!stillNeeded && remove.some((id) => m.roles.cache.has(id))) await thread.members.remove(m.id).catch(() => undefined);
+      }
+    }
+    const names = pick.map((i) => cfg.tiers[i].name).join(', ');
+    await reviewRoomsRepository.update(roomId, { doneTiers: done, history: [...room.history, { at: new Date().toISOString(), by: actor.id, event: `Marked done: ${names}` }] } as any);
+    await (thread || channel)?.send({ content: `✅ <@${actor.id}> marked **${names}** as done. They no longer see this application.`, allowedMentions: { parse: [] } }).catch(() => undefined);
+    return `${names} marked as done.`;
+  },
+
+  /** Special access for one member; any reviewer can add, the current rank or higher can remove. */
+  async invite(roomId: string, actor: any, userId: string, add: boolean): Promise<string> {
+    const room = await reviewRoomsRepository.getById(roomId);
+    if (!room || room.status !== 'OPEN') throw new Error('This review room is closed.');
+    const actorTier = await this.memberTier(room.communityId, actor);
+    if (actorTier < 0) throw new Error('Only reviewers can manage access.');
+    if (!add && actorTier < room.tier) throw new Error('Only the current rank or higher can remove special access.');
+    const guild: any = await guildFor(room.communityId);
+    const channel: any = guild?.channels.cache.get(room.channelId);
+    const { applicationFlow } = await import('../recruitment/applicationFlow.service.js');
+    const thread: any = await applicationFlow.staffThread(roomId);
+    let invited = room.invited || [];
+    if (add) {
+      if (userId === room.applicantId) throw new Error('The applicant already has their own chat.');
+      await channel?.permissionOverwrites.edit(userId, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }).catch(() => undefined);
+      await thread?.members.add(userId).catch(() => undefined);
+      invited = [...new Set([...invited, userId])];
+    } else {
+      await channel?.permissionOverwrites.delete(userId).catch(() => undefined);
+      await thread?.members.remove(userId).catch(() => undefined);
+      invited = invited.filter((x) => x !== userId);
+    }
+    await reviewRoomsRepository.update(roomId, { invited, history: [...room.history, { at: new Date().toISOString(), by: actor.id, event: `${add ? 'Invited' : 'Removed'} <@${userId}>` }] } as any);
+    await thread?.send({ content: add ? `➕ <@${actor.id}> gave <@${userId}> special access to this application.` : `➖ <@${actor.id}> removed <@${userId}>’s special access.`, allowedMentions: { users: add ? [userId] : [] } }).catch(() => undefined);
+    return add ? 'Access given.' : 'Access removed.';
   },
 
   /** Called after any approve/reject (dashboard, slash command or room button). */

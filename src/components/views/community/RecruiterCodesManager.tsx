@@ -55,7 +55,7 @@ export function RecruiterCodesManager({ communityId }: { communityId: string }) 
     <div className="space-y-6">
       {toast && <p role="status" className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${toast.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{toast.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}{toast.text}</p>}
 
-      {data && <SeriesCard api={api} series={data.series} dmOnCreate={data.dmOnCreate} onSaved={(t) => { flash(true, t); load(); }} onError={(t) => flash(false, t)} />}
+      {data && <SeriesCard api={api} series={data.series} dmOnCreate={data.dmOnCreate} codeForNewMembers={(data as any).codeForNewMembers} onSaved={(t) => { flash(true, t); load(); }} onError={(t) => flash(false, t)} />}
 
       <ImportCard api={api} onDone={(t) => { flash(true, t); load(); }} onTemplate={() => exportFile(true)} />
 
@@ -92,7 +92,7 @@ export function RecruiterCodesManager({ communityId }: { communityId: string }) 
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
                           <button title="History" aria-label="History" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900" onClick={() => api(`/codes/${c.id}/history`).then((items: any[]) => setHistory({ code: c, items }))}><History className="h-4 w-4" /></button>
-                          <button title="Send code to recruiter by DM" aria-label="Send by DM" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-indigo-700" onClick={() => api(`/codes/${c.id}`, 'PUT', { dm: true }).then(() => flash(true, `Sent ${c.code} to the recruiter by DM (if their DMs are open).`)).catch((e: any) => flash(false, e.message))}><Send className="h-4 w-4" /></button>
+                          <button title="Send the code to its owner by DM" aria-label="Send by DM" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-indigo-700" onClick={() => api(`/codes/${c.id}`, 'PUT', { dm: true }).then(() => flash(true, `Sent ${c.code} to the recruiter by DM (if their DMs are open).`)).catch((e: any) => flash(false, e.message))}><Send className="h-4 w-4" /></button>
                           <button title="Edit" aria-label="Edit" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-indigo-700" onClick={() => setEditing(c)}><Pencil className="h-4 w-4" /></button>
                           <button title="Delete" aria-label="Delete" className="rounded-md p-1.5 text-slate-500 hover:bg-rose-50 hover:text-rose-600" onClick={() => window.confirm(`Delete ${c.code}? Applicants can no longer use it. Past credit stays.`) && api(`/codes/${c.id}`, 'DELETE').then(() => { flash(true, `${c.code} deleted.`); load(); }).catch((e: any) => flash(false, e.message))}><Trash2 className="h-4 w-4" /></button>
                         </div>
@@ -138,22 +138,63 @@ function Dialog({ title, onClose, children }: { title: string; onClose: () => vo
   );
 }
 
-function SeriesCard({ api, series, dmOnCreate, onSaved, onError }: { api: any; series: any; dmOnCreate: boolean; onSaved: (t: string) => void; onError: (t: string) => void }) {
-  const [s, setS] = useState(series);
+/** Same rules as the server (toolkit.controller seriesCode) so the preview matches real codes. */
+function previewSeries(s: any, name: string) {
+  const words = String(name || '').normalize('NFKD').toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  const letters = words.join('');
+  const n = Math.max(1, Math.min(8, Number(s.firstN) || 3));
+  const m = Math.max(1, Math.min(8, Number(s.lastM) || 2));
+  const part = s.mode === 'INITIALS' ? words.map((w) => w[0]).join('').slice(0, 6) || 'X'
+    : s.mode === 'FIRST' ? letters.slice(0, n) || 'X'
+    : s.mode === 'FIRST_LAST' ? (letters.length <= n + m ? letters || 'X' : letters.slice(0, n) + letters.slice(-m)) : '';
+  const num = String(Number(s.next) || 1).padStart(Math.max(1, Math.min(8, Number(s.padding) || 3)), '0');
+  const mid = s.mode && s.mode !== 'FIXED' ? `${part}${s.separator ?? '-'}` : '';
+  return `${s.prefix || ''}${mid}${num}${s.suffix || ''}`.toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 32);
+}
+
+const MODES = [
+  { v: 'FIXED', l: 'Fixed text', d: 'Same text for everyone, then a number.' },
+  { v: 'INITIALS', l: 'Initials', d: 'First letter of each word in the name.' },
+  { v: 'FIRST', l: 'First letters', d: 'The first few letters of the name.' },
+  { v: 'FIRST_LAST', l: 'First + last letters', d: 'Some letters from the start and some from the end.' },
+];
+
+function SeriesCard({ api, series, dmOnCreate, codeForNewMembers, onSaved, onError }: { api: any; series: any; dmOnCreate: boolean; codeForNewMembers: boolean; onSaved: (t: string) => void; onError: (t: string) => void }) {
+  const [s, setS] = useState({ mode: 'FIXED', separator: '-', firstN: 3, lastM: 2, ...series });
   const [dm, setDm] = useState(dmOnCreate);
-  const example = `${(s.prefix || '').toUpperCase()}${String(s.next || 1).padStart(s.padding || 3, '0')}${(s.suffix || '').toUpperCase()}`;
+  const [auto, setAuto] = useState(codeForNewMembers);
+  const [sample, setSample] = useState('Kunal Pareek');
+  const field = 'w-24 text-xs font-semibold text-slate-600';
   return (
-    <Card title="Code naming series" desc="When on, new codes are numbered automatically in this format, so every code follows the same pattern."
-      right={<button className={primary} onClick={() => api('/codes/settings', 'PUT', { series: s, dmOnCreate: dm }).then(() => onSaved('Code settings saved.')).catch((e: any) => onError(e.message))}>Save</button>}>
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={!!s.enabled} onChange={(e) => setS({ ...s, enabled: e.target.checked })} />Use a naming series</label>
-        <label className="w-32 text-xs font-semibold text-slate-600">Prefix<input className={input} value={s.prefix || ''} onChange={(e) => setS({ ...s, prefix: e.target.value })} placeholder="BHARAT-" /></label>
-        <label className="w-24 text-xs font-semibold text-slate-600">Digits<input type="number" min={1} max={8} className={input} value={s.padding || 3} onChange={(e) => setS({ ...s, padding: Number(e.target.value) })} /></label>
-        <label className="w-28 text-xs font-semibold text-slate-600">Next number<input type="number" min={1} className={input} value={s.next || 1} onChange={(e) => setS({ ...s, next: Number(e.target.value) })} /></label>
-        <label className="w-28 text-xs font-semibold text-slate-600">Suffix<input className={input} value={s.suffix || ''} onChange={(e) => setS({ ...s, suffix: e.target.value })} placeholder="optional" /></label>
-        <div className="rounded-lg bg-indigo-50 px-3 py-2 text-sm"><span className="text-slate-500">Next code: </span><b className="font-mono text-indigo-700">{example}</b></div>
+    <Card title="Code naming and delivery" desc="How codes are named, and whether every approved member automatically gets their own code."
+      right={<button className={primary} onClick={() => api('/codes/settings', 'PUT', { series: s, dmOnCreate: dm, codeForNewMembers: auto }).then(() => onSaved('Code settings saved.')).catch((e: any) => onError(e.message))}>Save</button>}>
+      <label className="flex items-start gap-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-slate-800"><input type="checkbox" className="mt-0.5" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+        <span><b>Give every approved member their own recruiter code</b><br /><span className="text-xs text-slate-600">When an application is approved and the member is in the server, the bot creates their code with the pattern below and sends it to them by DM. Members can see their own code any time with <code>/mycode</code> (only they see the reply).</span></span>
+      </label>
+      <label className="mt-4 flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={!!s.enabled} onChange={(e) => setS({ ...s, enabled: e.target.checked })} />Use a naming pattern for new codes</label>
+      <div className={`mt-3 space-y-3 ${s.enabled ? '' : 'pointer-events-none opacity-50'}`}>
+        <div className="grid gap-2 sm:grid-cols-4">
+          {MODES.map((m) => (
+            <button key={m.v} type="button" onClick={() => setS({ ...s, mode: m.v })} className={`rounded-xl border p-3 text-left transition ${s.mode === m.v ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300'}`}>
+              <div className="text-sm font-bold text-slate-900">{m.l}</div><div className="text-xs text-slate-500">{m.d}</div>
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="w-32 text-xs font-semibold text-slate-600">{s.mode === 'FIXED' ? 'Text' : 'Text before (optional)'}<input className={input} value={s.prefix || ''} onChange={(e) => setS({ ...s, prefix: e.target.value })} placeholder={s.mode === 'FIXED' ? 'BHARAT-' : 'e.g. BE-'} /></label>
+          {(s.mode === 'FIRST' || s.mode === 'FIRST_LAST') && <label className={field}>Letters from start<input type="number" min={1} max={8} className={input} value={s.firstN} onChange={(e) => setS({ ...s, firstN: Number(e.target.value) })} /></label>}
+          {s.mode === 'FIRST_LAST' && <label className={field}>Letters from end<input type="number" min={1} max={8} className={input} value={s.lastM} onChange={(e) => setS({ ...s, lastM: Number(e.target.value) })} /></label>}
+          {s.mode !== 'FIXED' && <label className={field}>Separator<select className={input} value={s.separator} onChange={(e) => setS({ ...s, separator: e.target.value })}><option value="-">-</option><option value="_">_</option><option value="">none</option></select></label>}
+          <label className={field}>Digits<input type="number" min={1} max={8} className={input} value={s.padding || 3} onChange={(e) => setS({ ...s, padding: Number(e.target.value) })} /></label>
+          <label className="w-28 text-xs font-semibold text-slate-600">Next number<input type="number" min={1} className={input} value={s.next || 1} onChange={(e) => setS({ ...s, next: Number(e.target.value) })} /></label>
+          <label className="w-28 text-xs font-semibold text-slate-600">Suffix<input className={input} value={s.suffix || ''} onChange={(e) => setS({ ...s, suffix: e.target.value })} placeholder="optional" /></label>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm">
+          {s.mode !== 'FIXED' && <label className="text-xs font-semibold text-slate-600">Try a name<input className="ml-2 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm" value={sample} onChange={(e) => setSample(e.target.value)} /></label>}
+          <span className="text-slate-500">Next code:</span><b className="font-mono text-lg text-indigo-700">{previewSeries(s, sample)}</b>
+        </div>
       </div>
-      <label className="mt-4 flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={dm} onChange={(e) => setDm(e.target.checked)} />Send each new code to its recruiter by Discord DM</label>
+      <label className="mt-4 flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={dm} onChange={(e) => setDm(e.target.checked)} />When staff create a code here, also send it to its owner by DM</label>
     </Card>
   );
 }
@@ -248,7 +289,7 @@ function EditDialog({ api, communityId, code, series, dmDefault, onClose, onSave
   return (
     <Dialog title={code ? `Edit ${code.code}` : 'New recruiter code'} onClose={onClose}>
       <div className="space-y-3">
-        <label className="block text-xs font-semibold text-slate-600">Recruiter (who gets the credit)
+        <label className="block text-xs font-semibold text-slate-600">Code owner (the member who shares it and gets the credit)
           <div className="mt-1"><MemberSelect communityId={communityId} value={f.recruiterDiscordId} onChange={(id, m) => setF({ ...f, recruiterDiscordId: id, recruiterName: m?.name || f.recruiterName })} placeholder="Search a member" /></div>
         </label>
         <label className="block text-xs font-semibold text-slate-600"><span className="flex items-center gap-1"><Hash className="h-3.5 w-3.5" />Code</span>

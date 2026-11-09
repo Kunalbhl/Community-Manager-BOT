@@ -394,6 +394,7 @@ router.get(`${tk}/codes/:codeId/history`, requireTenantAccess(), requirePermissi
 router.get(`${tk}/integrations`, requireTenantAccess(), requirePermission('community.view'), Toolkit.integrationsStatusHandler);
 router.put(`${tk}/recruitment/basics`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.recruitmentBasicsHandler);
 router.get(`${tk}/members`, requireTenantAccess(), requirePermission('community.view'), Toolkit.membersListHandler);
+router.put(`${tk}/bot-role`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.botRoleHandler);
 router.post(`${tk}/bot-nickname`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.botNicknameHandler);
 router.get(`${tk}/recruitment/rules`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listRulesHandler);
 router.post(`${tk}/recruitment/rules`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.addRuleHandler);

@@ -279,6 +279,9 @@ export const discordRecruitment = {
     if (approved && isSnowflake(applicantId)) {
       const { secureGate } = await import('./secureGate.service.js');
       await secureGate.onApproved(app.communityId, applicantId).catch(() => undefined);
+      // Every approved member can become a recruiter: give them their own code (if turned on) and DM it.
+      const { issueMemberCode } = await import('../../controllers/toolkit.controller.js');
+      await issueMemberCode(app.communityId, applicantId, vars.applicant).catch(() => undefined);
     }
     {
       const { recruitmentLog } = await import('./recruitmentLog.service.js');

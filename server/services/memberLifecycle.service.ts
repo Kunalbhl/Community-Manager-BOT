@@ -284,6 +284,7 @@ export class MemberLifecycleService {
       // 9. Welcome Experience - Task 51.10
       let welcomeStatus: MemberHandoffDocument['welcomeStatus'] = 'SKIPPED';
       try {
+        try { const { issueMemberCode } = await import('../controllers/toolkit.controller.js'); await issueMemberCode(communityId, discordUserId, applicantName); } catch { /* optional */ }
         const welcomeResult = await welcomeOnboardingService.executeWelcomeAndOnboarding({
           communityId,
           applicantDiscordUserId: discordUserId,

@@ -176,6 +176,35 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
     ));
     return true;
   }
+  // ---------- review room: rank done / special access ----------
+  if (area === 'room' && (action === 'done' || action === 'invite' || action === 'uninvite')) {
+    try {
+      const { StringSelectMenuBuilder, UserSelectMenuBuilder } = await import('discord.js');
+      if (action === 'done') {
+        const opts = await reviewRooms.doneOptions(arg, interaction.member);
+        if (!opts.length) { await interaction.reply({ content: 'No lower rank is active in this application.', ephemeral: true }); return true; }
+        await interaction.reply({ ephemeral: true, content: 'Which rank has finished its part? They will stop seeing this application.', components: [new ActionRowBuilder<any>().addComponents(new StringSelectMenuBuilder().setCustomId(`cm:room:donepick:${arg}`).setPlaceholder('Pick ranks').setMinValues(1).setMaxValues(opts.length).addOptions(opts.map((o) => ({ label: o.name.slice(0, 100), value: String(o.i) }))))] });
+      } else if (action === 'invite') {
+        await interaction.reply({ ephemeral: true, content: 'Who should get special access to this application?', components: [new ActionRowBuilder<any>().addComponents(new UserSelectMenuBuilder().setCustomId(`cm:room:invpick:${arg}`).setPlaceholder('Pick a member').setMinValues(1).setMaxValues(1))] });
+      } else {
+        const room: any = await reviewRoomsRepository.getById(arg);
+        const list: string[] = room?.invited || [];
+        if (!list.length) { await interaction.reply({ content: 'Nobody has special access.', ephemeral: true }); return true; }
+        const names = await Promise.all(list.map(async (id) => (await interaction.guild.members.fetch(id).catch(() => null))?.displayName || id));
+        await interaction.reply({ ephemeral: true, content: 'Remove whose special access?', components: [new ActionRowBuilder<any>().addComponents(new StringSelectMenuBuilder().setCustomId(`cm:room:uninvpick:${arg}`).setPlaceholder('Pick a member').addOptions(list.map((id, i) => ({ label: String(names[i]).slice(0, 100), value: id }))))] });
+      }
+    } catch (e: any) { await interaction.reply({ content: `⚠️ ${e.message}`, ephemeral: true }).catch(() => undefined); }
+    return true;
+  }
+  if (area === 'room' && (action === 'donepick' || action === 'invpick' || action === 'uninvpick')) {
+    await interaction.deferUpdate().catch(() => undefined);
+    try {
+      const msg = action === 'donepick' ? await reviewRooms.markDone(arg, interaction.member, interaction.values.map(Number))
+        : await reviewRooms.invite(arg, interaction.member, interaction.values[0], action === 'invpick');
+      await interaction.editReply({ content: `✅ ${msg}`, components: [] });
+    } catch (e: any) { await interaction.editReply({ content: `⚠️ ${e.message}`, components: [] }).catch(() => undefined); }
+    return true;
+  }
   if (area === 'room' && (action === 'voice' || action === 'escalate')) {
     try {
       const msg = action === 'voice' ? await reviewRooms.toggleVoice(arg, interaction.member) : await reviewRooms.escalate(arg, interaction.member);
