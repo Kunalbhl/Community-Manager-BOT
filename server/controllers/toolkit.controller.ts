@@ -297,7 +297,12 @@ export async function draftQuizHandler(req: Request, res: Response) {
     })).filter((q: any) => q.question && q.options.length === 4);
     if (!questions.length) throw new Error('Could not draft questions this time. Please try again.');
     ok(res, questions);
-  } catch (err) { fail(res, err); }
+  } catch (err: any) {
+    const m = String(err?.message || err);
+    if (/402|429|RESOURCE_EXHAUSTED|prepay|credits|quota|billing/i.test(m)) return fail(res, new Error('AI drafting is unavailable right now: the Google AI key on the bot server has no credit or quota left. You can still add questions yourself with "Add question".'));
+    if (/api key|not configured|API_KEY_INVALID|permission/i.test(m)) return fail(res, new Error('AI drafting is not set up on the bot server. You can still add questions yourself with "Add question".'));
+    fail(res, err);
+  }
 }
 
 export async function screeningThresholdHandler(req: Request, res: Response) {
