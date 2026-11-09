@@ -380,20 +380,20 @@ router.post(`${ft}/giveaways/:giveawayId/cancel`, ...manage, Features.cancelGive
 const tk = '/communities/:communityId/toolkit';
 router.get(tk, requireTenantAccess(), requirePermission('community.view'), Toolkit.getToolkitHandler);
 // Blacklist
-router.get(`${tk}/blacklist`, requireTenantAccess(), requirePermission('community.view'), Blacklist.listHandler);
+router.get(`${tk}/blacklist`, requireTenantAccess(), requirePermission('community.manage'), Blacklist.listHandler);
 router.get(`${tk}/blacklist/lookup`, requireTenantAccess(), requirePermission('community.manage'), Blacklist.lookupHandler);
-router.get(`${tk}/blacklist/search`, requireTenantAccess(), requirePermission('community.view'), Blacklist.searchHandler);
+router.get(`${tk}/blacklist/search`, requireTenantAccess(), requirePermission('community.manage'), Blacklist.searchHandler);
 router.post(`${tk}/blacklist`, requireTenantAccess(), requirePermission('community.manage'), Blacklist.createHandler);
 router.put(`${tk}/blacklist/settings`, requireTenantAccess(), requirePermission('settings.manage'), Blacklist.settingsHandler);
 router.put(`${tk}/blacklist/:entryId`, requireTenantAccess(), requirePermission('community.manage'), Blacklist.updateHandler);
 // Invite rewards
-router.get(`${tk}/rewards`, requireTenantAccess(), requirePermission('community.view'), Rewards.overviewHandler);
+router.get(`${tk}/rewards`, requireTenantAccess(), requirePermission('community.manage'), Rewards.overviewHandler);
 router.post(`${tk}/rewards/rules`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.createRuleHandler);
 router.put(`${tk}/rewards/rules/:ruleId`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.updateRuleHandler);
 router.delete(`${tk}/rewards/rules/:ruleId`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.deleteRuleHandler);
 router.post(`${tk}/rewards/grants/:grantId/:action`, requireTenantAccess(), requirePermission('community.manage'), Rewards.grantActionHandler);
 router.post(`${tk}/rewards/credits`, requireTenantAccess(), requirePermission('community.manage'), Rewards.creditHandler);
-router.get(`${tk}/rewards/wallet`, requireTenantAccess(), requirePermission('community.view'), Rewards.walletHandler);
+router.get(`${tk}/rewards/wallet`, requireTenantAccess(), requirePermission('community.manage'), Rewards.walletHandler);
 router.post(`${tk}/rewards/items`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.saveItemHandler);
 router.put(`${tk}/rewards/items/:itemId`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.saveItemHandler);
 router.post(`${tk}/rewards/items/:itemId/panel`, requireTenantAccess(), requirePermission('community.manage'), Rewards.panelHandler);
