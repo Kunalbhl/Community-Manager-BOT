@@ -97,9 +97,9 @@ async function startServer() {
   // Platform-owner diagnostics: DB latency, connection pool use and the slowest recent requests.
   app.get('/api/v1/platform/perf', async (req: Request, res: Response) => {
     try {
-      const { getPoolStats, pingDb } = await import('./server/repositories/postgres.store.js');
+      const { getPoolStats, pingDb, lockReport } = await import('./server/repositories/postgres.store.js');
       if (!(req as any).user?.isPlatformOwner) return res.status(403).json({ success: false, error: 'Platform owner only' });
-      res.json({ success: true, data: { db: await pingDb(), pool: getPoolStats(), slow: (globalThis as any).__cmSlow || [], uptimeSec: Math.round(process.uptime()), memoryMb: Math.round(process.memoryUsage().rss / 1048576) } });
+      res.json({ success: true, data: { db: await pingDb(), pool: getPoolStats(), stuckTransactions: await lockReport(), slow: (globalThis as any).__cmSlow || [], uptimeSec: Math.round(process.uptime()), memoryMb: Math.round(process.memoryUsage().rss / 1048576) } });
     } catch (err: any) { res.status(500).json({ success: false, error: err.message }); }
   });
 
@@ -153,6 +153,8 @@ async function startServer() {
       await connectDiscordBot();
       EngagementSchedulerService.startScheduler();
       startReminderScheduler();
+      // Clear database locks left by a write that a restart cut short, now and every 5 minutes.
+      { const tidy = () => import('./server/repositories/postgres.store.js').then(async (m) => { const n = await m.releaseOrphanLocks(); if (n) console.warn(`[DB] Released ${n} stuck transaction(s) holding locks.`); }).catch(() => undefined); tidy(); setInterval(tidy, 5 * 60_000); }
       setTimeout(() => { import('./server/services/brandSync.service.js').then((m) => m.syncBrandToDiscord()).catch(() => undefined); }, 90_000);
       // One-time workspace tidy-up per server (bold category on top, purpose messages, staff-role fix).
       setTimeout(async () => {

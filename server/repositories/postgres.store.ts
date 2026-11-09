@@ -229,6 +229,8 @@ export const postgresStore = {
     const client = await getPool().connect();
     try {
       await client.query('BEGIN');
+      // Never wait forever on a row another (possibly dead) connection still holds.
+      await client.query("SET LOCAL lock_timeout = '8s'; SET LOCAL statement_timeout = '20s'");
       const r = await client.query(`SELECT data FROM ${T_DOCS} WHERE collection = $1 AND id = $2 FOR UPDATE`, [collection, id]);
       if (!r.rows[0]) {
         await client.query('ROLLBACK');
@@ -254,6 +256,8 @@ export const postgresStore = {
     const client = await getPool().connect();
     try {
       await client.query('BEGIN');
+      // Never wait forever on a row another (possibly dead) connection still holds.
+      await client.query("SET LOCAL lock_timeout = '8s'; SET LOCAL statement_timeout = '20s'");
       const r = await client.query(`SELECT data FROM ${T_DOCS} WHERE collection = $1 AND id = $2 FOR UPDATE`, [collection, id]);
       const merged = deepMerge(r.rows[0]?.data || {}, encode({ ...data, id }));
       await client.query(
@@ -349,4 +353,22 @@ export function getPoolStats() {
 export async function pingDb() {
   const t = Date.now();
   try { await getPool().query('SELECT 1'); return { ok: true, ms: Date.now() - t }; } catch (e: any) { return { ok: false, ms: Date.now() - t, error: e.message }; }
+}
+
+/** Database sessions stuck "idle in transaction" (e.g. a bot restart cut a write short) hold row locks. */
+export async function lockReport() {
+  try {
+    const r = await getPool().query(`SELECT pid, state, now() - state_change AS age, left(query, 120) AS query
+      FROM pg_stat_activity WHERE usename = current_user AND pid <> pg_backend_pid() AND state LIKE 'idle in transaction%' ORDER BY state_change`);
+    return r.rows.map((x: any) => ({ pid: x.pid, state: x.state, ageSec: Math.round((x.age?.hours || 0) * 3600 + (x.age?.minutes || 0) * 60 + (x.age?.seconds || 0)), query: x.query }));
+  } catch (e: any) { return [{ error: e.message }]; }
+}
+
+/** End our own sessions that have been idle inside a transaction for over 2 minutes (they only block others). */
+export async function releaseOrphanLocks(): Promise<number> {
+  try {
+    const r = await getPool().query(`SELECT pg_terminate_backend(pid) AS ok FROM pg_stat_activity
+      WHERE usename = current_user AND pid <> pg_backend_pid() AND state LIKE 'idle in transaction%' AND now() - state_change > interval '2 minutes'`);
+    return r.rowCount || 0;
+  } catch { return 0; }
 }
