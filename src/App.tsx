@@ -61,8 +61,6 @@ import { PublicPricingTrustView } from './components/views/community/PublicPrici
 import { LifecycleIntelligenceView } from './components/views/lifecycle/LifecycleIntelligenceView.js';
 import { CommandMenu } from './components/common/CommandMenu.js';
 import { SupportTroubleshootingModal } from './components/common/SupportTroubleshootingModal.js';
-import { FirstLoginCalendarModal } from './components/common/FirstLoginCalendarModal.js';
-import { DiscordOAuthDiagnosticModal } from './components/common/DiscordOAuthDiagnosticModal.js';
 
 import { PrivacyPolicyView } from './components/views/public/PrivacyPolicyView.js';
 import { TermsOfServiceView } from './components/views/public/TermsOfServiceView.js';
@@ -225,7 +223,6 @@ export default function App() {
   } | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [sessionLoaded, setSessionLoaded] = useState<boolean>(false);
-  const [showOAuthDiagnostics, setShowOAuthDiagnostics] = useState<boolean>(false);
 
   const [aiInitialAction, setAiInitialAction] = useState<any>(null);
   const [aiInitialPrompt, setAiInitialPrompt] = useState<string | undefined>(undefined);
@@ -313,7 +310,6 @@ export default function App() {
     () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'onboarding'
   );
   const [onboardingRequired, setOnboardingRequired] = useState<boolean>(false);
-  const [showCalendarSetupModal, setShowCalendarSetupModal] = useState<boolean>(false);
 
   // Check onboarding status & first-login calendar setup status
   React.useEffect(() => {
@@ -342,29 +338,7 @@ export default function App() {
       }
     };
 
-    const checkCalendarSetup = async () => {
-      try {
-        const res = await fetch(`/api/v1/calendar/setup-status?communityId=${selectedCommunity}&recordPrompt=true`, {
-          credentials: 'include',
-          headers: {
-            'x-community-id': selectedCommunity,
-            ...(isPlatformVerified ? { 'x-platform-key': platformKey } : {}),
-          },
-        });
-        if (!res.ok) return;
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) return;
-        const json = await res.json();
-        if (json.success && json.data?.shouldShowFirstLoginPrompt) {
-          setShowCalendarSetupModal(true);
-        }
-      } catch (err) {
-        console.error('Failed checking calendar setup status', err);
-      }
-    };
-
     checkOnboarding();
-    checkCalendarSetup();
   }, [selectedCommunity, isPlatformVerified, platformKey]);
 
   // Fetch authentication context from the server dynamically
@@ -775,7 +749,6 @@ export default function App() {
           isAuthenticated={isAuthenticated}
           onLoginWithDiscord={handleLoginWithDiscord}
           onLogout={handleLogout}
-          onOpenOAuthDiagnostics={() => setShowOAuthDiagnostics(true)}
           onStartOnboarding={() => {
             setShowWorkspaceSettings(false);
             setShowOnboardingFlow(true);
@@ -888,21 +861,7 @@ export default function App() {
         communityId={selectedCommunity}
       />
 
-      {/* Discord OAuth Diagnostics Modal */}
-      <DiscordOAuthDiagnosticModal
-        isOpen={showOAuthDiagnostics}
-        onClose={() => setShowOAuthDiagnostics(false)}
-        onLoginSuccess={fetchSession}
-      />
 
-      {/* TASK 61 First-Login Google Calendar Onboarding Prompt */}
-      <FirstLoginCalendarModal
-        isOpen={showCalendarSetupModal}
-        onClose={() => setShowCalendarSetupModal(false)}
-        onConnected={() => setShowCalendarSetupModal(false)}
-        onSkipped={() => setShowCalendarSetupModal(false)}
-        communityId={selectedCommunity}
-      />
     </div>
   );
 }

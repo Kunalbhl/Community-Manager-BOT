@@ -340,3 +340,13 @@ export const postgresStore = {
     ready = null;
   },
 };
+
+/** Connection pool use (for diagnostics). */
+export function getPoolStats() {
+  try { const p: any = getPool(); return { total: p.totalCount, idle: p.idleCount, waiting: p.waitingCount, max: p.options?.max }; } catch { return null; }
+}
+/** Round-trip time of a trivial query. */
+export async function pingDb() {
+  const t = Date.now();
+  try { await getPool().query('SELECT 1'); return { ok: true, ms: Date.now() - t }; } catch (e: any) { return { ok: false, ms: Date.now() - t, error: e.message }; }
+}
