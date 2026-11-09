@@ -37,7 +37,7 @@ async function guildResources(communityId: string) {
     textChannels: chans.filter((c) => c.type === 0 || c.type === 5).sort((a, b) => a.rawPosition - b.rawPosition).map((c) => ({ id: c.id, name: c.name })),
     categories: chans.filter((c) => c.type === 4).sort((a, b) => a.rawPosition - b.rawPosition).map((c) => ({ id: c.id, name: c.name })),
     voiceChannels: chans.filter((c) => c.type === 2 || c.type === 13).sort((a, b) => a.rawPosition - b.rawPosition).map((c) => ({ id: c.id, name: c.name })),
-    emojis: Array.from(guild.emojis.cache.values()).filter((e: any) => e.available !== false).map((e: any) => ({ id: e.id, name: e.name, animated: !!e.animated, url: e.imageURL({ size: 48 }) })),
+    emojis: (() => { try { return Array.from(guild.emojis.cache.values()).filter((e: any) => e.available !== false).map((e: any) => ({ id: e.id, name: e.name, animated: !!e.animated, url: e.imageURL({ size: 64 }) })); } catch { return []; } })(),
     botNickname: guild.members.me?.nickname || '',
     botName: guild.members.me?.user?.username || '',
   };
