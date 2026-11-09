@@ -11,7 +11,7 @@ import {
 } from 'discord.js';
 import { FirestoreRepository } from '../../repositories/firestore.repository.js';
 import { logger } from '../../logging/logger.js';
-import { getToolkit, saveToolkit, isSnowflake, TicketType } from './toolkitConfig.js';
+import { getToolkit, saveToolkit, isSnowflake, TicketType, DEFAULT_TICKET_PANEL } from './toolkitConfig.js';
 
 export interface TicketDoc {
   id: string;
@@ -40,21 +40,64 @@ export const ticketsRepository = new FirestoreRepository<TicketDoc>('tickets');
 const MAX_OPEN_PER_MEMBER = 3;
 
 export const ticketService = {
-  panelComponents(types: TicketType[]) {
+  panelComponents(types: TicketType[], panel = DEFAULT_TICKET_PANEL) {
+    const list = types.slice(0, 25);
+    if (panel.style === 'BUTTONS') {
+      const styles: Record<string, ButtonStyle> = { PRIMARY: ButtonStyle.Primary, SECONDARY: ButtonStyle.Secondary, SUCCESS: ButtonStyle.Success, DANGER: ButtonStyle.Danger };
+      const rows: ActionRowBuilder<ButtonBuilder>[] = [];
+      for (let i = 0; i < list.length; i += 5) {
+        rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(list.slice(i, i + 5).map((t) => {
+          const bt = new ButtonBuilder().setCustomId(`cm:ticket:btn:${t.key}`).setLabel(t.label.slice(0, 80)).setStyle(styles[t.buttonStyle || 'SECONDARY'] || ButtonStyle.Secondary);
+          if (t.emoji) bt.setEmoji(t.emoji);
+          return bt;
+        })));
+      }
+      return rows;
+    }
     const menu = new StringSelectMenuBuilder()
       .setCustomId('cm:ticket:pick')
-      .setPlaceholder('Choose what you need help with')
-      .addOptions(types.slice(0, 25).map((t) => ({ label: t.label.slice(0, 100), value: t.key, description: t.description.slice(0, 100), emoji: t.emoji || undefined })));
+      .setPlaceholder((panel.placeholder || 'Choose what you need help with').slice(0, 150))
+      .addOptions(list.map((t) => ({ label: t.label.slice(0, 100), value: t.key, description: (t.description || '').slice(0, 100) || undefined, emoji: t.emoji || undefined })));
     return [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)];
   },
 
-  async postPanel(communityId: string, channel: any) {
+  panelMessage(cfg: any) {
+    const panel = { ...DEFAULT_TICKET_PANEL, ...(cfg.tickets.panel || {}), embed: { ...DEFAULT_TICKET_PANEL.embed, ...(cfg.tickets.panel?.embed || {}) } };
+    const e = panel.embed;
+    const lines = cfg.tickets.types.map((t: TicketType) => `${t.emoji} **${t.label}**${t.description ? ` · ${t.description}` : ''}`).join('\n');
+    const description = [e.description, e.listTypes ? lines : ''].filter(Boolean).join('\n\n').slice(0, 4096);
+    const embed: any = { color: parseInt(String(e.color || '#7c8cff').slice(1), 16) || 0x7c8cff };
+    if (e.title) embed.title = e.title;
+    if (description) embed.description = description;
+    if (e.url && e.title) embed.url = e.url;
+    if (e.authorName) embed.author = { name: e.authorName, icon_url: e.authorIcon || undefined };
+    if (e.thumbnail) embed.thumbnail = { url: e.thumbnail };
+    if (e.image) embed.image = { url: e.image };
+    if (e.footerText) embed.footer = { text: e.footerText, icon_url: e.footerIcon || undefined };
+    if (e.timestamp) embed.timestamp = new Date().toISOString();
+    const hasEmbed = !!(embed.title || embed.description || embed.image || embed.author);
+    return {
+      content: panel.content || undefined,
+      embeds: hasEmbed ? [embed] : [],
+      components: this.panelComponents(cfg.tickets.types, panel),
+      allowedMentions: { parse: ['roles', 'users', 'everyone'] as any },
+    };
+  },
+
+  /** Posts the panel, or updates the one already posted in that channel (unless forceNew). */
+  async postPanel(communityId: string, channel: any, forceNew = false) {
     const cfg = await getToolkit(communityId);
-    const lines = cfg.tickets.types.map((t) => `${t.emoji} **${t.label}** · ${t.description}`).join('\n');
-    return channel.send({
-      embeds: [{ title: '🎫 Need help? Open a ticket', description: `Pick a type below and a private channel opens for you and our staff.\n\n${lines}`, color: 0x7c8cff }],
-      components: this.panelComponents(cfg.tickets.types),
-    });
+    if (!cfg.tickets.types.length) throw new Error('Add at least one ticket type first.');
+    const msg = this.panelMessage(cfg);
+    const p: any = cfg.tickets.panel || {};
+    let sent: any = null; let updated = false;
+    if (!forceNew && p.messageId && p.channelId === channel.id) {
+      const old = await channel.messages.fetch(p.messageId).catch(() => null);
+      if (old) { sent = await old.edit({ ...msg, allowedMentions: { parse: [] } }); updated = true; }
+    }
+    if (!sent) sent = await channel.send(msg);
+    await saveToolkit(communityId, { tickets: { ...cfg.tickets, panel: { ...DEFAULT_TICKET_PANEL, ...p, channelId: channel.id, messageId: sent.id }, panelPostedAt: new Date().toISOString() } as any });
+    return { updated, url: sent.url };
   },
 
   modal(typeKey: string, label: string) {
@@ -135,11 +178,20 @@ export const ticketService = {
       new ButtonBuilder().setCustomId(`cm:ticket:claim:${ticket.id}`).setLabel('Claim').setEmoji('✋').setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId(`cm:ticket:close:${ticket.id}`).setLabel('Close').setEmoji('🔒').setStyle(ButtonStyle.Danger),
     );
+    const panelCfg: any = cfg.tickets.panel || {};
+    const pingRoles = [...new Set([...(panelCfg.pingStaff === false ? [] : staff), ...(type.pingRoleIds || []).filter((id) => guild.roles.cache.has(id))])];
+    const pingUsers = [...new Set([member.id, ...(type.pingUserIds || [])])];
+    // People pinged on this type must be able to see the ticket.
+    for (const uid of type.pingUserIds || []) await channel.permissionOverwrites.edit(uid, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }).catch(() => undefined);
+    for (const rid of type.pingRoleIds || []) if (!staff.includes(rid)) await channel.permissionOverwrites.edit(rid, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }).catch(() => undefined);
+    const num = String(number).padStart(4, '0');
+    const fill = (t: string) => t.replace(/\{\{?\s*(member|type|number|subject|server)\s*\}?\}/g, (_m, k) => ({ member: `<@${member.id}>`, type: type.label, number: `#${num}`, subject: params.subject, server: guild.name } as any)[k]);
     await channel.send({
-      content: `<@${member.id}> ${staff.map((id) => `<@&${id}>`).join(' ')}`.trim(),
-      allowedMentions: { users: [member.id], roles: staff },
+      content: [pingUsers.map((id) => `<@${id}>`).join(' '), pingRoles.map((id) => `<@&${id}>`).join(' ')].filter(Boolean).join(' '),
+      allowedMentions: { users: pingUsers, roles: pingRoles },
       embeds: [{
-        title: `${type.emoji} ${type.label} · #${String(number).padStart(4, '0')}`,
+        title: type.welcomeTitle ? fill(type.welcomeTitle).slice(0, 256) : `${type.emoji} ${type.label} · #${num}`,
+        ...(type.welcomeMessage ? { description: fill(type.welcomeMessage).slice(0, 4000) } : {}),
         color: 0xff5c8a,
         fields: [
           { name: 'Subject', value: params.subject.slice(0, 1024) },

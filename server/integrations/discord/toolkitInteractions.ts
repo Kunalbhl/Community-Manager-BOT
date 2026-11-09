@@ -151,6 +151,11 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
     await interaction.showModal(ticketService.modal(typeKey, label));
     return true;
   }
+  if (area === 'ticket' && action === 'btn') {
+    const label = interaction.component?.label || 'Open a ticket';
+    await interaction.showModal(ticketService.modal(arg, label));
+    return true;
+  }
   if (area === 'ticket' && action === 'form' && interaction.isModalSubmit()) {
     await interaction.deferReply({ ephemeral: true });
     try {
