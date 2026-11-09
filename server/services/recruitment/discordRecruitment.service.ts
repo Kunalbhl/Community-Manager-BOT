@@ -107,6 +107,10 @@ export const discordRecruitment = {
     {
       // Blacklisted people are told before they fill the form.
       if (risk && (risk.riskStatus === 'BLACKLISTED' || risk.riskStatus === 'DO_NOT_REAPPLY')) return interaction.reply({ content: '🚫 You can’t apply to this server right now. If you think this is a mistake, please contact the server staff.', ephemeral: true });
+      try {
+        const { guardApplicant } = await import('../blacklist/blacklistGuard.service.js');
+        await guardApplicant(communityId, { id: interaction.user.id, username: interaction.user.username, globalName: interaction.user.globalName, displayName: interaction.member?.displayName, avatar: interaction.user.displayAvatarURL?.() });
+      } catch (e: any) { if (e?.blacklisted) return interaction.reply({ content: `🚫 ${e.message}`, ephemeral: true }); }
     }
     const open = (active as any[]).find((a) => ['SUBMITTED', 'UNDER_REVIEW', 'ESCALATED', 'INTERVIEW_SCHEDULED', 'INTERVIEW_PENDING'].includes(a.status));
     if (open) return interaction.reply({ content: `⏳ You already have an application in review (submitted <t:${Math.floor(Date.parse(open.submittedAt || open.createdAt) / 1000)}:R>). You will get a DM when it is decided.`, ephemeral: true });

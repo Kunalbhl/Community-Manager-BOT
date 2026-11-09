@@ -62,6 +62,10 @@ export function attachFeatureHandlers(client: Client) {
     const { inviteRewards } = await import('../../services/rewards/inviteRewards.service.js');
     await inviteRewards.onMemberLeft(await communityOf(member.guild.id), member.id);
   }));
+  client.on(Events.GuildMemberAdd, (member: any) => safe('blacklist join', async () => {
+    const { onJoin } = await import('../../services/blacklist/blacklistGuard.service.js');
+    await onJoin(await communityOf(member.guild.id), member);
+  }));
   client.on(Events.GuildMemberAdd, (member: any) => safe('invite rewards rejoin', async () => {
     if (member.user?.bot) return;
     const { inviteRewards } = await import('../../services/rewards/inviteRewards.service.js');
