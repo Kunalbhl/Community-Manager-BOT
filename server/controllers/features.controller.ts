@@ -44,6 +44,7 @@ export async function saveFeatureSectionHandler(req: Request, res: Response) {
         message: str(b.message, 500) || cur.levels.message, noXpChannelIds: ids(b.noXpChannelIds, 100), noXpRoleIds: ids(b.noXpRoleIds, 50),
         rewards: (Array.isArray(b.rewards) ? b.rewards : []).filter((r: any) => isSnowflake(r?.roleId)).slice(0, 50).map((r: any) => ({ level: int(r.level, 1, 500, 5), roleId: r.roleId })).sort((x: any, y: any) => x.level - y.level),
         keepOldRewards: b.keepOldRewards !== false,
+        voiceXpPerMinute: int(b.voiceXpPerMinute, 0, 100, 0), voiceRequireOthers: b.voiceRequireOthers !== false, voiceIgnoreMuted: b.voiceIgnoreMuted !== false,
       } };
     } else if (section === 'logs') {
       const e = b.events || {};
@@ -56,7 +57,7 @@ export async function saveFeatureSectionHandler(req: Request, res: Response) {
     } else if (section === 'birthdays') {
       const tz = str(b.timezone, 60) || 'Asia/Kolkata';
       try { new Intl.DateTimeFormat('en', { timeZone: tz }); } catch { throw new Error('Unknown time zone.'); }
-      patch = { birthdays: { ...cur.birthdays, enabled: bool(b.enabled), channelId: snow(b.channelId), roleId: snow(b.roleId), message: str(b.message, 500) || cur.birthdays.message, hour: int(b.hour, 0, 23, 9), timezone: tz } };
+      patch = { birthdays: { ...cur.birthdays, enabled: bool(b.enabled), channelId: snow(b.channelId), roleId: snow(b.roleId), message: str(b.message, 500) || cur.birthdays.message, hour: int(b.hour, 0, 23, 9), timezone: tz, askOnJoin: bool(b.askOnJoin) } };
     } else if (section === 'verification') {
       patch = { verification: { enabled: bool(b.enabled), roleId: snow(b.roleId), removeRoleId: snow(b.removeRoleId), mode: b.mode === 'MATH' ? 'MATH' : 'BUTTON', message: str(b.message, 1000) || cur.verification.message } };
     } else if (section === 'customCommands') {

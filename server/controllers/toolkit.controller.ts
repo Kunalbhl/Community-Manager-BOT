@@ -686,3 +686,29 @@ export async function recruitmentBasicsHandler(req: Request, res: Response) {
     ok(res, { applyEnabled: rec.applyEnabled, askRecruiterCode: rec.askRecruiterCode, codeRequired: !!rec.codeRequired });
   } catch (err) { fail(res, err); }
 }
+
+/** Live member list from Discord: server nickname, username, roles, join date. Paged and searchable. */
+export async function membersListHandler(req: Request, res: Response) {
+  try {
+    const guild: any = await guildFor(req.params.communityId);
+    if (!guild) throw new Error('The bot is not connected to this server.');
+    if (guild.members.cache.size < guild.memberCount) await guild.members.fetch().catch(() => undefined);
+    const q = str(req.query.q, 50).toLowerCase();
+    const role = String(req.query.role || '');
+    const kind = String(req.query.kind || 'humans');
+    const sort = req.query.sort === 'name' ? 'name' : 'joined';
+    const page = Math.max(1, Number(req.query.page) || 1);
+    let list = Array.from(guild.members.cache.values()) as any[];
+    if (kind === 'humans') list = list.filter((m) => !m.user.bot); else if (kind === 'bots') list = list.filter((m) => m.user.bot);
+    if (role) list = list.filter((m) => m.roles.cache.has(role));
+    if (q) list = list.filter((m) => m.displayName.toLowerCase().includes(q) || m.user.username.toLowerCase().includes(q) || m.id === q);
+    list.sort((a, b) => (sort === 'name' ? a.displayName.localeCompare(b.displayName) : (b.joinedTimestamp || 0) - (a.joinedTimestamp || 0)));
+    const total = list.length;
+    const rows = list.slice((page - 1) * 50, page * 50).map((m) => ({
+      id: m.id, name: m.displayName, username: m.user.username, avatar: m.user.displayAvatarURL({ size: 64 }), bot: m.user.bot,
+      joinedAt: m.joinedAt?.toISOString(), createdAt: m.user.createdAt?.toISOString(), timedOut: !!m.communicationDisabledUntilTimestamp && m.communicationDisabledUntilTimestamp > Date.now(),
+      roles: m.roles.cache.filter((r: any) => r.id !== guild.id).sort((a: any, b: any) => b.position - a.position).map((r: any) => ({ id: r.id, name: r.name, color: r.hexColor })),
+    }));
+    ok(res, { total, page, pages: Math.max(1, Math.ceil(total / 50)), rows });
+  } catch (err) { fail(res, err); }
+}

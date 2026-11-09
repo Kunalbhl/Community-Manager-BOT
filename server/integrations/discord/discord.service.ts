@@ -23,6 +23,7 @@ export const AUTHORITATIVE_GATEWAY_INTENTS = [
   GatewayIntentBits.GuildMessageReactions,
   GatewayIntentBits.MessageContent,
   GatewayIntentBits.DirectMessages,
+  GatewayIntentBits.GuildVoiceStates, // voice XP and interview voice rooms
   // GuildPresences removed: privileged, unused, and heavy on memory/bandwidth.
 ] as const;
 

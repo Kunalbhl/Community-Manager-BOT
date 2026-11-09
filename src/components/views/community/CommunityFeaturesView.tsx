@@ -62,7 +62,7 @@ export function CommunityFeaturesView({ communityId, only }: { communityId: stri
           );
         })}
       </div>
-      <p className="text-sm text-slate-500">{current.hint}</p>
+      {!only && <p className="text-sm text-slate-500">{current.hint}</p>}
       {error && <Banner tone="error">{error} <button onClick={load} className="ml-2 underline">Try again</button></Banner>}
       {res && !res.connected && <Banner tone="warn">The bot is not connected to this server right now, so roles and channels can’t be listed.</Banner>}
       {!cfg && !error && <div className="h-64 animate-pulse rounded-2xl bg-slate-100" />}
@@ -107,6 +107,16 @@ function LevelsTab({ api, cfg, res, onSave }: any) {
             <div className="md:col-span-3"><Label t="Level-up message ({user}, {username}, {level}, {server})"><input className={input} value={c.message} onChange={(e) => setC({ ...c, message: e.target.value })} /></Label></div>
             <div className="text-sm font-medium text-slate-700 md:col-span-3 lg:col-span-1">No XP in channels<div className="mt-1"><MultiPick options={res.textChannels} value={c.noXpChannelIds} onChange={(v) => setC({ ...c, noXpChannelIds: v })} placeholder="Add a channel" prefix="#" /></div></div>
             <div className="text-sm font-medium text-slate-700 md:col-span-3 lg:col-span-2">No XP for roles<div className="mt-1"><MultiPick options={res.roles} value={c.noXpRoleIds} onChange={(v) => setC({ ...c, noXpRoleIds: v })} placeholder="Add a role" prefix="@" /></div></div>
+            <div className="rounded-xl border border-slate-200 p-4 md:col-span-3">
+              <div className="font-semibold text-slate-900">Voice XP</div>
+              <p className="text-xs text-slate-500">Members also earn XP every minute they spend in voice channels. Messages in a voice channel’s text chat already count like normal messages. Discord doesn’t let bots hear who is talking without recording, so “active” means not deafened{c.voiceIgnoreMuted !== false ? ' or muted' : ''}.</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <Label t="XP per minute in voice (0 = off)"><input type="number" min={0} max={100} className={input} value={c.voiceXpPerMinute || 0} onChange={(e) => setC({ ...c, voiceXpPerMinute: Number(e.target.value) })} /></Label>
+                <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={c.voiceRequireOthers !== false} onChange={(e) => setC({ ...c, voiceRequireOthers: e.target.checked })} />Only when at least 2 people are in the channel</label>
+                <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={c.voiceIgnoreMuted !== false} onChange={(e) => setC({ ...c, voiceIgnoreMuted: e.target.checked })} />No XP while muted</label>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">The server’s AFK channel and channels in “No XP in channels” never give voice XP.</p>
+            </div>
           </div>
         </Card>
         <Card title="Reward roles" desc="Given automatically when a member reaches the level."
@@ -317,6 +327,7 @@ function BirthdaysTab({ api, cfg, res, onSave }: any) {
           <Label t="Announce at (hour)"><select className={input} value={c.hour} onChange={(e) => setC({ ...c, hour: Number(e.target.value) })}>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}</select></Label>
           <Label t="Time zone"><input className={input} value={c.timezone} onChange={(e) => setC({ ...c, timezone: e.target.value })} placeholder="Asia/Kolkata" /></Label>
           <div className="md:col-span-2"><Label t="Message ({user}, {username}, {server})"><input className={input} value={c.message} onChange={(e) => setC({ ...c, message: e.target.value })} /></Label></div>
+          <label className="flex items-start gap-2 rounded-xl border border-slate-200 p-3 text-sm text-slate-700 md:col-span-2"><input type="checkbox" className="mt-0.5" checked={!!c.askOnJoin} onChange={(e) => setC({ ...c, askOnJoin: e.target.checked })} /><span><b>Ask new members for their birthday</b><br /><span className="text-xs text-slate-500">A few seconds after joining, the bot sends a private message with “Share my birthday” and “No thanks”. Sharing is optional; only day and month are saved, and members can change or remove it with /birthday.</span></span></label>
         </div>
         <div className="mt-5"><SaveBar onSave={() => onSave(c)} /></div>
       </Card>

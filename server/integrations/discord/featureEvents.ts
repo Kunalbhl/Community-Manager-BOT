@@ -33,6 +33,23 @@ export function attachFeatureHandlers(client: Client) {
     await serverLogs.send(c, member.guild, 'memberJoin', '📥 Member joined', `<@${member.id}> · ${member.user.username}`, [{ name: 'Account created', value: ts(member.user.createdTimestamp), inline: true }, { name: 'Members', value: String(member.guild.memberCount), inline: true }]);
   }));
 
+  // Optional: ask new members for their birthday in a DM (they can skip; nothing is required).
+  client.on(Events.GuildMemberAdd, (member: any) => safe('birthday ask', async () => {
+    if (member.user.bot) return;
+    const c = await communityOf(member.guild.id);
+    const cfg = (await (await import('../../services/features/featuresConfig.js')).getFeatures(c)).birthdays;
+    if (!cfg.enabled || !cfg.askOnJoin) return;
+    const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
+    await new Promise((r) => setTimeout(r, 15_000)); // after the welcome, not on top of it
+    await member.send({
+      content: `👋 Welcome to **${member.guild.name}**! Would you like the server to celebrate your birthday? It’s completely optional; only the day and month are saved.`,
+      components: [new ActionRowBuilder<any>().addComponents(
+        new ButtonBuilder().setCustomId(`cm:bday:ask:${member.guild.id}`).setLabel('Share my birthday').setEmoji('🎂').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId(`cm:bday:skip:${member.guild.id}`).setLabel('No thanks').setStyle(ButtonStyle.Secondary),
+      )],
+    }).catch(() => undefined); // DMs closed: nothing to do
+  }));
+
   client.on(Events.GuildMemberRemove, (member: any) => safe('log leave', async () => {
     const c = await communityOf(member.guild.id);
     const roles = member.roles?.cache ? Array.from(member.roles.cache.values()).filter((r: any) => r.id !== member.guild.id).map((r: any) => `<@&${r.id}>`).join(' ') : '';

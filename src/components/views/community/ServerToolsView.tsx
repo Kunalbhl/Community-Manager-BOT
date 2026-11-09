@@ -74,7 +74,7 @@ export function ServerToolsView({ communityId, only }: { communityId: string; on
           </button>
         ))}
       </div>
-      <p className="text-sm text-slate-500">{current.hint}</p>
+      {!only && <p className="text-sm text-slate-500">{current.hint}</p>}
 
       {error && <Banner tone="error">{error} <button onClick={load} className="ml-2 underline">Try again</button></Banner>}
       {res && !res.connected && <Banner tone="warn">The bot is not connected to this server right now, so roles and channels can’t be listed. Settings still save.</Banner>}

@@ -14,13 +14,14 @@ export interface FeaturesConfig {
     enabled: boolean; minXp: number; maxXp: number; cooldownSeconds: number;
     announce: 'SAME_CHANNEL' | 'CHANNEL' | 'DM' | 'OFF'; channelId?: string; message: string;
     noXpChannelIds: string[]; noXpRoleIds: string[]; rewards: LevelReward[]; keepOldRewards: boolean;
+    /** XP per minute spent in voice (0 = off). */ voiceXpPerMinute?: number; voiceRequireOthers?: boolean; voiceIgnoreMuted?: boolean;
   };
   logs: {
     enabled: boolean; channelId?: string;
     events: { memberJoin: boolean; memberLeave: boolean; messageDelete: boolean; messageEdit: boolean; roleChange: boolean; nicknameChange: boolean; moderation: boolean };
   };
   starboard: { enabled: boolean; channelId?: string; emoji: string; threshold: number; allowSelfStar: boolean };
-  birthdays: { enabled: boolean; channelId?: string; roleId?: string; message: string; hour: number; timezone: string; lastRunDate?: string };
+  birthdays: { enabled: boolean; channelId?: string; roleId?: string; message: string; hour: number; timezone: string; lastRunDate?: string; askOnJoin?: boolean };
   verification: { enabled: boolean; roleId?: string; removeRoleId?: string; mode: 'BUTTON' | 'MATH'; message: string };
   customCommands: { enabled: boolean; prefix: string; commands: CustomCommand[] };
   updatedAt: string;

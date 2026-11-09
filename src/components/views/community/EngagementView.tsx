@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Megaphone, Repeat, Clock, BarChart3, FileText, Trash2, Pause, Play, Pencil, Copy, Info, Send, CheckCircle2 } from 'lucide-react';
-import { ChannelSelect, RoleSelect, MemberSelect, MultiMemberSelect, useDiscordResources } from '../../common/DiscordPickers.js';
+import { ChannelSelect, RoleSelect, MemberSelect, MultiMemberSelect, useDiscordResources, MemberName } from '../../common/DiscordPickers.js';
 import { MessageComposer } from '../../common/MessageComposer.js';
 
 interface EngagementViewProps { communityId: string; initialTab?: Tab; only?: Tab }
@@ -280,7 +280,7 @@ function Reminders({ communityId, data, run, api, busy, chanName }: P) {
       list={!data.length ? <Empty text="No reminders yet." /> : data.map((r) => (
         <div key={r.id} className="rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-bold text-slate-900">{r.targetType === 'CHANNEL' ? `#${chanName?.(r.channelId) || 'channel'}` : r.targetUserName ? `@${r.targetUserName}` : 'A member (DM)'}</span>
+            <span className="text-sm font-bold text-slate-900">{r.targetType === 'CHANNEL' ? `#${chanName?.(r.channelId) || 'channel'}` : <>@<MemberName id={r.targetUser} communityId={communityId} fallback={r.targetUserName} /></>}</span>
             <Badge s={r.status} />
           </div>
           <div className="mt-1 text-xs text-slate-500">{r.status === 'PENDING' ? `Sends ${when(r.triggerAt)}` : `Sent ${when(r.updatedAt)}`}{r.recurrence && r.recurrence !== 'ONCE' ? ` · repeats ${r.recurrence === 'DAILY' ? 'daily' : 'weekly'}` : ''}</div>
@@ -382,7 +382,7 @@ function Templates({ communityId, data, run, api, busy }: P) {
             <datalist id="cm-tpl-cats">{['General', 'Announcement', 'Recruitment', 'Promotion', 'Event', 'Reminder', 'Moderation', ...cats].filter((v, i, a) => a.indexOf(v) === i).map((c) => <option key={c} value={c} />)}</datalist>
           </label>
         </div>
-        <div><span className={label}>Message</span><div className="mt-1"><MessageComposer communityId={communityId} value={content} onChange={setContent} allowTemplates={false} placeholder="Hello {{username}}! Welcome to {{communityName}}…" /></div></div>
+        <div><span className={label}>Message</span><div className="mt-1"><MessageComposer communityId={communityId} value={content} onChange={setContent} allowTemplates={false} placeholder="Hello {{username}}! Welcome to {{communityName}}…" vars={[{ token: 'username', label: 'Member name' }, { token: 'member', label: '@Member' }, { token: 'communityName', label: 'Server name' }, { token: 'memberCount', label: 'Member count' }, { token: 'recruiter', label: '@Recruiter' }, { token: 'recruiterCode', label: 'Recruiter code' }]} /></div></div>
         <div className="flex gap-2">
           <button className={primary} disabled={busy || !name.trim() || !content.trim()}><CheckCircle2 className="h-4 w-4" />{editing ? 'Save changes' : 'Save template'}</button>
           {editing && <button type="button" onClick={reset} className="rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-600">Cancel</button>}

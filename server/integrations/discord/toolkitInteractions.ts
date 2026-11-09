@@ -23,6 +23,30 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
   if (!id.startsWith('cm:')) return false;
   const [, area, action, arg] = id.split(':');
 
+  // ---------- birthday asked in DM after joining (optional for the member) ----------
+  if (area === 'bday' && action === 'ask') {
+    return interaction.showModal(new ModalBuilder().setCustomId(`cm:bday:save:${arg}`).setTitle('Your birthday').addComponents(
+      new ActionRowBuilder<TextInputBuilder>().addComponents(new TextInputBuilder().setCustomId('day').setLabel('Day (1-31)').setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(2).setRequired(true)),
+      new ActionRowBuilder<TextInputBuilder>().addComponents(new TextInputBuilder().setCustomId('month').setLabel('Month (1-12)').setStyle(TextInputStyle.Short).setMinLength(1).setMaxLength(2).setRequired(true)),
+    )).then(() => true);
+  }
+  if (area === 'bday' && action === 'skip') {
+    await interaction.update({ content: 'No problem, we won’t ask again. You can add it any time with `/birthday set` in the server.', components: [] }).catch(() => undefined);
+    return true;
+  }
+  if (area === 'bday' && action === 'save' && interaction.isModalSubmit()) {
+    const day = Number(interaction.fields.getTextInputValue('day'));
+    const month = Number(interaction.fields.getTextInputValue('month'));
+    try {
+      const { birthdays } = await import('../../services/features/community.service.js');
+      await birthdays.set(await communityForGuild(arg), interaction.user.id, interaction.user.username, day, month);
+      await interaction.reply({ content: `🎂 Saved: ${day}/${month}. The server will celebrate with you on the day! Change or remove it any time with \`/birthday\`.` });
+    } catch (e: any) {
+      await interaction.reply({ content: `⚠️ ${e.message} Press the button to try again.` });
+    }
+    return true;
+  }
+
   // ---------- events: Register / Can't go ----------
   if (area === 'evt' && (action === 'join' || action === 'leave')) {
     await interaction.deferReply({ ephemeral: true });
