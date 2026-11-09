@@ -99,7 +99,7 @@ async function startServer() {
     try {
       const { getPoolStats, pingDb, lockReport } = await import('./server/repositories/postgres.store.js');
       if (!(req as any).user?.isPlatformOwner) return res.status(403).json({ success: false, error: 'Platform owner only' });
-      res.json({ success: true, data: { db: await pingDb(), pool: getPoolStats(), stuckTransactions: await lockReport(), slow: (globalThis as any).__cmSlow || [], uptimeSec: Math.round(process.uptime()), memoryMb: Math.round(process.memoryUsage().rss / 1048576) } });
+      res.json({ success: true, data: { db: await pingDb(), pool: getPoolStats(), stuckTransactions: await lockReport(), lastSettingsSave: (globalThis as any).__cmSaveTrace || null, instance: process.env.BOT_INSTANCE_ROLE || 'cloudrun', slow: (globalThis as any).__cmSlow || [], uptimeSec: Math.round(process.uptime()), memoryMb: Math.round(process.memoryUsage().rss / 1048576) } });
     } catch (err: any) { res.status(500).json({ success: false, error: err.message }); }
   });
 

@@ -720,6 +720,10 @@ export class SettingsService {
     if (!communityId) {
       throw new BadRequestError('communityId is required');
     }
+    const t0 = Date.now();
+    const trace: string[] = [];
+    const step = (name: string) => { trace.push(`${name} +${Date.now() - t0}ms`); (globalThis as any).__cmSaveTrace = { at: new Date(t0).toISOString(), trace: [...trace] }; };
+    step('start');
 
     // Role safety check
     if (actor.role !== 'OWNER' && actor.role !== 'CONTROLLER' && actor.role !== 'PLATFORM_OWNER') {
@@ -727,6 +731,7 @@ export class SettingsService {
     }
 
     const current = await this.getConsolidatedSettings(communityId);
+    step('const current = await this.getConsolidatedSettings(community');
     const now = new Date().toISOString();
 
     // 1. Validate payloads
@@ -767,8 +772,10 @@ export class SettingsService {
       if (payload.general.description !== undefined) commPatch.description = payload.general.description.trim();
 
       const existingComm = await communitiesRepository.getById(communityId);
+      step('const existingComm = await communitiesRepository.getById(com');
       if (existingComm) {
         await communitiesRepository.update(communityId, commPatch);
+        step('await communitiesRepository.update(communityId, commPatch);');
       }
     }
 
@@ -820,8 +827,10 @@ export class SettingsService {
     }
 
     const existingConfig = await communityConfigurationRepository.getById(communityId);
+    step('const existingConfig = await communityConfigurationRepositor');
     if (existingConfig) {
       await communityConfigurationRepository.update(communityId, configPatch);
+      step('await communityConfigurationRepository.update(communityId, c');
     } else {
       await communityConfigurationRepository.create({
         id: communityId,
@@ -853,6 +862,7 @@ export class SettingsService {
     // C. Recruiter Record configuration
     if (payload.recruitment && (payload.recruitment.recordEnabled !== undefined || payload.recruitment.recordChannelName || payload.recruitment.recordChannelId || payload.recruitment.recordTemplate)) {
       const records = await recruiterRecordConfigsRepository.listForTenant(communityId);
+      step('const records = await recruiterRecordConfigsRepository.listF');
       if (records.length > 0) {
         const patch: Record<string, any> = { updatedAt: now, updatedBy: actor.userId };
         if (payload.recruitment.recordEnabled !== undefined) patch.enabled = payload.recruitment.recordEnabled;
@@ -869,6 +879,7 @@ export class SettingsService {
           patch.initialMessageTemplate = payload.recruitment.recordTemplate;
         }
         await recruiterRecordConfigsRepository.update(records[0].id, patch);
+        step('await recruiterRecordConfigsRepository.update(records[0].id,');
       } else {
         await recruiterRecordConfigsRepository.create({
           id: `rec_cfg_${communityId}_${Date.now()}`,
@@ -898,6 +909,7 @@ export class SettingsService {
       for (const [roleKey, roleConfig] of Object.entries(payload.permissions.roleMappings)) {
         if (roleConfig.isProtected && roleKey === 'OWNER') continue;
         const tenantRoles = await rolesRepository.listForTenant(communityId);
+        step('const tenantRoles = await rolesRepository.listForTenant(comm');
         const existingRole = tenantRoles.find(
           (r: any) => (r.role || r.canonicalRole || r.type || r.name) === roleKey
         );
