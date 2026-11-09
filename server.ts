@@ -130,6 +130,13 @@ async function startServer() {
       EngagementSchedulerService.startScheduler();
       startReminderScheduler();
       setTimeout(() => { import('./server/services/brandSync.service.js').then((m) => m.syncBrandToDiscord()).catch(() => undefined); }, 90_000);
+      // One-time workspace tidy-up per server (bold category on top, purpose messages, staff-role fix).
+      setTimeout(async () => {
+        try {
+          const { refreshWorkspaceLook } = await import('./server/services/serverWorkspace.service.js');
+          for (const g of ((discordService as any).client?.guilds?.cache?.values?.() || [])) await refreshWorkspaceLook(`comm_${g.id}`).catch(() => undefined);
+        } catch { /* best effort */ }
+      }, 120_000);
     },
     onLoseLeadership: async () => {
       EngagementSchedulerService.stopScheduler();
