@@ -1,3 +1,4 @@
+import { BlacklistView } from '../views/community/BlacklistView.js';
 import { RewardsView } from '../views/community/RewardsView.js';
 import React, { useEffect, useState } from 'react';
 import {
@@ -73,7 +74,7 @@ export const MODULES: Record<string, ModuleDef> = {
       { id: 'warning-rules', label: 'Warning rules', icon: Scale, hint: 'Points per reason and the action taken at each level.', render: (c) => <ServerToolsView communityId={c.communityId} only="warnings" /> },
       { id: 'tickets', label: 'Tickets', icon: Ticket, hint: 'Members open private tickets by type; staff claim and close them.', render: (c) => <ServerToolsView communityId={c.communityId} only="tickets" /> },
       { id: 'logs', label: 'Server logs', icon: ScrollText, hint: 'Joins, leaves, deleted and edited messages, role changes and warnings in one channel.', render: (c) => <CommunityFeaturesView communityId={c.communityId} only="logs" /> },
-      { id: 'blacklist', label: 'Blacklist', icon: Ban, hint: 'People who can’t apply or join.', render: (c) => <ModerationView embedded communityId={c.communityId} initialTab="blacklist" /> },
+      { id: 'blacklist', label: 'Blacklist', icon: Ban, hint: 'People kept out of the server, known by Discord ID, Discord name or only their game name. Search, filters, alerts and /blacklist check.', render: (c) => <BlacklistView communityId={c.communityId} /> },
       { id: 'bulk', label: 'Bulk tools', icon: Layers, hint: 'Do one thing to many members or channels at once.', render: (c) => <ServerToolsView communityId={c.communityId} only="bulk" /> },
       { id: 'starboard', label: 'Starboard', icon: Star, hint: 'Messages with enough star reactions are reposted in a highlight channel.', render: (c) => <CommunityFeaturesView communityId={c.communityId} only="starboard" /> },
     ],

@@ -1,140 +1,75 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { SlashCommandDefinition, CommandContext } from './types.js';
-import { applicantRestrictionService } from '../../../services/applicantRestriction.service.js';
-import { auditService } from '../../../services/audit.service.js';
 
+/**
+ * /blacklist check — anyone allowed (Ban Members, Manage Server, or a lookup role set in the dashboard)
+ * types a Discord name, game name or ID and sees whether that person is on the server blacklist.
+ * In a lookup channel the answer is posted for the team; elsewhere only the asker sees it.
+ * /blacklist add — quick add by name or game name (Ban Members or Manage Server).
+ */
 export const blacklistCommand: SlashCommandDefinition = {
   data: new SlashCommandBuilder()
     .setName('blacklist')
-    .setDescription('Check or flag a restricted applicant (Requires Controller or Administrator authority)')
-    .addSubcommand((sub) =>
-      sub
-        .setName('check')
-        .setDescription('Check restriction status for a Discord User ID or username')
-        .addStringOption((opt) =>
-          opt.setName('target').setDescription('Discord User ID or username to check').setRequired(true)
-        )
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName('flag')
-        .setDescription('Flag an applicant restriction (Requires Controller or Administrator authority)')
-        .addStringOption((opt) =>
-          opt.setName('user_id').setDescription('Permanent Discord User ID').setRequired(true)
-        )
-        .addStringOption((opt) =>
-          opt.setName('username').setDescription('Current Discord Username').setRequired(true)
-        )
-        .addStringOption((opt) =>
-          opt
-            .setName('status')
-            .setDescription('Restriction level')
-            .setRequired(true)
-            .addChoices(
-              { name: 'Blacklisted (Permanent Ban)', value: 'BLACKLISTED' },
-              { name: 'Caution (Flag for review)', value: 'CAUTION' },
-              { name: 'Do Not Reapply', value: 'DO_NOT_REAPPLY' }
-            )
-        )
-        .addStringOption((opt) =>
-          opt.setName('reason').setDescription('Reason for restriction').setRequired(true)
-        )
-    ),
+    .setDescription('Check or add people on the server blacklist')
+    .addSubcommand((sub) => sub.setName('check').setDescription('Is this person blacklisted? Search by Discord name, game name or ID')
+      .addStringOption((o) => o.setName('name').setDescription('Discord name, in-game name or Discord user ID').setRequired(true).setMaxLength(64)))
+    .addSubcommand((sub) => sub.setName('add').setDescription('Add someone to the blacklist')
+      .addStringOption((o) => o.setName('reason').setDescription('Why they are blacklisted').setRequired(true).setMaxLength(500))
+      .addUserOption((o) => o.setName('member').setDescription('Their Discord account, if you know it'))
+      .addStringOption((o) => o.setName('game_name').setDescription('Their in-game name(s), comma separated').setMaxLength(200))
+      .addStringOption((o) => o.setName('discord_name').setDescription('Their Discord username, if they are not in the server').setMaxLength(64))
+      .addBooleanOption((o) => o.setName('ban').setDescription('Also ban this Discord account now'))),
   category: 'SECURITY_MODERATION',
-  minimumRole: 'CONTROLLER',
-  requiredPermission: 'community.manage',
+  minimumRole: 'MEMBER' as any,
   status: 'ACTIVE',
 
   async execute(interaction: ChatInputCommandInteraction, context: CommandContext): Promise<void> {
-    const { communityId, guildId, discordUserId, effectiveRole } = context;
-    const subcommand = interaction.options.getSubcommand();
+    const g = await import('../../../services/blacklist/blacklistGuard.service.js');
+    const s = await g.getSettings(context.communityId);
+    const perms = interaction.memberPermissions;
+    const isMod = !!(perms?.has(PermissionFlagsBits.BanMembers) || perms?.has(PermissionFlagsBits.ManageGuild) || ['PLATFORM_OWNER', 'OWNER', 'CONTROLLER'].includes(context.effectiveRole as any));
+    const roles: any = (interaction.member as any)?.roles;
+    const hasRole = s.lookupRoleIds.some((id) => roles?.cache?.has?.(id) || (Array.isArray(roles) && roles.includes(id)));
+    const sub = interaction.options.getSubcommand();
 
-    const isAuthorized = ['PLATFORM_OWNER', 'OWNER', 'CONTROLLER'].includes(effectiveRole);
-
-    if (!isAuthorized && !interaction.memberPermissions?.has(PermissionFlagsBits.BanMembers)) {
-      await interaction.reply({
-        content: `⛔ **PERMISSION_REQUIRED**: Only Controllers and Administrators have authority to access or modify the restriction database.`,
-        ephemeral: true,
-      });
-      return;
-    }
-
-    if (subcommand === 'check') {
-      const target = interaction.options.getString('target', true);
-      const isId = /^\d{17,20}$/.test(target);
-      const discordId = isId ? target : 'unknown';
-      const username = isId ? undefined : target;
-
-      const risk = await applicantRestrictionService.checkApplicantRisk(communityId, discordId, username);
-
-      if (risk.riskStatus === 'CLEAR') {
-        await interaction.reply({
-          content: `✅ **Restriction Check:** \`CLEAR\`\nNo active restrictions found for \`${target}\`.`,
-          ephemeral: true,
-        });
-        return;
+    if (sub === 'check') {
+      if (!isMod && !hasRole) { await interaction.reply({ content: '⛔ Only staff can search the blacklist.', ephemeral: true }); return; }
+      const inLookup = s.lookupChannelIds.includes(interaction.channelId);
+      if (s.lookupChannelIds.length && !inLookup && !isMod) { await interaction.reply({ content: `Use this in ${s.lookupChannelIds.map((id) => `<#${id}>`).join(', ')}.`, ephemeral: true }); return; }
+      const q = interaction.options.getString('name', true);
+      const hits = await g.search(context.communityId, q);
+      const ephemeral = !inLookup;
+      if (!hits.length) { await interaction.reply({ content: `✅ **${q}** is not on the blacklist.\n-# Searched Discord names, game names, aliases and IDs, including close spellings.`, ephemeral, allowedMentions: { parse: [] } }); return; }
+      const embed = new EmbedBuilder().setColor(0xe11d48).setTitle(`🚫 ${hits.length === 1 ? 'Found on the blacklist' : `${hits.length} possible matches`}`).setDescription(`Search: **${q}**`);
+      for (const h of hits.slice(0, 5)) {
+        const e = h.entry;
+        const known = [e.discordUserId && `ID \`${e.discordUserId}\``, (e.discordUsername || e.displayName) && `Discord **${e.displayName || e.discordUsername}**${e.discordUsername && e.displayName ? ` (@${e.discordUsername})` : ''}`, e.gameNames?.length && `Game: ${e.gameNames.join(', ')}`, e.aliases?.length && `Also: ${e.aliases.join(', ')}`].filter(Boolean).join(' · ');
+        embed.addFields({ name: `${h.score >= 100 ? '🔴 Exact' : h.score >= 70 ? '🟠 Close' : '🟡 Similar'} · ${g.entryLabel(e)}${e.category ? ` · ${e.category}` : ''}`.slice(0, 250), value: `${known}\nMatched ${h.matched}\nReason: ${String(e.reason || '—').slice(0, 300)}${e.expiresAt ? `\nUntil <t:${Math.floor(Date.parse(e.expiresAt) / 1000)}:D>` : ''}`.slice(0, 1000) });
       }
-
-      await interaction.reply({
-        content:
-          `⚠️ **Restriction Alert:** \`${risk.riskStatus}\`\n` +
-          `• **Match Type:** \`${risk.matchType}\`\n` +
-          `• **Reason:** ${risk.restriction?.reason || 'Flagged by moderation team'}\n` +
-          `• **Permanent Discord ID Matched:** \`${risk.restriction?.discordUserId || 'N/A'}\`\n` +
-          `• **Discord Enforcement:** \`${risk.restriction?.discordEnforcementStatus || 'MANUAL_ACTION_REQUIRED'}\``,
-        ephemeral: true,
-      });
+      await interaction.reply({ embeds: [embed], ephemeral, allowedMentions: { parse: [] } });
       return;
     }
 
-    if (subcommand === 'flag') {
-      const targetUserId = interaction.options.getString('user_id', true);
-      const targetUsername = interaction.options.getString('username', true);
-      const status = interaction.options.getString('status', true) as 'BLACKLISTED' | 'CAUTION' | 'DO_NOT_REAPPLY';
-      const reason = interaction.options.getString('reason', true);
-
-      const record = await applicantRestrictionService.flagUser(
-        {
-          communityId,
-          discordUserId: targetUserId,
-          currentUsernameSnapshot: targetUsername,
-          gameNameAliases: [],
-          status,
-          reason,
-        },
-        `usr_${discordUserId}`,
-        effectiveRole
-      );
-
-      await auditService.record({
-        communityId,
-        guildId,
-        actorUserId: `usr_${discordUserId}`,
-        discordUserId,
-        actorRole: effectiveRole,
-        effectiveRole,
-        action: 'BLACKLIST_CREATED',
-        targetType: 'applicant_restriction',
-        targetId: record.id,
-        metadata: {
-          targetDiscordUserId: targetUserId,
-          targetUsername,
-          status,
-          reason,
-        },
-        source: 'DISCORD_BOT_COMMAND',
-      });
-
-      await interaction.reply({
-        content:
-          `🛡️ **Applicant Restriction Registered**\n` +
-          `• **Target Discord ID:** \`${record.discordUserId}\`\n` +
-          `• **Username Snapshot:** \`${record.currentUsernameSnapshot}\`\n` +
-          `• **Status:** \`${record.status}\`\n` +
-          `• **Enforcement Status:** \`${record.discordEnforcementStatus}\`\n` +
-          `• **Reason:** ${record.reason}`,
-        ephemeral: true,
-      });
-    }
+    if (!isMod) { await interaction.reply({ content: '⛔ You need Ban Members or Manage Server to add to the blacklist.', ephemeral: true }); return; }
+    const user = interaction.options.getUser('member');
+    const gameNames = (interaction.options.getString('game_name') || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 10);
+    const dname = (interaction.options.getString('discord_name') || '').trim().replace(/^@/, '');
+    const reason = interaction.options.getString('reason', true);
+    if (!user && !gameNames.length && !dname) { await interaction.reply({ content: 'Give at least one: **member**, **game_name** or **discord_name**.', ephemeral: true }); return; }
+    const { blacklistEntriesRepository } = await import('../../../repositories/index.js');
+    const now = new Date().toISOString();
+    const c = context.communityId;
+    const id = user ? `${c}_${user.id}` : `${c}_n_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const cur: any = user ? await blacklistEntriesRepository.getById(id).catch(() => null) : null;
+    if (cur && g.active(cur)) { await interaction.reply({ content: `${user} is already on the blacklist.`, ephemeral: true, allowedMentions: { parse: [] } }); return; }
+    await blacklistEntriesRepository.create({
+      id, communityId: c, discordUserId: user?.id || '', discordUsername: user?.username || dname, displayName: user?.globalName || '', avatarUrl: user?.displayAvatarURL({ size: 64 }) || '',
+      gameNames, aliases: [], category: 'Other', reason, status: 'ACTIVE', actor: interaction.user.username, timestamp: now, createdAt: now, updatedAt: now,
+      history: [{ at: now, by: interaction.user.username, what: 'Added from Discord' }],
+    } as any);
+    g.clearCache(c);
+    let banned = '';
+    if (user && interaction.options.getBoolean('ban')) banned = await interaction.guild!.bans.create(user.id, { reason: `Blacklisted: ${reason}`.slice(0, 500) }).then(() => ' and banned').catch(() => ' (the ban failed: check the bot’s Ban Members permission and role position)');
+    await interaction.reply({ content: `🚫 Added **${user ? user.username : dname || gameNames[0]}** to the blacklist${banned}. They can’t apply, and staff are alerted if they join.`, ephemeral: true });
   },
 };

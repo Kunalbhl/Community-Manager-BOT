@@ -113,6 +113,14 @@ export class ApplicationWorkflowService {
       );
     }
 
+    // 2b. Blacklist by name or in-game name (also checks the answers, where people give their game name).
+    {
+      const { guardApplicant } = await import('./blacklist/blacklistGuard.service.js');
+      try {
+        await guardApplicant(communityId, { id: applicantDiscordUserId, username: applicantUsername, displayName: (input as any).applicantDisplayName }, ((answers as any[]) || []).map((a: any) => String(a?.answerText ?? a?.answer ?? '')));
+      } catch (e: any) { if (e?.blacklisted) throw new ForbiddenError(e.message); throw e; }
+    }
+
     // 3. Question validation
     const configuredQuestions = await communityQuestionsService.listApplicationQuestions(communityId);
     if (configuredQuestions.length === 0) {

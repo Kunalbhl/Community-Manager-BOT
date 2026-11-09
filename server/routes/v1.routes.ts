@@ -213,6 +213,7 @@ import * as Team from '../controllers/team.controller.js';
 import { setupGuideHandler } from '../controllers/setupGuide.controller.js';
 import * as Toolkit from '../controllers/toolkit.controller.js';
 import * as Rewards from '../controllers/rewards.controller.js';
+import * as Blacklist from '../controllers/blacklist.controller.js';
 import * as Features from '../controllers/features.controller.js';
 import { getSocialCordStatus, setSocialCordEnabled } from '../controllers/socialcord.controller.js';
 import { requirePermission, requirePlatformOwner, requireTenantAccess, requirePermissionOrApplicant } from '../middleware/auth.js';
@@ -378,6 +379,13 @@ router.post(`${ft}/giveaways/:giveawayId/cancel`, ...manage, Features.cancelGive
 // Server toolkit: tickets, warning policy, role rules, review rooms, bulk tools
 const tk = '/communities/:communityId/toolkit';
 router.get(tk, requireTenantAccess(), requirePermission('community.view'), Toolkit.getToolkitHandler);
+// Blacklist
+router.get(`${tk}/blacklist`, requireTenantAccess(), requirePermission('community.view'), Blacklist.listHandler);
+router.get(`${tk}/blacklist/lookup`, requireTenantAccess(), requirePermission('community.manage'), Blacklist.lookupHandler);
+router.get(`${tk}/blacklist/search`, requireTenantAccess(), requirePermission('community.view'), Blacklist.searchHandler);
+router.post(`${tk}/blacklist`, requireTenantAccess(), requirePermission('community.manage'), Blacklist.createHandler);
+router.put(`${tk}/blacklist/settings`, requireTenantAccess(), requirePermission('settings.manage'), Blacklist.settingsHandler);
+router.put(`${tk}/blacklist/:entryId`, requireTenantAccess(), requirePermission('community.manage'), Blacklist.updateHandler);
 // Invite rewards
 router.get(`${tk}/rewards`, requireTenantAccess(), requirePermission('community.view'), Rewards.overviewHandler);
 router.post(`${tk}/rewards/rules`, requireTenantAccess(), requirePermission('settings.manage'), Rewards.createRuleHandler);

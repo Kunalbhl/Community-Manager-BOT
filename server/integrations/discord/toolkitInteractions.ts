@@ -23,6 +23,13 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
   if (!id.startsWith('cm:')) return false;
   const [, area, action, arg] = id.split(':');
 
+  // ---------- blacklist match alerts: Ban / Kick / Not them ----------
+  if (area === 'bl' && ['ban', 'kick', 'clear'].includes(action)) {
+    const { onAlertButton } = await import('../../services/blacklist/blacklistGuard.service.js');
+    await onAlertButton(interaction, action, id.split(':').slice(3).join(':'));
+    return true;
+  }
+
   // ---------- birthday asked in DM after joining (optional for the member) ----------
   if (area === 'bday' && action === 'ask') {
     return interaction.showModal(new ModalBuilder().setCustomId(`cm:bday:save:${arg}`).setTitle('Your birthday').addComponents(
