@@ -935,7 +935,8 @@ export class SettingsService {
       else if (section === 'notifications') auditAction = 'NOTIFICATION_SETTINGS_UPDATED';
       else if (section === 'security') auditAction = 'SECURITY_SETTINGS_UPDATED';
 
-      await SettingsAuditService.auditSettingChange({
+      // Recorded in the background so saving doesn't wait for the audit trail.
+      void SettingsAuditService.auditSettingChange({
         communityId,
         actorUserId: actor.userId,
         actorRole: actor.role,
@@ -943,11 +944,11 @@ export class SettingsService {
         section,
         previousSummary: (current as any)[section] || {},
         newSummary: (payload as any)[section] || {},
-      });
+      }).catch((e: any) => logger.warn(`Settings audit failed: ${e?.message}`));
     }
 
-    // 5. Emit Event Bus notification
-    await AutomationEventBusService.publish({
+    // 5. Emit Event Bus notification (background)
+    void AutomationEventBusService.publish({
       communityId,
       eventType: 'COMMUNITY_SETTINGS_UPDATED',
       metadata: {

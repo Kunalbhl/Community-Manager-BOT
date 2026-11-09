@@ -79,9 +79,19 @@ export function WelcomeRulesView({ communityId }: { communityId: string }) {
             </label>
           </Row>
           <div className="rounded-xl border border-slate-200 p-4">
-            <div className="font-bold text-slate-900">Rules channel</div>
-            <p className="text-sm text-slate-500">The channel where your rules are posted. Discord servers rarely have a website, so the bot links this channel instead of a web page.</p>
-            <div className="mt-3 max-w-md"><ChannelSelect communityId={communityId} value={cfg.rulesChannelId || ''} onChange={(id) => set({ rulesChannelId: id })} placeholder="Choose your rules channel" /></div>
+            <div className="font-bold text-slate-900">Rules channels</div>
+            <p className="text-sm text-slate-500">Channels that hold your rules or server guide. The bot links these instead of a web page. The first one is your main rules channel.</p>
+            {(() => {
+              const list: string[] = cfg.rulesChannelIds?.length ? cfg.rulesChannelIds : cfg.rulesChannelId ? [cfg.rulesChannelId] : [];
+              const setList = (l: string[]) => set({ rulesChannelIds: l, rulesChannelId: l[0] || '' });
+              return <>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {list.map((id, i) => <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">#{res?.textChannels?.find((c: any) => c.id === id)?.name || 'channel'}{i === 0 && <span className="text-indigo-400">· main</span>}<button type="button" aria-label="Remove" onClick={() => setList(list.filter((x) => x !== id))}>×</button></span>)}
+                  {!list.length && <span className="text-xs text-slate-500">None picked yet</span>}
+                </div>
+                <div className="mt-2 max-w-md"><ChannelSelect communityId={communityId} value="" exclude={list} onChange={(id) => id && setList([...list, id])} placeholder="Add a rules or guide channel" /></div>
+              </>;
+            })()}
           </div>
         </div>
       </Card>

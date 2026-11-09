@@ -16,10 +16,12 @@ import { MemberPick } from '../views/community/ServerToolsView.js';
 interface Template { id: string; name: string; content: string; category?: string }
 
 export function MessageComposer({
-  value, onChange, communityId, rows = 6, placeholder, maxLength = 2000, allowTemplates = true, defaultCategory, textareaRef,
+  value, onChange, communityId, rows = 6, placeholder, maxLength = 2000, allowTemplates = true, defaultCategory, textareaRef, vars,
 }: {
   value: string; onChange: (v: string) => void; communityId?: string; rows?: number; placeholder?: string;
   maxLength?: number; allowTemplates?: boolean; defaultCategory?: string; textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+  /** Optional variable buttons shown under the box, e.g. {{username}}. */
+  vars?: { token: string; label: string }[];
 }) {
   const cid = communityId || currentCommunityId();
   const res: any = useDiscordResources(cid);
@@ -124,14 +126,18 @@ export function MessageComposer({
             </div>
           )}
           {(open === 'role' || open === 'channel') && (
-            <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto pr-6">
-              {(open === 'role' ? res?.roles : [...(res?.textChannels || []), ...(res?.voiceChannels || [])])?.map((o: any) => (
-                <button key={o.id} type="button" onClick={() => { insert(open === 'role' ? `<@&${o.id}> ` : `<#${o.id}> `); setOpen(null); }}
-                  className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-indigo-400 hover:text-indigo-700"
-                  style={open === 'role' && o.color && o.color !== '#000000' ? { color: o.color } : undefined}>
-                  {open === 'role' ? '@' : '#'}{o.name}
-                </button>
-              )) || <span className="text-xs text-slate-500">Loading…</span>}
+            <div className="max-w-md pr-6">
+              <select autoFocus defaultValue="" aria-label={open === 'role' ? 'Choose a role to mention' : 'Choose a channel to link'}
+                onChange={(e) => { const id = e.target.value; if (!id) return; insert(open === 'role' ? `<@&${id}> ` : `<#${id}> `); setOpen(null); }}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none">
+                <option value="">{res ? (open === 'role' ? 'Choose a role to mention' : 'Choose a channel to link') : 'Loading…'}</option>
+                {open === 'role'
+                  ? (res?.roles || []).map((o: any) => <option key={o.id} value={o.id}>@{o.name}</option>)
+                  : <>
+                    <optgroup label="Text channels">{(res?.textChannels || []).map((o: any) => <option key={o.id} value={o.id}>#{o.name}</option>)}</optgroup>
+                    {!!res?.voiceChannels?.length && <optgroup label="Voice channels">{res.voiceChannels.map((o: any) => <option key={o.id} value={o.id}>🔊 {o.name}</option>)}</optgroup>}
+                  </>}
+              </select>
             </div>
           )}
           {open === 'template' && (
@@ -170,6 +176,12 @@ export function MessageComposer({
 
       <textarea ref={ref} rows={rows} value={value} maxLength={maxLength} placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)} className="block w-full resize-y rounded-b-xl border-0 bg-transparent px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-0" />
+      {!!vars?.length && (
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-200 px-3 py-2">
+          <span className="text-xs font-semibold text-slate-500">Insert:</span>
+          {vars.map((v) => <button key={v.token} type="button" onClick={() => insert(`{{${v.token}}}`)} className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">{v.label}</button>)}
+        </div>
+      )}
       {(hasMention || note) && (
         <div className="border-t border-slate-200 px-3 py-2 text-xs">
           {note && <p className="mb-1 font-semibold text-emerald-700">{note}</p>}

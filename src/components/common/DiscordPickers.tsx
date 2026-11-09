@@ -91,7 +91,7 @@ export function MemberSelect({ value, onChange, communityId, placeholder }: { va
     fetch(`/api/v1/communities/${encodeURIComponent(id)}/discord/member-search?q=${value}`, { credentials: 'include', headers: { 'x-community-id': id } })
       .then((r) => r.json()).then((j) => { if (j?.data?.[0]) setPicked(j.data[0]); }).catch(() => undefined);
   }, [value, id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const shown = picked && picked.id === value ? picked : value ? { id: value, name: value, username: value } : null;
+  const shown = picked && picked.id === value ? picked : value ? { id: value, name: 'Loading member…', username: '' } : null;
   return <MemberPick communityId={id} value={shown} placeholder={placeholder} onChange={(m) => { setPicked(m); onChange(m?.id || '', m); }} />;
 }
 
@@ -113,4 +113,23 @@ export function MultiMemberSelect({ onChange, communityId }: { onChange: (ids: s
         onChange={(m) => { if (m && !list.some((x) => x.id === m.id)) { const n = [...list, m]; setList(n); onChange(n.map((x) => x.id)); } }} />
     </div>
   );
+}
+
+const nameCache = new Map<string, Promise<string>>();
+/** Shows a member's name in this server (nickname) instead of their Discord ID. */
+export function MemberName({ id, communityId, fallback }: { id?: string; communityId?: string; fallback?: string }) {
+  const cid = communityId || currentCommunityId();
+  const [name, setName] = useState<string>(fallback || '');
+  useEffect(() => {
+    if (!id || !/^\d{15,21}$/.test(id) || !cid) return;
+    const key = `${cid}:${id}`;
+    if (!nameCache.has(key)) {
+      nameCache.set(key, fetch(`/api/v1/communities/${encodeURIComponent(cid)}/discord/member-search?q=${id}`, { credentials: 'include', headers: { 'x-community-id': cid } })
+        .then((r) => r.json()).then((j) => j?.data?.[0]?.name || '').catch(() => ''));
+    }
+    let alive = true;
+    nameCache.get(key)!.then((n) => alive && n && setName(n));
+    return () => { alive = false; };
+  }, [id, cid]);
+  return <>{name || fallback || 'Member left the server'}</>;
 }

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Download, Upload, Search, Pencil, Trash2, History, Send, X, CheckCircle2, AlertTriangle, Hash } from 'lucide-react';
-import { MemberSelect } from '../../common/DiscordPickers.js';
+import { MemberSelect, MemberName } from '../../common/DiscordPickers.js';
 import { Card, useApi } from './ServerToolsView.js';
 
 /**
@@ -82,7 +82,7 @@ export function RecruiterCodesManager({ communityId }: { communityId: string }) 
                   return (
                     <tr key={c.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3 font-mono font-bold text-slate-900">{c.code}{c.source === 'IMPORT' && <span className="ml-2 rounded bg-sky-50 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-sky-700">imported</span>}</td>
-                      <td className="px-4 py-3 text-slate-700">{owner(c)}</td>
+                      <td className="px-4 py-3 text-slate-700"><MemberName id={c.recruiterDiscordId || c.recruiterUserId} communityId={communityId} fallback={c.recruiterName} /></td>
                       <td className="px-4 py-3">
                         <button title={active ? 'Click to deactivate' : 'Click to activate'} onClick={() => api(`/codes/${c.id}`, 'PUT', { status: active ? 'INACTIVE' : 'ACTIVE' }).then(() => { flash(true, `${c.code} ${active ? 'deactivated' : 'activated'}.`); load(); }).catch((e: any) => flash(false, e.message))}
                           className={`rounded-full px-2.5 py-1 text-xs font-bold ${active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{active ? 'Active' : 'Inactive'}</button>
