@@ -24,9 +24,10 @@ import {
 interface ModerationViewProps {
   communityId: string;
   initialTab?: string;
+  embedded?: boolean;
 }
 
-export const ModerationView: React.FC<ModerationViewProps> = ({ communityId, initialTab = 'warnings' }) => {
+export const ModerationView: React.FC<ModerationViewProps> = ({ communityId, initialTab = 'warnings', embedded = false }) => {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
 
   // General state
@@ -453,7 +454,7 @@ export const ModerationView: React.FC<ModerationViewProps> = ({ communityId, ini
   return (
     <div id="moderation-module" className="space-y-6">
       {/* Module Banner */}
-      <div>
+      <div className={embedded ? 'hidden' : ''}>
         <div className="flex items-center gap-2">
           <span className="rounded bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
             COMMUNITY SCOPE
@@ -471,7 +472,7 @@ export const ModerationView: React.FC<ModerationViewProps> = ({ communityId, ini
       </div>
 
       {/* Primary Sub-Navigation Tabs */}
-      <div className="flex border-b border-slate-200 overflow-x-auto">
+      <div className={`${embedded ? 'hidden' : 'flex'} border-b border-slate-200 overflow-x-auto`}>
         <button
           onClick={() => setActiveTab('warnings')}
           className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-colors whitespace-nowrap ${

@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
+
+const EmojiPicker = lazy(() => import('emoji-picker-react'));
 import { Smile, AtSign, Hash, Shield, FileText, Save, X } from 'lucide-react';
 import { useDiscordResources, currentCommunityId } from './DiscordPickers.js';
 import { MemberPick } from '../views/community/ServerToolsView.js';
@@ -9,15 +11,6 @@ import { MemberPick } from '../views/community/ServerToolsView.js';
  * a saved template, or saves the text as a new template. Mentions are stored in Discord's
  * format (<@id>, <@&id>, <#id>) so they work when the bot posts, and the preview shows names.
  */
-const EMOJI: Record<string, string[]> = {
-  Smileys: ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','😇','🙂','😉','😍','🥰','😘','😎','🤩','🥳','😏','🤔','🤨','😐','🙄','😴','😮','😲','😳','🥺','😢','😭','😤','😡','🤯','😱','🤗','🤫','🤭','🫡','😈','💀','👻','🤖','👽'],
-  Gestures: ['👍','👎','👏','🙌','🙏','🤝','👋','✌️','🤞','🤟','🤘','👌','🤌','👈','👉','👆','👇','☝️','✋','💪','🫶','👀','🧠'],
-  Celebrate: ['🎉','🎊','🥳','🎁','🎈','🏆','🥇','🥈','🥉','🏅','🎖️','⭐','🌟','✨','💫','🔥','💯','🚀','🎯','💎','👑','🪙','💰'],
-  Gaming: ['🎮','🕹️','👾','🎲','♟️','🧩','🏁','🏎️','🔫','⚔️','🛡️','🏹','💣','🗡️','🧨','🎧','🎤','📺','💻','🖥️','⌨️','🖱️'],
-  Activity: ['📢','📣','🔔','📌','📍','📅','🗓️','⏰','⏳','✅','☑️','❌','⚠️','🚫','❗','❓','ℹ️','🆕','🆓','🔗','📝','📊','📈','🗳️','🎟️','📬','💬','🗨️'],
-  Hearts: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💖','💗','💓','💞','💕','❣️','💔'],
-  Symbols: ['➡️','⬅️','⬆️','⬇️','🔼','🔽','▶️','⏸️','🔁','🔄','➕','➖','✖️','➗','♾️','🔴','🟠','🟡','🟢','🔵','🟣','⚫','⚪','🟥','🟩','🟦','🔸','🔹','🔺','🔻','•','—','│'],
-};
 
 interface Template { id: string; name: string; content: string; category?: string }
 
@@ -32,7 +25,6 @@ export function MessageComposer({
   const ownRef = useRef<HTMLTextAreaElement>(null);
   const ref = (textareaRef as React.RefObject<HTMLTextAreaElement>) || ownRef;
   const [open, setOpen] = useState<null | 'emoji' | 'member' | 'role' | 'channel' | 'template' | 'save'>(null);
-  const [emojiTab, setEmojiTab] = useState('Smileys');
   const [templates, setTemplates] = useState<Template[]>([]);
   const [tName, setTName] = useState('');
   const [tCat, setTCat] = useState(defaultCategory || 'General');
@@ -100,21 +92,26 @@ export function MessageComposer({
         <div className="relative border-b border-slate-200 bg-slate-50 p-3">
           <button type="button" aria-label="Close" onClick={() => setOpen(null)} className="absolute right-2 top-2 text-slate-400 hover:text-slate-700"><X className="h-4 w-4" /></button>
           {open === 'emoji' && (
-            <div>
-              <div className="mb-2 flex flex-wrap gap-1 pr-6">
-                {[...(res?.emojis?.length ? ['Server'] : []), ...Object.keys(EMOJI)].map((k) => (
-                  <button key={k} type="button" onClick={() => setEmojiTab(k)} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${emojiTab === k ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-indigo-50'}`}>{k}</button>
-                ))}
-              </div>
-              <div className="grid max-h-44 grid-cols-8 gap-1 overflow-y-auto sm:grid-cols-12">
-                {emojiTab === 'Server'
-                  ? (res?.emojis || []).map((e: any) => (
-                    <button key={e.id} type="button" title={`:${e.name}:`} onClick={() => insert(`<${e.animated ? 'a' : ''}:${e.name}:${e.id}>`)} className="grid h-9 place-items-center rounded-lg hover:bg-white hover:shadow-sm">
-                      <img src={e.url} alt={e.name} className="h-6 w-6 object-contain" loading="lazy" />
-                    </button>))
-                  : (EMOJI[emojiTab] || []).map((e) => (
-                    <button key={e} type="button" onClick={() => insert(e)} className="grid h-9 place-items-center rounded-lg text-xl transition hover:scale-125 hover:bg-white hover:shadow-sm">{e}</button>))}
-              </div>
+            <div className="pr-6">
+              <Suspense fallback={<div className="h-80 animate-pulse rounded-xl bg-slate-200/60" />}>
+                <EmojiPicker
+                  width="100%"
+                  height={360}
+                  lazyLoadEmojis
+                  emojiStyle={'native' as any}
+                  theme={(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light') as any}
+                  searchPlaceHolder="Search emoji"
+                  previewConfig={{ showPreview: false }}
+                  customEmojis={(res?.emojis || []).map((e: any) => ({ id: e.id, names: [e.name], imgUrl: e.url }))}
+                  onEmojiClick={(d: any) => {
+                    if (d.isCustom) {
+                      const e = (res?.emojis || []).find((x: any) => x.id === d.emoji || x.name === d.names?.[0]);
+                      if (e) insert(`<${e.animated ? 'a' : ''}:${e.name}:${e.id}>`);
+                    } else insert(d.emoji);
+                  }}
+                />
+              </Suspense>
+              {!!res?.emojis?.length && <p className="mt-1 text-[11px] text-slate-500">Your server’s own emojis are under “Custom”. Recently used emojis appear at the top.</p>}
             </div>
           )}
           {open === 'member' && (

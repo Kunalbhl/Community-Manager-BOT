@@ -10,6 +10,7 @@ import { SetupGuideView } from './components/views/community/SetupGuideView.js';
 import { HomeToday } from './components/views/community/HomeToday.js';
 import { ServerToolsView } from './components/views/community/ServerToolsView.js';
 import { CapabilitiesView } from './components/views/community/CapabilitiesView.js';
+import { MODULES, ModuleView, resolveSection, setPendingModuleTab } from './components/modules/ModuleView.js';
 import { AccessDeniedView } from './components/views/AccessDeniedView.js';
 import { ApplicantPortalView } from './components/views/ApplicantPortalView.js';
 import { RecruiterPortalView } from './components/views/RecruiterPortalView.js';
@@ -159,14 +160,25 @@ export default function App() {
   const [portalMode, setPortalMode] = useState<PortalMode>('COMMUNITY_DASHBOARD');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
   const [activeCommunitySection, setSectionRaw] = useState<CommunitySection>(
-    () => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('application') ? 'applications' : 'dashboard') as CommunitySection
+    () => {
+      if (typeof window === 'undefined') return 'dashboard' as CommunitySection;
+      const q = new URLSearchParams(window.location.search);
+      if (q.get('application')) return 'recruitment' as CommunitySection;
+      const r = resolveSection(q.get('s') || 'dashboard'); // a reload stays on the same page
+      if (r.tab) setPendingModuleTab(r.tab);
+      return r.section as CommunitySection;
+    }
   );
   // Page history so every page can go back to where you came from.
   const sectionHistory = React.useRef<CommunitySection[]>([]);
   const [, setHistoryTick] = useState(0);
   const setActiveCommunitySection = React.useCallback((next: CommunitySection | ((p: CommunitySection) => CommunitySection)) => {
     setSectionRaw((prev) => {
-      const value = typeof next === 'function' ? (next as any)(prev) : next;
+      const raw = typeof next === 'function' ? (next as any)(prev) : next;
+      // Old screen names open their new module + tab.
+      const r = resolveSection(String(raw));
+      if (r.tab) { setPendingModuleTab(r.tab); window.dispatchEvent(new CustomEvent('cm:module-tab', { detail: r.tab })); }
+      const value = r.section as CommunitySection;
       const h = sectionHistory.current;
       if (value !== prev && h[h.length - 1] !== prev) h.push(prev);
       if (h.length > 30) h.shift();
@@ -174,6 +186,19 @@ export default function App() {
     });
     setHistoryTick((t) => t + 1);
   }, []);
+  // Keep the page in the address bar (module tabs add ?t=), so reloading returns here.
+  React.useEffect(() => {
+    try {
+      if (!window.location.pathname.startsWith('/dashboard')) return;
+      const u = new URL(window.location.href);
+      if (u.searchParams.get('s') !== activeCommunitySection) {
+        u.searchParams.set('s', activeCommunitySection);
+        if (!MODULES[activeCommunitySection as string]) u.searchParams.delete('t');
+        window.history.replaceState(window.history.state, '', u.toString());
+      }
+    } catch { /* ignore */ }
+  }, [activeCommunitySection]);
+
   const goBackSection = () => {
     const prev = sectionHistory.current.pop();
     if (prev) { setSectionRaw(prev); setHistoryTick((t) => t + 1); }
@@ -493,6 +518,11 @@ export default function App() {
           onGoHome={() => setActiveCommunitySection('dashboard')}
         />
       );
+    }
+
+    const moduleDef = MODULES[activeCommunitySection as string];
+    if (moduleDef) {
+      return <ModuleView module={moduleDef} ctx={{ communityId: selectedCommunity, currentRole, canEdit: currentRole === 'OWNER' || currentRole === 'PLATFORM_OWNER' }} />;
     }
 
     switch (activeCommunitySection) {

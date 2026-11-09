@@ -449,3 +449,224 @@ export async function botNicknameHandler(req: Request, res: Response) {
     fail(res, /Missing Permissions/i.test(err?.message || '') ? new Error('The bot needs the “Change Nickname” permission in this server.') : err);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Recruiter codes: naming series, import/export, edit, status, history */
+/* ------------------------------------------------------------------ */
+async function codeRepos() {
+  const repos = await import('../repositories/index.js');
+  return { codes: repos.recruiterCodesRepository as any, apps: (repos as any).applicationsRepository, flags: new (await import('../repositories/firestore.repository.js')).FirestoreRepository<any>('recruiterCodeLogs') };
+}
+const CODE_RE = /^[A-Z0-9][A-Z0-9_-]{1,31}$/;
+const nowIso = () => new Date().toISOString();
+
+async function codeLog(communityId: string, codeId: string, code: string, action: string, by: string, detail?: string) {
+  const { flags } = await codeRepos();
+  await flags.create({ communityId, codeId, code, action, by, detail, at: nowIso() }).catch(() => undefined);
+}
+
+function seriesCode(s: any, n: number) {
+  return `${s.prefix || ''}${String(n).padStart(Math.max(1, Math.min(8, Number(s.padding) || 3)), '0')}${s.suffix || ''}`.toUpperCase();
+}
+
+async function nextSeriesCode(communityId: string) {
+  const t = await getToolkit(communityId);
+  const s: any = (t.recruitment as any).codeSeries || {};
+  if (!s.enabled) return null;
+  const { codes } = await codeRepos();
+  const existing = new Set((await codes.listForTenant(communityId)).map((c: any) => c.code));
+  let n = Math.max(1, Number(s.next) || 1);
+  while (existing.has(seriesCode(s, n))) n++;
+  await saveToolkit(communityId, { recruitment: { ...t.recruitment, codeSeries: { ...s, next: n + 1 } } as any });
+  return seriesCode(s, n);
+}
+
+async function dmCode(communityId: string, discordId: string, code: string) {
+  try {
+    const guild: any = await guildFor(communityId);
+    const user = await guild?.client?.users?.fetch(discordId);
+    await user?.send(`🎟️ Your recruiter code for **${guild?.name || 'the server'}** is **${code}**.\nShare it with people you invite; they enter it when they apply, and you get credit when they join.`);
+    return true;
+  } catch { return false; }
+}
+
+export async function listCodesHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const { codes } = await codeRepos();
+    const t = await getToolkit(communityId);
+    const list = (await codes.listForTenant(communityId)).sort((a: any, b: any) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    ok(res, { codes: list, series: (t.recruitment as any).codeSeries || { enabled: false, prefix: 'REC-', padding: 3, next: 1, suffix: '' }, dmOnCreate: !!(t.recruitment as any).codeDmOnCreate });
+  } catch (err) { fail(res, err, 500); }
+}
+
+export async function codeSettingsHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const b = req.body || {};
+    const prefix = String(b.series?.prefix || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 16);
+    const suffix = String(b.series?.suffix || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 8);
+    const series = { enabled: !!b.series?.enabled, prefix, suffix, padding: Math.max(1, Math.min(8, Number(b.series?.padding) || 3)), next: Math.max(1, Number(b.series?.next) || 1) };
+    const t = await getToolkit(communityId);
+    await saveToolkit(communityId, { recruitment: { ...t.recruitment, codeSeries: series, codeDmOnCreate: !!b.dmOnCreate } as any });
+    ok(res, { series, dmOnCreate: !!b.dmOnCreate, example: seriesCode(series, series.next) });
+  } catch (err) { fail(res, err); }
+}
+
+/** Create one code. Without a code, the next one in the naming series is used. */
+export async function createCodeHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const b = req.body || {};
+    const { codes } = await codeRepos();
+    if (!isSnowflake(b.recruiterDiscordId)) throw new Error('Pick the recruiter (Discord member) who owns this code.');
+    let code = String(b.code || '').trim().toUpperCase();
+    if (!code) code = (await nextSeriesCode(communityId)) || '';
+    if (!code) throw new Error('Type a code, or turn on a naming series to create codes automatically.');
+    if (!CODE_RE.test(code)) throw new Error('Codes can use letters, numbers, - and _ (2–32 characters).');
+    const all = await codes.listForTenant(communityId);
+    if (all.some((c: any) => c.code === code)) throw new Error(`The code ${code} already exists.`);
+    const doc = await codes.create({
+      communityId, code, recruiterUserId: b.recruiterDiscordId, recruiterDiscordId: b.recruiterDiscordId, recruiterName: String(b.recruiterName || '').slice(0, 64),
+      status: 'ACTIVE', isActive: true, totalUses: 0, usesRemaining: b.maxUses ? Math.max(1, Number(b.maxUses)) : undefined,
+      expiresAt: b.expiresAt ? new Date(b.expiresAt).toISOString() : undefined, notes: String(b.notes || '').slice(0, 300),
+      source: 'DASHBOARD', createdAt: nowIso(), updatedAt: nowIso(),
+    });
+    await codeLog(communityId, doc.id, code, 'CREATED', (req as any).user?.username || (req as any).user?.userId || 'staff');
+    const t = await getToolkit(communityId);
+    let dmSent = false;
+    if (b.dm ?? (t.recruitment as any).codeDmOnCreate) {
+      dmSent = await dmCode(communityId, b.recruiterDiscordId, code);
+      await codeLog(communityId, doc.id, code, dmSent ? 'DM_SENT' : 'DM_FAILED', 'bot', dmSent ? 'Code sent to the recruiter by DM' : 'The recruiter has DMs closed');
+    }
+    ok(res, { code: doc, dmSent });
+  } catch (err) { fail(res, err); }
+}
+
+export async function updateCodeHandler(req: Request, res: Response) {
+  try {
+    const { communityId, codeId } = req.params;
+    const b = req.body || {};
+    const { codes } = await codeRepos();
+    const c: any = await codes.getById(codeId);
+    if (!c || c.communityId !== communityId) throw new Error('Code not found.');
+    const patch: any = { updatedAt: nowIso() };
+    const changes: string[] = [];
+    if (b.code !== undefined) {
+      const code = String(b.code).trim().toUpperCase();
+      if (!CODE_RE.test(code)) throw new Error('Codes can use letters, numbers, - and _ (2–32 characters).');
+      if (code !== c.code) {
+        if ((await codes.listForTenant(communityId)).some((x: any) => x.code === code)) throw new Error(`The code ${code} already exists.`);
+        patch.code = code; changes.push(`code ${c.code} → ${code}`);
+      }
+    }
+    if (b.recruiterDiscordId !== undefined && b.recruiterDiscordId !== c.recruiterDiscordId) {
+      if (!isSnowflake(b.recruiterDiscordId)) throw new Error('Pick a recruiter.');
+      patch.recruiterDiscordId = b.recruiterDiscordId; patch.recruiterUserId = b.recruiterDiscordId; patch.recruiterName = String(b.recruiterName || '').slice(0, 64);
+      changes.push(`recruiter → ${patch.recruiterName || b.recruiterDiscordId}`);
+    }
+    if (b.status && ['ACTIVE', 'INACTIVE'].includes(b.status) && b.status !== c.status) {
+      patch.status = b.status; patch.isActive = b.status === 'ACTIVE'; changes.push(b.status === 'ACTIVE' ? 'activated' : 'deactivated');
+    }
+    if (b.maxUses !== undefined) { patch.usesRemaining = b.maxUses ? Math.max(1, Number(b.maxUses)) : null; changes.push(`limit ${b.maxUses || 'none'}`); }
+    if (b.expiresAt !== undefined) { patch.expiresAt = b.expiresAt ? new Date(b.expiresAt).toISOString() : null; changes.push(`expires ${b.expiresAt ? new Date(b.expiresAt).toDateString() : 'never'}`); }
+    if (b.notes !== undefined) patch.notes = String(b.notes).slice(0, 300);
+    const updated = await codes.update(codeId, patch);
+    if (changes.length) await codeLog(communityId, codeId, patch.code || c.code, 'UPDATED', (req as any).user?.username || 'staff', changes.join(', '));
+    if (b.dm) {
+      const sent = await dmCode(communityId, patch.recruiterDiscordId || c.recruiterDiscordId || c.recruiterUserId, patch.code || c.code);
+      await codeLog(communityId, codeId, patch.code || c.code, sent ? 'DM_SENT' : 'DM_FAILED', 'bot');
+    }
+    ok(res, updated);
+  } catch (err) { fail(res, err); }
+}
+
+export async function deleteCodeHandler(req: Request, res: Response) {
+  try {
+    const { communityId, codeId } = req.params;
+    const { codes } = await codeRepos();
+    const c: any = await codes.getById(codeId);
+    if (!c || c.communityId !== communityId) throw new Error('Code not found.');
+    await codes.delete(codeId);
+    await codeLog(communityId, codeId, c.code, 'DELETED', (req as any).user?.username || 'staff');
+    ok(res, { deleted: true });
+  } catch (err) { fail(res, err); }
+}
+
+/** History of one code: changes plus the applications that used it. */
+export async function codeHistoryHandler(req: Request, res: Response) {
+  try {
+    const { communityId, codeId } = req.params;
+    const { codes, apps, flags } = await codeRepos();
+    const c: any = await codes.getById(codeId);
+    if (!c || c.communityId !== communityId) throw new Error('Code not found.');
+    const logs = (await flags.listForTenant(communityId)).filter((l: any) => l.codeId === codeId);
+    const used = apps ? (await apps.listForTenant(communityId)).filter((a: any) => String(a.recruiterCode || '').toUpperCase() === c.code)
+      .map((a: any) => ({ at: a.createdAt, action: 'USED', by: a.applicantUsername || a.applicantName || 'applicant', detail: `Application ${String(a.status || '').toLowerCase()}` })) : [];
+    ok(res, [...logs, ...used].sort((a: any, b: any) => String(b.at).localeCompare(String(a.at))).slice(0, 200));
+  } catch (err) { fail(res, err); }
+}
+
+/** Import up to 200 rows per call; the dashboard sends batches and shows progress. */
+export async function importCodesHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const rows: any[] = Array.isArray(req.body?.rows) ? req.body.rows.slice(0, 200) : [];
+    const mode = req.body?.mode === 'update' ? 'update' : 'skip';
+    const { codes } = await codeRepos();
+    const all: any[] = await codes.listForTenant(communityId);
+    const byCode = new Map(all.map((c) => [c.code, c]));
+    const guild: any = await guildFor(communityId);
+    const results: { row: number; code: string; result: 'created' | 'updated' | 'skipped' | 'error'; message?: string }[] = [];
+    for (const [i, r] of rows.entries()) {
+      const rowNo = Number(r.__row) || i + 2;
+      const code = String(r.code || '').trim().toUpperCase();
+      try {
+        if (!CODE_RE.test(code)) throw new Error('Invalid code (letters, numbers, - and _, 2–32 characters).');
+        let discordId = String(r.recruiterDiscordId || '').trim();
+        if (!isSnowflake(discordId) && r.recruiterUsername && guild) {
+          const q = String(r.recruiterUsername).replace(/^@/, '').toLowerCase();
+          const found = (await guild.members.fetch({ query: q, limit: 5 }).catch(() => null))?.find((m: any) => m.user.username.toLowerCase() === q || m.displayName.toLowerCase() === q);
+          if (found) discordId = found.id;
+        }
+        if (!isSnowflake(discordId)) throw new Error('Recruiter not found: add their Discord ID or exact username.');
+        const status = String(r.status || 'ACTIVE').toUpperCase() === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE';
+        const data: any = {
+          recruiterUserId: discordId, recruiterDiscordId: discordId, recruiterName: String(r.recruiterName || r.recruiterUsername || '').slice(0, 64),
+          status, isActive: status === 'ACTIVE', usesRemaining: r.maxUses ? Math.max(1, Number(r.maxUses)) : undefined,
+          expiresAt: r.expiresAt && !isNaN(new Date(r.expiresAt).getTime()) ? new Date(r.expiresAt).toISOString() : undefined,
+          notes: String(r.notes || '').slice(0, 300), updatedAt: nowIso(),
+        };
+        const existing = byCode.get(code);
+        if (existing) {
+          if (mode === 'skip') { results.push({ row: rowNo, code, result: 'skipped', message: 'Already exists' }); continue; }
+          await codes.update(existing.id, data);
+          await codeLog(communityId, existing.id, code, 'IMPORTED', 'import', 'Updated from file');
+          results.push({ row: rowNo, code, result: 'updated' });
+        } else {
+          const doc = await codes.create({ communityId, code, totalUses: Math.max(0, Number(r.totalUses) || 0), source: 'IMPORT', createdAt: nowIso(), ...data });
+          byCode.set(code, doc);
+          await codeLog(communityId, doc.id, code, 'IMPORTED', 'import', 'Created from file');
+          results.push({ row: rowNo, code, result: 'created' });
+        }
+      } catch (e: any) {
+        results.push({ row: rowNo, code, result: 'error', message: e.message });
+      }
+    }
+    ok(res, results);
+  } catch (err) { fail(res, err); }
+}
+
+/** Real status of what this server is connected to (no storage internals). */
+export async function integrationsStatusHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const guild: any = await guildFor(communityId);
+    const t = await getToolkit(communityId);
+    ok(res, {
+      discord: { connected: !!guild, guildId: guild?.id || '', guildName: guild?.name || '', memberCount: guild?.memberCount || 0, ping: guild?.client?.ws?.ping ?? null },
+      sheets: { connected: !!t.recruitment.sheetWebhookUrl, viewUrl: (t.recruitment as any).sheetViewUrl || '' },
+      ai: { configured: Boolean(process.env.GEMINI_API_KEY) },
+    });
+  } catch (err) { fail(res, err, 500); }
+}

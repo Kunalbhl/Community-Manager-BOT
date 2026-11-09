@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { TrendingUp, Gift, MousePointerClick, BadgeCheck, ScrollText, Star, Cake, TerminalSquare, Plus, Trash2, Send, RefreshCw, Trophy } from 'lucide-react';
 import { Banner, Card, Toggle, Pick, MultiPick, SaveBar, input, btn, ghost, fmtDate, Resources } from './ServerToolsView.js';
 
-type Tab = 'levels' | 'giveaways' | 'buttonRoles' | 'verification' | 'logs' | 'starboard' | 'birthdays' | 'custom';
+export type Tab = 'levels' | 'giveaways' | 'buttonRoles' | 'verification' | 'logs' | 'starboard' | 'birthdays' | 'custom';
 const TABS: { id: Tab; label: string; icon: any; hint: string }[] = [
   { id: 'levels', label: 'Levels & XP', icon: TrendingUp, hint: 'Members earn XP by chatting, level up and unlock reward roles. /rank and /leaderboard show progress.' },
   { id: 'giveaways', label: 'Giveaways', icon: Gift, hint: 'Members press Enter; winners are picked fairly when time runs out. Also /giveaway in Discord.' },
@@ -25,9 +25,9 @@ function useApi(communityId: string) {
   }, [communityId]);
 }
 
-export function CommunityFeaturesView({ communityId }: { communityId: string }) {
+export function CommunityFeaturesView({ communityId, only }: { communityId: string; only?: Tab }) {
   const api = useApi(communityId);
-  const [tab, setTab] = useState<Tab>(() => takeOpenTab(['levels', 'giveaways', 'buttonRoles', 'verification', 'logs', 'starboard', 'birthdays', 'custom'] as const, 'levels'));
+  const [tab, setTab] = useState<Tab>(() => only || takeOpenTab(['levels', 'giveaways', 'buttonRoles', 'verification', 'logs', 'starboard', 'birthdays', 'custom'] as const, 'levels'));
   const [cfg, setCfg] = useState<any>(null);
   const [res, setRes] = useState<Resources | null>(null);
   const [error, setError] = useState('');
@@ -46,11 +46,11 @@ export function CommunityFeaturesView({ communityId }: { communityId: string }) 
 
   return (
     <div className="space-y-6">
-      <div>
+      {!only && <div>
         <h1 className="text-3xl font-bold text-slate-900">Community features</h1>
         <p className="mt-1 text-slate-500">Levels, giveaways, self-roles, verification, logs, starboard, birthdays and custom commands.</p>
-      </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      </div>}
+      <div className={`${only ? 'hidden' : 'flex'} gap-2 overflow-x-auto pb-1`}>
         {TABS.map((t) => {
           const on = cfg && (t.id === 'custom' ? cfg.customCommands?.enabled : t.id === 'giveaways' || t.id === 'buttonRoles' ? null : cfg[t.id]?.enabled);
           return (

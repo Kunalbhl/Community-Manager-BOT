@@ -22,7 +22,7 @@ import { UserRole } from '../../../shared/types/rbac.js';
 import { PortalMode } from '../../types/ui.js';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher.js';
 import { getTheme, setTheme, ThemeChoice } from '../../lib/theme.js';
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Sun, Sparkles } from 'lucide-react';
 
 function ThemeSwitch() {
   const [t, setT] = useState<ThemeChoice>(getTheme());
@@ -442,6 +442,15 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Standard Actions */}
               <div className="py-1.5 space-y-0.5">
+                {isAuthenticated && (
+                  <button
+                    onClick={() => { setShowProfileDropdown(false); window.dispatchEvent(new CustomEvent('cm:navigate', { detail: 'capabilities' })); }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                  >
+                    <Sparkles className="h-4 w-4 text-yellow-500" />
+                    <span>All features</span>
+                  </button>
+                )}
                 {!isAuthenticated && onLoginWithDiscord && (
                   <button
                     onClick={() => {

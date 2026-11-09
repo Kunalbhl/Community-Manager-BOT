@@ -3,8 +3,8 @@ import { Megaphone, Repeat, Clock, BarChart3, FileText, Trash2, Pause, Play, Pen
 import { ChannelSelect, RoleSelect, MemberSelect, MultiMemberSelect, useDiscordResources } from '../../common/DiscordPickers.js';
 import { MessageComposer } from '../../common/MessageComposer.js';
 
-interface EngagementViewProps { communityId: string; initialTab?: Tab }
-type Tab = 'announcements' | 'campaigns' | 'reminders' | 'polls' | 'templates';
+interface EngagementViewProps { communityId: string; initialTab?: Tab; only?: Tab }
+export type Tab = 'announcements' | 'campaigns' | 'reminders' | 'polls' | 'templates';
 
 const card = 'rounded-2xl border border-slate-200 bg-white p-6 shadow-sm';
 const label = 'block text-xs font-bold uppercase tracking-wide text-slate-600';
@@ -20,8 +20,8 @@ const STATUS: Record<string, string> = {
 };
 const Badge = ({ s }: { s: string }) => <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${STATUS[s] || 'bg-slate-100 text-slate-600'}`}>{s.charAt(0) + s.slice(1).toLowerCase()}</span>;
 
-export const EngagementView: React.FC<EngagementViewProps> = ({ communityId, initialTab = 'announcements' }) => {
-  const [tab, setTab] = useState<Tab>(initialTab);
+export const EngagementView: React.FC<EngagementViewProps> = ({ communityId, initialTab = 'announcements', only }) => {
+  const [tab, setTab] = useState<Tab>(only || initialTab);
   const [data, setData] = useState<{ announcements: any[]; campaigns: any[]; reminders: any[]; polls: any[]; templates: any[] }>({ announcements: [], campaigns: [], reminders: [], polls: [], templates: [] });
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -62,12 +62,12 @@ export const EngagementView: React.FC<EngagementViewProps> = ({ communityId, ini
 
   return (
     <div className="mx-auto max-w-[min(100%,2000px)] space-y-6">
-      <div>
+      <div className={only ? 'hidden' : ''}>
         <h1 className="text-3xl font-extrabold text-slate-900">Engagement</h1>
         <p className="mt-1 text-slate-600">Announcements, repeating campaigns, reminders and native Discord polls. Everything is posted by the bot in your server.</p>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b border-slate-200">
+      <div className={`${only ? 'hidden' : 'flex'} flex-wrap gap-1 border-b border-slate-200`}>
         {TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)} className={`-mb-px inline-flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
             <t.icon className={`h-4 w-4 ${t.tone}`} />{t.label}

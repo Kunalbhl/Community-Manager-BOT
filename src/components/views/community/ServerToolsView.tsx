@@ -10,9 +10,9 @@ import {
 /* ------------------------------------------------------------------ */
 export interface Opt { id: string; name: string; color?: string }
 export interface Resources { connected: boolean; roles: Opt[]; textChannels: Opt[]; categories: Opt[] }
-type Tab = 'recruit' | 'tickets' | 'warnings' | 'roles' | 'rooms' | 'bulk';
+export type Tab = 'recruit' | 'tickets' | 'warnings' | 'roles' | 'rooms' | 'bulk';
 
-function useApi(communityId: string) {
+export function useApi(communityId: string) {
   const base = `/api/v1/communities/${encodeURIComponent(communityId)}/toolkit`;
   const headers = { 'Content-Type': 'application/json', 'x-community-id': communityId };
   return useCallback(async (path: string, method = 'GET', body?: unknown) => {
@@ -35,9 +35,9 @@ const TABS: { id: Tab; label: string; icon: any; hint: string }[] = [
 /* ------------------------------------------------------------------ */
 /* View                                                                */
 /* ------------------------------------------------------------------ */
-export function ServerToolsView({ communityId }: { communityId: string }) {
+export function ServerToolsView({ communityId, only }: { communityId: string; only?: Tab }) {
   const api = useApi(communityId);
-  const [tab, setTab] = useState<Tab>(() => takeOpenTab(['recruit', 'tickets', 'warnings', 'roles', 'rooms', 'bulk'] as const, 'recruit'));
+  const [tab, setTab] = useState<Tab>(() => only || takeOpenTab(['recruit', 'tickets', 'warnings', 'roles', 'rooms', 'bulk'] as const, 'recruit'));
   const [config, setConfig] = useState<any>(null);
   const [res, setRes] = useState<Resources | null>(null);
   const [error, setError] = useState('');
@@ -61,12 +61,12 @@ export function ServerToolsView({ communityId }: { communityId: string }) {
   const current = TABS.find((t) => t.id === tab)!;
   return (
     <div className="space-y-6">
-      <div>
+      {!only && <div>
         <h1 className="text-3xl font-bold text-slate-900">Server tools</h1>
         <p className="mt-1 text-slate-500">Tickets, warnings, recruitment roles, review rooms and bulk actions for your Discord server.</p>
-      </div>
+      </div>}
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className={`${only ? 'hidden' : 'flex'} gap-2 overflow-x-auto pb-1`}>
         {TABS.map((t) => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${tab === t.id ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300'}`}>
@@ -942,7 +942,20 @@ function SheetsCard({ api, res }: { api: any; res: Resources }) {
 }
 
 /** The server's rules: shown with the consent message and used to draft the rules quiz. */
-function RulesCard({ api, res }: { api: any; res: Resources }) {
+const RULE_SUGGESTIONS = [
+  'Be respectful to everyone',
+  'No hate speech, racism or harassment',
+  'No spam, flooding or unsolicited DMs',
+  'No advertising or self-promotion without staff permission',
+  'Keep content safe for work',
+  'Use the right channel for each topic',
+  'Do not share personal information',
+  'No cheating, hacking or exploit talk',
+  'Follow staff and moderator instructions',
+  'Follow Discord’s Terms of Service and Community Guidelines',
+];
+
+export function RulesCard({ api, res }: { api: any; res: Resources }) {
   const [rules, setRules] = useState<any[]>([]);
   const [text, setText] = useState('');
   const [channelId, setChannelId] = useState('');
@@ -955,7 +968,7 @@ function RulesCard({ api, res }: { api: any; res: Resources }) {
   };
   return (
     <div id="server-rules">
-      <Card title={`Server rules (${rules.length})`} desc="Applicants see these with the consent message, and “Draft from my rules” writes quiz questions from them.">
+      <Card title={`Server rules (${rules.length})`} desc="One list used everywhere: shown to applicants before they apply, and used to write the rules quiz.">
         {!!rules.length && <ol className="mb-4 space-y-2">
           {rules.map((r, i) => (
             <li key={r.id} className="flex items-start gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm">
@@ -965,6 +978,17 @@ function RulesCard({ api, res }: { api: any; res: Resources }) {
             </li>
           ))}
         </ol>}
+        {RULE_SUGGESTIONS.some((t) => !rules.some((r) => r.title.toLowerCase() === t.toLowerCase())) && (
+          <div className="mb-4">
+            <div className="text-sm font-semibold text-slate-700">Suggestions <span className="font-normal text-slate-500">· click to add</span></div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {RULE_SUGGESTIONS.filter((t) => !rules.some((r) => r.title.toLowerCase() === t.toLowerCase())).map((t) => (
+                <button key={t} type="button" onClick={() => api('/recruitment/rules', 'POST', { title: t }).then(load).catch((e: any) => setMsg(e.message))}
+                  className="rounded-full border border-dashed border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 hover:border-indigo-400 hover:text-indigo-700">+ {t}</button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="grid gap-4 lg:grid-cols-2">
           <div>
             <div className="text-sm font-semibold text-slate-700">Copy from a Discord channel</div>

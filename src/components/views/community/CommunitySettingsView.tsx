@@ -44,6 +44,8 @@ import { DiscordRolePicker } from '../../common/DiscordRolePicker';
 interface CommunitySettingsViewProps {
   communityId: string;
   currentRole: UserRole;
+  /** Show just one section, without the page header, diagnostics and section tabs (used inside module tabs). */
+  only?: SettingsSectionKey;
 }
 
 const SECTION_TABS: { key: SettingsSectionKey; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -109,8 +111,8 @@ const LOCALES = [
   { code: 'ru-RU', label: 'Русский (Russia)' },
 ];
 
-export const CommunitySettingsView: React.FC<CommunitySettingsViewProps> = ({ communityId, currentRole }) => {
-  const [activeTab, setActiveTab] = useState<SettingsSectionKey>(() => { try { const t = sessionStorage.getItem('cm_open_tab'); if (t === 'recruitment') { sessionStorage.removeItem('cm_open_tab'); return 'recruitment' as SettingsSectionKey; } } catch { /* ignore */ } return 'general'; });
+export const CommunitySettingsView: React.FC<CommunitySettingsViewProps> = ({ communityId, currentRole, only }) => {
+  const [activeTab, setActiveTab] = useState<SettingsSectionKey>(() => { if (only) return only; try { const t = sessionStorage.getItem('cm_open_tab'); if (t === 'recruitment') { sessionStorage.removeItem('cm_open_tab'); return 'recruitment' as SettingsSectionKey; } } catch { /* ignore */ } return 'general'; });
   const [settings, setSettings] = useState<ConsolidatedCommunitySettings | null>(null);
   const [originalSettings, setOriginalSettings] = useState<ConsolidatedCommunitySettings | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -379,8 +381,8 @@ export const CommunitySettingsView: React.FC<CommunitySettingsViewProps> = ({ co
   return (
     <div id="community-settings-control-plane" className="space-y-6">
       {/* Top Header & Context Metadata */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-5">
-        <div>
+      <div className={`flex flex-col gap-4 sm:flex-row sm:items-center ${only ? 'sm:justify-end' : 'sm:justify-between border-b border-slate-200 pb-5'}`}>
+        <div className={only ? 'hidden' : ''}>
           <div className="flex items-center gap-2">
             <span className="rounded bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
               SETTINGS CONTROL PLANE
@@ -478,6 +480,7 @@ export const CommunitySettingsView: React.FC<CommunitySettingsViewProps> = ({ co
       )}
 
       {/* Diagnostics Health Summary Bar */}
+      {!only && <>
       <div id="settings-diagnostics-bar" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -566,8 +569,9 @@ export const CommunitySettingsView: React.FC<CommunitySettingsViewProps> = ({ co
         )}
       </div>
 
+      </>}
       {/* Main Section Tabs Navigation */}
-      <div id="settings-tab-navigation" className="flex items-center space-x-1 border-b border-slate-200 pb-2 overflow-x-auto">
+      <div id="settings-tab-navigation" className={`${only ? 'hidden' : 'flex'} items-center space-x-1 border-b border-slate-200 pb-2 overflow-x-auto`}>
         {SECTION_TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
