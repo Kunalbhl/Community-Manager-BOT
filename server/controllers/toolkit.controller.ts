@@ -165,7 +165,7 @@ export async function postTicketPanelHandler(req: Request, res: Response) {
     const channel = isSnowflake(req.body?.channelId) ? guild.channels.cache.get(req.body.channelId) : null;
     if (!channel) throw new Error('Pick a channel for the ticket panel.');
     const r = await ticketService.postPanel(communityId, channel, req.body?.mode === 'NEW');
-    ok(res, { posted: true, updated: r.updated, url: r.url });
+    ok(res, { posted: true, ...r });
   } catch (err) { fail(res, err); }
 }
 

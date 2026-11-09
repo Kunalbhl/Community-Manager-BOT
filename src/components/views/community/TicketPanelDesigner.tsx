@@ -88,7 +88,8 @@ export function TicketPanelDesigner({ communityId, c, setC, api }: { communityId
     try {
       await api('/settings/tickets', 'PUT', { ...c, panel });
       const r = await api('/tickets/panel', 'POST', { channelId: channel, mode });
-      setMsg(r.updated ? 'Panel updated in Discord.' : 'Panel posted.');
+      setC({ ...c, panel: { ...panel, channelId: r.channelId, messageId: r.messageId } });
+      setMsg(r.updated ? 'Panel updated in Discord (same message).' : 'Panel posted.');
     } catch (e: any) { setMsg(e.message); }
   };
   return (
@@ -138,15 +139,12 @@ export function TicketPanelDesigner({ communityId, c, setC, api }: { communityId
           <div className="text-sm font-black text-slate-900">Post to Discord</div>
           <div className="mt-2 flex flex-wrap gap-2">
             <div className="min-w-[220px] flex-1"><ChannelSelect communityId={communityId} value={channel} onChange={setChannel} placeholder="Choose a channel" /></div>
-            {panel.messageId && panel.channelId === channel ? (
-              <>
-                <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} disabled={!channel} onClick={() => post('UPDATE')}><RefreshCw className="h-4 w-4" />Update posted panel</button>
-                <button className={`${btn} border border-slate-300 bg-white`} disabled={!channel} onClick={() => post('NEW')}><Send className="h-4 w-4" />Post a new one</button>
-              </>
-            ) : <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} disabled={!channel} onClick={() => post('NEW')}><Send className="h-4 w-4" />Save & post</button>}
+            {panel.messageId && panel.channelId === channel
+              ? <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} disabled={!channel} onClick={() => post('UPDATE')}><RefreshCw className="h-4 w-4" />Save & update panel</button>
+              : <button className={`${btn} bg-indigo-600 text-white hover:bg-indigo-700`} disabled={!channel} onClick={() => post('UPDATE')}><Send className="h-4 w-4" />{panel.messageId ? 'Save & move panel here' : 'Save & post'}</button>}
           </div>
           {msg && <p className="mt-2 text-sm text-slate-700">{msg}</p>}
-          <p className="mt-2 text-xs text-slate-500">Updating edits the same message, so the link stays and nobody is pinged again.</p>
+          <p className="mt-2 text-xs text-slate-500">There is only ever one panel: saving again edits the same message (nobody is pinged again). Choosing another channel moves it there and removes the old one.</p>
         </div>
       </div>
       <div className="xl:sticky xl:top-4 xl:self-start">
