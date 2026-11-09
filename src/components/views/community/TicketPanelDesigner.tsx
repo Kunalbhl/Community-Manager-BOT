@@ -52,7 +52,7 @@ function Preview({ panel, types, res }: any) {
                 </div>
                 {e.thumbnail && <img src={e.thumbnail} alt="" className="h-20 w-20 shrink-0 rounded object-cover" />}
               </div>
-              {e.image && <img src={e.image} alt="" className="mt-3 max-h-72 w-full rounded object-cover" />}
+              {e.image && <img key={e.image} src={e.image} alt="" className="mt-3 max-h-72 w-full rounded object-cover" onError={(ev) => { const el = ev.currentTarget; el.replaceWith(Object.assign(document.createElement('div'), { className: 'mt-3 rounded bg-black/20 p-3 text-xs text-[#b5bac1]', textContent: 'This link has expired in the browser, so the preview can’t show it. When you post or update the panel, the bot refreshes Discord links and stores the image with the message so it keeps working.' })); }} />}
               {(e.footerText || e.timestamp) && <div className="mt-2 flex items-center gap-2 text-xs text-[#b5bac1]">{e.footerIcon && <img src={e.footerIcon} alt="" className="h-5 w-5 rounded-full" />}{e.footerText}{e.footerText && e.timestamp ? ' • ' : ''}{e.timestamp ? 'Today' : ''}</div>}
             </div>
           )}
@@ -131,7 +131,7 @@ export function TicketPanelDesigner({ communityId, c, setC, api }: { communityId
                 <label className="flex items-center gap-2 self-end pb-2 text-sm text-slate-700"><input type="checkbox" checked={panel.embed.timestamp} onChange={(e) => setE({ timestamp: e.target.checked })} />Show the time it was posted</label>
               </div>
             )}
-            <p className="text-xs text-slate-500">Images must be public https links. Tip: upload the image in any Discord channel, right-click it → Copy Link.</p>
+            <p className="text-xs text-slate-500">Images must be https links. Discord image links (right-click → Copy Link) expire after a day, so the bot saves those images into the panel message when posting; they keep working.</p>
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={panel.pingStaff} onChange={(e) => setP({ pingStaff: e.target.checked })} />Ping the staff roles when a ticket opens (each type can add more people below)</label>

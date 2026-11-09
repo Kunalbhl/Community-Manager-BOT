@@ -84,16 +84,56 @@ export const ticketService = {
     };
   },
 
+  /**
+   * Discord image links copied from a channel expire after about a day, and an expired link shows
+   * no image when the panel is posted or edited. So Discord-hosted images are refreshed, downloaded
+   * and attached to the panel message itself, which keeps them working for good.
+   */
+  async withStoredImages(msg: any, client: any) {
+    const e = msg.embeds?.[0];
+    if (!e) return msg;
+    const slots: { get: () => string | undefined; set: (v: string) => void; name: string }[] = [
+      { get: () => e.image?.url, set: (v) => { e.image.url = v; }, name: 'panel-image' },
+      { get: () => e.thumbnail?.url, set: (v) => { e.thumbnail.url = v; }, name: 'panel-thumb' },
+      { get: () => e.author?.icon_url, set: (v) => { e.author.icon_url = v; }, name: 'panel-author' },
+      { get: () => e.footer?.icon_url, set: (v) => { e.footer.icon_url = v; }, name: 'panel-footer' },
+    ];
+    const isDiscord = (u?: string) => !!u && /^https:\/\/(cdn\.discordapp\.com|media\.discordapp\.net)\/attachments\//.test(u);
+    const urls = slots.map((x) => x.get()).filter(isDiscord) as string[];
+    if (!urls.length) return msg;
+    const fresh = new Map<string, string>();
+    try {
+      const r: any = await client.rest.post('/attachments/refresh-urls', { body: { attachment_urls: urls } });
+      for (const x of r?.refreshed_urls || []) fresh.set(x.original, x.refreshed);
+    } catch { /* fall back to the given links */ }
+    const files: any[] = [];
+    for (const slot of slots) {
+      const u = slot.get();
+      if (!isDiscord(u)) continue;
+      try {
+        const res = await fetch(fresh.get(u!) || u!);
+        if (!res.ok) continue;
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length > 8 * 1024 * 1024) continue;
+        const ext = ((res.headers.get('content-type') || '').split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '').slice(0, 5) || 'png';
+        const name = `${slot.name}.${ext}`;
+        files.push({ attachment: buf, name });
+        slot.set(`attachment://${name}`);
+      } catch { /* keep the link */ }
+    }
+    return files.length ? { ...msg, files } : msg;
+  },
+
   /** Posts the panel, or updates the one already posted in that channel (unless forceNew). */
   async postPanel(communityId: string, channel: any, forceNew = false) {
     const cfg = await getToolkit(communityId);
     if (!cfg.tickets.types.length) throw new Error('Add at least one ticket type first.');
-    const msg = this.panelMessage(cfg);
+    const msg: any = await this.withStoredImages(this.panelMessage(cfg), channel.client);
     const p: any = cfg.tickets.panel || {};
     let sent: any = null; let updated = false;
     if (!forceNew && p.messageId && p.channelId === channel.id) {
       const old = await channel.messages.fetch(p.messageId).catch(() => null);
-      if (old) { sent = await old.edit({ ...msg, allowedMentions: { parse: [] } }); updated = true; }
+      if (old) { sent = await old.edit({ ...msg, attachments: [], allowedMentions: { parse: [] } }); updated = true; }
     }
     if (!sent) {
       sent = await channel.send(msg);
