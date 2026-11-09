@@ -244,8 +244,7 @@ import {
   testAutomationWorkflow,
   getAutomationExecutions,
   getInsightsSummary,
-  consultAi,
-} from '../controllers/communityManager.controller.js';
+  consultAi, updateCampaignState, deleteReminder, closePollHandler, updateMessageTemplate, deleteMessageTemplate } from '../controllers/communityManager.controller.js';
 import {
   createEvent,
   editEvent,
@@ -385,6 +384,7 @@ router.post(`${tk}/tickets/:ticketId/close`, requireTenantAccess(), requirePermi
 router.get(`${tk}/warnings`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listWarningsHandler);
 router.post(`${tk}/warnings`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.issueWarningHandler);
 router.post(`${tk}/warnings/:strikeId/revoke`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.revokeWarningHandler);
+router.post(`${tk}/bot-nickname`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.botNicknameHandler);
 router.get(`${tk}/recruitment/rules`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listRulesHandler);
 router.post(`${tk}/recruitment/rules`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.addRuleHandler);
 router.post(`${tk}/recruitment/rules/import`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.importRulesHandler);
@@ -768,16 +768,21 @@ router.post('/engagement/announcements/:id/cancel', requirePermission('community
 
 router.get('/engagement/campaigns', requirePermission('community.view'), getCampaigns);
 router.post('/engagement/campaigns', requirePermission('community.manage'), createCampaign);
+router.post('/engagement/campaigns/:id/state', requirePermission('community.manage'), updateCampaignState);
 
 router.get('/engagement/reminders', requirePermission('community.view'), getReminders);
 router.post('/engagement/reminders', requirePermission('community.manage'), createReminder);
+router.delete('/engagement/reminders/:id', requirePermission('community.manage'), deleteReminder);
 
 router.get('/engagement/polls', requirePermission('community.view'), getPolls);
 router.post('/engagement/polls', requirePermission('community.manage'), createPoll);
 router.post('/engagement/polls/:id/vote', votePoll);
+router.post('/engagement/polls/:id/close', requirePermission('community.manage'), closePollHandler);
 
 router.get('/engagement/templates', requirePermission('community.view'), getMessageTemplates);
 router.post('/engagement/templates', requirePermission('community.manage'), createMessageTemplate);
+router.put('/engagement/templates/:id', requirePermission('community.manage'), updateMessageTemplate);
+router.delete('/engagement/templates/:id', requirePermission('community.manage'), deleteMessageTemplate);
 
 // Moderation module
 router.get('/moderation/warnings', requirePermission('community.view'), getWarningsHandler);

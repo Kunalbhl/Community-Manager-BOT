@@ -314,44 +314,111 @@ export async function createCampaign(req: Request, res: Response, next: NextFunc
       throw new ForbiddenError('Engagement Campaigns are not available on your active plan.');
     }
 
-    const { name, targetAudience, message, scheduledAt } = req.body;
-    if (!name || !targetAudience || !message) {
-      throw new BadRequestError('Name, target audience, and message content are required.');
-    }
-
-    // Resolve audience count truthfully
-    const recipientIds = await EngagementAudienceService.resolveAudience(communityId, targetAudience);
+    const { name, message } = req.body;
+    const targetAudience = ['CHANNEL', 'ALL', 'ROLE', 'MEMBERS'].includes(req.body.targetAudience) ? req.body.targetAudience : 'CHANNEL';
+    const frequency = ['ONCE', 'HOURLY', 'DAILY', 'WEEKLY', 'MONTHLY'].includes(req.body.frequency) ? req.body.frequency : 'ONCE';
+    if (!name || !message) throw new BadRequestError('Give the campaign a name and a message.');
+    if (targetAudience === 'CHANNEL' && !req.body.channelId) throw new BadRequestError('Pick the channel to post in.');
+    if (targetAudience === 'ROLE' && !req.body.roleId) throw new BadRequestError('Pick the role to message.');
+    if (targetAudience === 'MEMBERS' && !(req.body.memberIds || []).length) throw new BadRequestError('Pick at least one member.');
+    const startAt = req.body.startAt ? new Date(req.body.startAt) : null;
+    if (startAt && isNaN(startAt.getTime())) throw new BadRequestError('The start time is not valid.');
+    const scheduled = !!startAt && startAt.getTime() > Date.now() + 30_000;
 
     const campaign = await campaignsRepository.create({
-      communityId,
-      name,
-      targetAudience,
-      message,
-      scheduledAt,
-      status: scheduledAt ? 'SCHEDULED' : 'ACTIVE',
+      communityId, name: String(name).slice(0, 100), message: String(message).slice(0, 2000), targetAudience,
+      channelId: req.body.channelId || undefined, roleId: req.body.roleId || undefined,
+      memberIds: Array.isArray(req.body.memberIds) ? req.body.memberIds.slice(0, 200) : undefined,
+      frequency, interval: Math.min(30, Math.max(1, Number(req.body.interval) || 1)),
+      endAt: req.body.endAt ? new Date(req.body.endAt).toISOString() : undefined,
+      maxRuns: req.body.maxRuns ? Math.max(1, Number(req.body.maxRuns)) : undefined,
+      runCount: 0,
+      scheduledAt: (startAt || new Date()).toISOString(),
+      status: scheduled ? 'SCHEDULED' : 'ACTIVE',
       deliveryAuditCount: 0,
-      audienceResolvedCount: recipientIds.length,
+      createdBy: req.user?.userId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     } as any);
 
     await auditService.log({
-      communityId,
-      actorUserId: req.user?.userId || 'system',
-      actorRole: req.user?.role || 'OWNER',
-      action: 'CAMPAIGN_CREATED',
-      targetType: 'CAMPAIGN',
-      targetId: campaign.id,
-      metadata: { audienceResolvedCount: recipientIds.length },
+      communityId, actorUserId: req.user?.userId || 'system', actorRole: req.user?.role || 'OWNER',
+      action: 'CAMPAIGN_CREATED', targetType: 'CAMPAIGN', targetId: campaign.id, metadata: { targetAudience, frequency },
     });
 
-    if (!scheduledAt) {
-      // Execute campaign asynchronously
+    if (!scheduled) {
       EngagementCampaignService.executeCampaign(campaign.id, req.user?.userId || 'system', req.user?.role || 'OWNER')
         .catch(err => console.error('[CampaignExecution] Async run error:', err));
     }
-
     res.status(201).json({ success: true, campaign });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/** Pause, resume or delete a campaign. */
+export async function updateCampaignState(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const c: any = await campaignsRepository.getById(req.params.id);
+    if (!c || c.communityId !== communityId) throw new NotFoundError('Campaign not found');
+    const action = req.body?.action;
+    if (action === 'delete') { await campaignsRepository.delete(c.id); return res.json({ success: true, deleted: true }); }
+    if (action === 'pause') return res.json({ success: true, campaign: await campaignsRepository.update(c.id, { status: 'PAUSED', updatedAt: new Date().toISOString() } as any) });
+    if (action === 'resume') {
+      const next = new Date(c.scheduledAt || Date.now()) > new Date() ? c.scheduledAt : new Date(Date.now() + 60_000).toISOString();
+      return res.json({ success: true, campaign: await campaignsRepository.update(c.id, { status: 'SCHEDULED', scheduledAt: next, updatedAt: new Date().toISOString() } as any) });
+    }
+    throw new BadRequestError('Unknown action.');
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteReminder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const r: any = await remindersRepository.getById(req.params.id);
+    if (!r || r.communityId !== communityId) throw new NotFoundError('Reminder not found');
+    await remindersRepository.delete(r.id);
+    res.json({ success: true, deleted: true });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function closePollHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const poll = await EngagementPollService.closePoll(communityId, req.params.id, req.user?.userId || 'system', req.user?.role || 'OWNER');
+    res.json({ success: true, poll });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function updateMessageTemplate(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const t: any = await messageTemplatesRepository.getById(req.params.id);
+    if (!t || t.communityId !== communityId) throw new NotFoundError('Template not found');
+    const { name, content, category } = req.body;
+    if (!name || !content) throw new BadRequestError('Template name and content are required.');
+    const vars = Array.from(new Set((String(content).match(/\{\{\s*([\w.]+)\s*\}\}/g) || []).map((m) => m.replace(/[{}\s]/g, ''))));
+    const template = await messageTemplatesRepository.update(t.id, { name: String(name).slice(0, 80), content: String(content).slice(0, 4000), category: category ? String(category).slice(0, 40) : undefined, variables: vars, updatedAt: new Date().toISOString() } as any);
+    res.json({ success: true, template });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function deleteMessageTemplate(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const t: any = await messageTemplatesRepository.getById(req.params.id);
+    if (!t || t.communityId !== communityId) throw new NotFoundError('Template not found');
+    await messageTemplatesRepository.delete(t.id);
+    res.json({ success: true, deleted: true });
   } catch (error) {
     next(error);
   }
@@ -463,16 +530,19 @@ export async function getMessageTemplates(req: Request, res: Response, next: Nex
 export async function createMessageTemplate(req: Request, res: Response, next: NextFunction) {
   try {
     const communityId = getCommunityId(req);
-    const { name, content, variables } = req.body;
+    const { name, content, category } = req.body;
     if (!name || !content) {
       throw new BadRequestError('Template name and content are required.');
     }
+    // Variables are read from the text itself ({{name}}), so nobody has to list them by hand.
+    const variables = Array.from(new Set((String(content).match(/\{\{\s*([\w.]+)\s*\}\}/g) || []).map((m) => m.replace(/[{}\s]/g, ''))));
 
     const temp = await messageTemplatesRepository.create({
       communityId,
-      name,
-      content,
-      variables: variables || [],
+      name: String(name).slice(0, 80),
+      content: String(content).slice(0, 4000),
+      category: category ? String(category).slice(0, 40) : undefined,
+      variables,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });

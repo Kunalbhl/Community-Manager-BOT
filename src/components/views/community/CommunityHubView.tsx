@@ -41,6 +41,13 @@ export const CommunityHubView: React.FC<CommunityHubViewProps> = ({
   // Form States
   const [serverName, setServerName] = useState('');
   const [guildId, setGuildId] = useState('');
+  const [botNick, setBotNick] = useState('');
+  const [botName, setBotName] = useState('');
+  useEffect(() => {
+    if (!communityId) return;
+    fetch(`/api/v1/communities/${encodeURIComponent(communityId)}/toolkit`, { credentials: 'include', headers: { 'x-community-id': communityId } })
+      .then((r) => r.json()).then((j) => { setBotNick(j?.data?.resources?.botNickname || ''); setBotName(j?.data?.resources?.botName || ''); }).catch(() => undefined);
+  }, [communityId]);
 
   const [rulesEnabled, setRulesEnabled] = useState(true);
   const [welcomeDmEnabled, setWelcomeDmEnabled] = useState(true);
@@ -101,17 +108,15 @@ export const CommunityHubView: React.FC<CommunityHubViewProps> = ({
     setErrorMessage(null);
     try {
       if (activeModal === 'IDENTITY') {
-        const res = await fetch(`/api/v1/community/${communityId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-role': currentRole,
-            'x-user-role': currentRole,
-            'x-community-id': communityId,
-          },
-          body: JSON.stringify({ name: serverName, discordGuildId: guildId }),
+        const res = await fetch(`/api/v1/communities/${encodeURIComponent(communityId)}/toolkit/bot-nickname`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', 'x-community-id': communityId },
+          body: JSON.stringify({ nickname: botNick }),
         });
-        if (!res.ok) throw new Error('Failed to update community identity.');
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || j.success === false) throw new Error(j?.error?.message || 'Could not change the bot name.');
+        setBotNick(j.data?.nickname || '');
       } else if (activeModal === 'WELCOME') {
         const res = await fetch('/api/v1/community/welcome-config', {
           method: 'PUT',
@@ -209,6 +214,10 @@ export const CommunityHubView: React.FC<CommunityHubViewProps> = ({
             <div className="flex justify-between">
               <span className="text-slate-500">Server Name:</span>
               <span className="font-bold text-slate-900">{serverName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Bot name here:</span>
+              <span className="font-semibold text-slate-900">{botNick || botName || 'Community Manager'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Discord Guild ID:</span>
@@ -348,7 +357,7 @@ export const CommunityHubView: React.FC<CommunityHubViewProps> = ({
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900">
-                {activeModal === 'IDENTITY' && 'Edit Community Identity'}
+                {activeModal === 'IDENTITY' && 'Bot name in this server'}
                 {activeModal === 'WELCOME' && 'Edit Welcome & Rules Settings'}
                 {activeModal === 'RECRUITMENT_FLOW' && 'Edit Recruitment Flow Safeguards'}
                 {activeModal === 'RECRUITER_PROGRAM' && 'Edit Recruiter Program Settings'}
@@ -364,25 +373,22 @@ export const CommunityHubView: React.FC<CommunityHubViewProps> = ({
             <form onSubmit={handleSaveModal} className="space-y-4 text-xs">
               {activeModal === 'IDENTITY' && (
                 <>
-                  <div>
-                    <label className="block font-bold uppercase text-slate-700">Server Name</label>
-                    <input
-                      type="text"
-                      required
-                      value={serverName}
-                      onChange={(e) => setServerName(e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm"
-                    />
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-600">
+                    <div className="flex justify-between"><span>Server</span><span className="font-semibold text-slate-900">{serverName}</span></div>
+                    <div className="mt-1 flex justify-between"><span>Server ID</span><span className="font-mono">{guildId}</span></div>
+                    <p className="mt-2 text-[11px] text-slate-500">These come from Discord and can’t be changed here.</p>
                   </div>
                   <div>
-                    <label className="block font-bold uppercase text-slate-700">Discord Guild ID</label>
+                    <label className="block font-bold uppercase text-slate-700">Bot name in this server</label>
                     <input
                       type="text"
-                      required
-                      value={guildId}
-                      onChange={(e) => setGuildId(e.target.value)}
-                      className="mt-1 w-full font-mono rounded-lg border border-slate-300 p-2 text-sm"
+                      maxLength={32}
+                      value={botNick}
+                      placeholder={botName || 'Community Manager'}
+                      onChange={(e) => setBotNick(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm"
                     />
+                    <p className="mt-1 text-[11px] text-slate-500">Only changes how the bot is named in <b>this</b> server (its Discord nickname). Other servers and the bot’s own name stay the same. Leave empty to use “{botName || 'Community Manager'}”.</p>
                   </div>
                 </>
               )}

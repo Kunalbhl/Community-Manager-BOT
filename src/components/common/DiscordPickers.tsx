@@ -6,7 +6,7 @@ import { MemberPick, MemberOpt } from '../views/community/ServerToolsView.js';
  * Resources are loaded once per server and shared by every picker on the page.
  */
 interface Opt { id: string; name: string }
-interface Res { roles: Opt[]; textChannels: Opt[]; categories: Opt[]; voiceChannels?: Opt[] }
+interface Res { roles: Opt[]; textChannels: Opt[]; categories: Opt[]; voiceChannels?: Opt[]; emojis?: { id: string; name: string; animated: boolean; url: string }[]; botNickname?: string; botName?: string }
 
 const cache = new Map<string, Promise<Res>>();
 
@@ -31,6 +31,19 @@ export function useDiscordResources(communityId?: string): Res | null {
   return res;
 }
 
+/** Compare names the way people read them: ignore emojis, separators, case and a leading # or @. */
+export function normName(n: string): string {
+  return String(n || '').toLowerCase().replace(/^[#@]/, '').normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+/** If a stored name/ID isn't an exact match, find the channel/role it obviously means and switch to it. */
+function useAutoMatch<T extends Opt>(list: T[], cur: string, toVal: (o: T) => string, onChange: (v: string) => void, loaded: boolean) {
+  const exact = list.some((o) => toVal(o) === cur);
+  const match = !exact && cur ? list.find((o) => o.id === cur) || list.find((o) => normName(o.name) === normName(cur)) : undefined;
+  useEffect(() => { if (loaded && match) onChange(toVal(match)); }, [loaded, match?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  return exact || !!match;
+}
+
 const base = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20';
 
 /** Value can be the channel ID (default) or its name ("#name" / "name"), for older settings that store names. */
@@ -41,11 +54,11 @@ export function ChannelSelect({ value, onChange, valueType = 'id', placeholder =
   const list = ((kind === 'category' ? res?.categories : res?.textChannels) || []).filter((c) => !exclude.includes(c.id));
   const toVal = (o: Opt) => (valueType === 'id' ? o.id : valueType === 'hashName' ? `#${o.name}` : o.name);
   const cur = String(value || '');
-  const known = list.some((o) => toVal(o) === cur);
+  const known = useAutoMatch(list, cur, toVal, onChange, !!res);
   return (
     <select className={`${base} ${className}`} value={cur} onChange={(e) => onChange(e.target.value)}>
       <option value="">{res ? placeholder : 'Loading channels…'}</option>
-      {cur && !known && <option value={cur}>{cur} (not found in server)</option>}
+      {cur && !known && res && <option value={cur}>{/^\d+$/.test(cur) ? 'A deleted channel' : cur} (no longer in the server, pick another)</option>}
       {list.map((o) => <option key={o.id} value={toVal(o)}>{kind === 'category' ? '' : '#'}{o.name}</option>)}
     </select>
   );
@@ -58,11 +71,11 @@ export function RoleSelect({ value, onChange, valueType = 'id', placeholder = 'C
   const list = (res?.roles || []).filter((r) => !exclude.includes(r.id) || r.id === value);
   const toVal = (o: Opt) => (valueType === 'id' ? o.id : valueType === 'atName' ? `@${o.name}` : o.name);
   const cur = String(value || '');
-  const known = list.some((o) => toVal(o) === cur);
+  const known = useAutoMatch(list, cur, toVal, onChange, !!res);
   return (
     <select className={`${base} ${className}`} value={cur} onChange={(e) => onChange(e.target.value)}>
       <option value="">{res ? placeholder : 'Loading roles…'}</option>
-      {cur && !known && <option value={cur}>{cur} (not found in server)</option>}
+      {cur && !known && res && <option value={cur}>{/^\d+$/.test(cur) ? 'A deleted role' : cur} (no longer in the server, pick another)</option>}
       {list.map((o) => <option key={o.id} value={toVal(o)}>@{o.name}</option>)}
     </select>
   );

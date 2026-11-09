@@ -313,65 +313,87 @@ export class EngagementDeliveryService {
 /**
  * 5. ANNOUNCEMENTS SERVICE - EngagementCampaignService
  */
+/** Next run time for a recurring campaign, or null when it should stop. */
+export function nextCampaignRun(c: any, from = new Date()): string | null {
+  const f = c.frequency || 'ONCE';
+  if (f === 'ONCE') return null;
+  const n = Math.max(1, Number(c.interval) || 1);
+  const d = new Date(c.scheduledAt || from);
+  do {
+    if (f === 'HOURLY') d.setUTCHours(d.getUTCHours() + n);
+    else if (f === 'DAILY') d.setUTCDate(d.getUTCDate() + n);
+    else if (f === 'WEEKLY') d.setUTCDate(d.getUTCDate() + 7 * n);
+    else if (f === 'MONTHLY') d.setUTCMonth(d.getUTCMonth() + n);
+    else return null;
+  } while (d <= from);
+  if (c.endAt && d > new Date(c.endAt)) return null;
+  if (c.maxRuns && (c.runCount || 0) + 1 >= c.maxRuns) return null;
+  return d.toISOString();
+}
+
+/** Live recipients from Discord (falls back to the synced member list). */
+async function campaignRecipients(c: any): Promise<string[]> {
+  try {
+    const community: any = await communitiesRepository.getById(c.communityId);
+    const guild: any = discordService.getGuild(community?.discordGuildId || community?.guildId);
+    if (guild) {
+      if (c.targetAudience === 'MEMBERS' && Array.isArray(c.memberIds)) return c.memberIds;
+      const members = await guild.members.fetch();
+      return Array.from(members.values())
+        .filter((m: any) => !m.user.bot && (c.targetAudience !== 'ROLE' || m.roles.cache.has(c.roleId)))
+        .map((m: any) => m.id);
+    }
+  } catch (err: any) {
+    logger.warn(`[CampaignService] live member list unavailable: ${err?.message}`);
+  }
+  return EngagementAudienceService.resolveAudience(c.communityId, c.targetAudience === 'ROLE' ? 'ROLE' : c.targetAudience === 'MEMBERS' ? 'CUSTOM_MEMBER_SET' : 'ALL', { roleId: c.roleId, memberIds: c.memberIds });
+}
+
 export class EngagementCampaignService {
   static async executeCampaign(campaignId: string, actorUserId: string, actorRole: any): Promise<void> {
-    const campaign = await campaignsRepository.getById(campaignId);
+    const campaign: any = await campaignsRepository.getById(campaignId);
     if (!campaign) throw new NotFoundError('Campaign not found.');
-
+    if (campaign.status === 'PAUSED') return;
     await campaignsRepository.update(campaignId, { status: 'PROCESSING' as any, updatedAt: new Date().toISOString() });
 
-    // Audit started
-    await auditService.log({
-      communityId: campaign.communityId,
-      actorUserId,
-      actorRole,
-      action: 'CAMPAIGN_STARTED',
-      targetType: 'CAMPAIGN',
-      targetId: campaignId,
-    });
-
+    let sentCount = 0;
+    let audience = 0;
     try {
-      // Resolve audience
-      const recipientIds = await EngagementAudienceService.resolveAudience(campaign.communityId, campaign.targetAudience);
-      await campaignsRepository.update(campaignId, { audienceResolvedCount: recipientIds.length } as any);
-
-      if (recipientIds.length === 0) {
-        await campaignsRepository.update(campaignId, { status: 'COMPLETED', updatedAt: new Date().toISOString() });
-        return;
-      }
-
-      let sentCount = 0;
-      for (const userId of recipientIds) {
-        const deliver = await EngagementDeliveryService.deliverMessage({
-          communityId: campaign.communityId,
-          actorUserId,
-          actorRole,
-          targetUserId: userId,
-          content: campaign.message,
-          featureKey: 'CAMPAIGNS',
+      if (campaign.targetAudience === 'CHANNEL') {
+        audience = 1;
+        const d = await EngagementDeliveryService.deliverMessage({
+          communityId: campaign.communityId, actorUserId, actorRole,
+          targetChannelId: campaign.channelId, content: campaign.message, featureKey: 'CAMPAIGNS',
         });
-        if (deliver.status === 'SENT') {
-          sentCount++;
+        if (d.status === 'SENT') sentCount = 1;
+      } else {
+        const ids = await campaignRecipients(campaign);
+        audience = ids.length;
+        for (const userId of ids) {
+          const d = await EngagementDeliveryService.deliverMessage({
+            communityId: campaign.communityId, actorUserId, actorRole,
+            targetUserId: userId, content: campaign.message, featureKey: 'CAMPAIGNS',
+          });
+          if (d.status === 'SENT') sentCount++;
         }
       }
-
+      const next = nextCampaignRun(campaign);
       await campaignsRepository.update(campaignId, {
-        status: 'COMPLETED',
-        deliveryAuditCount: sentCount,
+        status: next ? 'SCHEDULED' : 'COMPLETED',
+        scheduledAt: next || campaign.scheduledAt,
+        runCount: (campaign.runCount || 0) + 1,
+        lastRunAt: new Date().toISOString(),
+        audienceResolvedCount: audience,
+        deliveryAuditCount: (campaign.deliveryAuditCount || 0) + sentCount,
         updatedAt: new Date().toISOString(),
-      });
-
+      } as any);
       await auditService.log({
-        communityId: campaign.communityId,
-        actorUserId,
-        actorRole,
-        action: 'CAMPAIGN_COMPLETED',
-        targetType: 'CAMPAIGN',
-        targetId: campaignId,
-        metadata: { sentCount },
+        communityId: campaign.communityId, actorUserId, actorRole,
+        action: 'CAMPAIGN_COMPLETED', targetType: 'CAMPAIGN', targetId: campaignId,
+        metadata: { sentCount, audience, next },
       });
     } catch (err: any) {
-      await campaignsRepository.update(campaignId, { status: 'FAILED', updatedAt: new Date().toISOString() });
+      await campaignsRepository.update(campaignId, { status: 'FAILED', updatedAt: new Date().toISOString() } as any);
       logger.error(`[CampaignService] Execution failed for ${campaignId}`, undefined, err);
     }
   }
@@ -381,82 +403,66 @@ export class EngagementCampaignService {
  * 11. POLLS SERVICE - EngagementPollService
  */
 export class EngagementPollService {
+  /** Posts a native Discord poll; Discord collects the votes and closes it after the chosen duration. */
   static async createPoll(communityId: string, pollData: any, actorUserId: string, actorRole: any): Promise<Poll> {
     const hasFeature = await EntitlementService.hasFeature(communityId, 'POLLS');
-    if (!hasFeature) {
-      throw new ForbiddenError('Interactive Polls are not available on your active plan.');
-    }
+    if (!hasFeature) throw new ForbiddenError('Interactive Polls are not available on your active plan.');
+    const question = String(pollData.question || '').trim().slice(0, 300);
+    const options: string[] = (Array.isArray(pollData.options) ? pollData.options : []).map((o: any) => String(o).trim().slice(0, 55)).filter(Boolean).slice(0, 10);
+    const channelId = String(pollData.channelId || '');
+    if (!question || options.length < 2 || !channelId) throw new BadRequestError('A question, a channel and at least 2 options are required.');
+    const hours = Math.min(768, Math.max(1, Math.round(Number(pollData.durationHours) || 24)));
 
-    const { question, options, channelId, durationMinutes } = pollData;
-    if (!question || !options || !Array.isArray(options) || options.length < 2 || !channelId) {
-      throw new BadRequestError('Question, channelId, and at least 2 options are required.');
-    }
-
-    const initialVotes: Record<string, number> = {};
-    options.forEach((_, idx) => {
-      initialVotes[idx.toString()] = 0;
+    const ch: any = await (discordService as any).client?.channels?.fetch(channelId).catch(() => null);
+    if (!ch?.send) throw new BadRequestError('The bot cannot post in that channel.');
+    const msg = await ch.send({
+      poll: { question: { text: question }, answers: options.map((text) => ({ text })), duration: hours, allowMultiselect: !!pollData.allowMultiselect },
     });
 
-    // Enforce delivery check before publishing
-    const deliverResult = await EngagementDeliveryService.deliverMessage({
-      communityId,
-      actorUserId,
-      actorRole,
-      targetChannelId: channelId,
-      content: `📊 **NEW POLL: ${question}**\n\n` + options.map((o, i) => `${i + 1}️⃣ ${o}`).join('\n') + `\n\n*Vote in the Community Manager dashboard!*`,
-      featureKey: 'POLLS',
-    });
-
-    if (deliverResult.status !== 'SENT') {
-      throw new BadRequestError(`Could not dispatch poll announcement to channel: ${deliverResult.failureReason}`);
-    }
-
+    const now = new Date();
     const poll = await pollsRepository.create({
-      communityId,
-      question,
-      options,
-      votes: initialVotes,
-      votedUserIds: [],
-      channelId,
-      durationMinutes: durationMinutes || 60,
-      status: 'ACTIVE',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-
-    await auditService.log({
-      communityId,
-      actorUserId,
-      actorRole,
-      action: 'POLL_CREATED',
-      targetType: 'POLL',
-      targetId: poll.id,
-    });
-
+      communityId, question, options, votes: {}, votedUserIds: [], channelId,
+      durationMinutes: hours * 60, messageId: msg.id, endsAt: new Date(now.getTime() + hours * 3600_000).toISOString(),
+      allowMultiselect: !!pollData.allowMultiselect, afterAction: pollData.afterAction === 'NONE' ? 'NONE' : 'ANNOUNCE',
+      status: 'ACTIVE', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+    } as any);
+    await auditService.log({ communityId, actorUserId, actorRole, action: 'POLL_CREATED', targetType: 'POLL', targetId: poll.id });
     return poll as Poll;
   }
 
+  /** End early (Discord finalises the result immediately). */
   static async closePoll(communityId: string, pollId: string, actorUserId: string, actorRole: any): Promise<Poll> {
-    const poll = await pollsRepository.getById(pollId);
-    if (!poll || poll.communityId !== communityId) {
-      throw new NotFoundError('Poll not found.');
+    const poll: any = await pollsRepository.getById(pollId);
+    if (!poll || poll.communityId !== communityId) throw new NotFoundError('Poll not found.');
+    const ch: any = await (discordService as any).client?.channels?.fetch(poll.channelId).catch(() => null);
+    const msg: any = await ch?.messages?.fetch(poll.messageId).catch(() => null);
+    if (msg?.poll && !msg.poll.resultsFinalized) await msg.poll.end().catch(() => undefined);
+    await auditService.log({ communityId, actorUserId, actorRole, action: 'POLL_CLOSED', targetType: 'POLL', targetId: pollId });
+    return (await this.finalize(poll, true)) || poll;
+  }
+
+  /** Reads Discord's final counts, stores them and (optionally) posts the result. */
+  static async finalize(poll: any, force = false): Promise<Poll | null> {
+    const ch: any = await (discordService as any).client?.channels?.fetch(poll.channelId).catch(() => null);
+    const msg: any = await ch?.messages?.fetch({ message: poll.messageId, force: true }).catch(() => null);
+    if (!msg?.poll) {
+      if (poll.endsAt && Date.now() - new Date(poll.endsAt).getTime() > 6 * 3600_000) {
+        return pollsRepository.update(poll.id, { status: 'CLOSED', updatedAt: new Date().toISOString() } as any) as any;
+      }
+      return null;
     }
-
-    const updated = await pollsRepository.update(pollId, {
-      status: 'CLOSED',
-      updatedAt: new Date().toISOString(),
-    });
-
-    await auditService.log({
-      communityId,
-      actorUserId,
-      actorRole,
-      action: 'POLL_CLOSED',
-      targetType: 'POLL',
-      targetId: pollId,
-    });
-
-    return updated as Poll;
+    if (!msg.poll.resultsFinalized && !force) return null;
+    const results = Array.from(msg.poll.answers.values()).map((a: any) => ({ text: a.text, votes: a.voteCount || 0 }));
+    const updated = await pollsRepository.update(poll.id, { status: 'CLOSED', results, updatedAt: new Date().toISOString() } as any);
+    if (poll.afterAction !== 'NONE') {
+      const total = results.reduce((n, r) => n + r.votes, 0);
+      const top = Math.max(0, ...results.map((r) => r.votes));
+      const winners = results.filter((r) => r.votes === top && top > 0).map((r) => `**${r.text}**`);
+      const text = !total ? `📊 Poll closed: **${poll.question}**\nNo votes were cast.`
+        : `📊 Poll closed: **${poll.question}**\n${winners.length > 1 ? `Tie between ${winners.join(' and ')}` : `Winner: ${winners[0]}`} with ${top} vote${top === 1 ? '' : 's'} (${total} total).`;
+      await msg.reply({ content: text, allowedMentions: { parse: [] } }).catch(() => undefined);
+    }
+    return updated as any;
   }
 }
 
@@ -470,15 +476,19 @@ export class EngagementReminderService {
       throw new ForbiddenError('Reminders & Notifications are not available on your active plan.');
     }
 
-    const { triggerAt, targetUser, message, recurrence, timezone } = reminderData;
-    if (!triggerAt || !targetUser || !message) {
-      throw new BadRequestError('triggerAt, targetUser, and message are required.');
+    const { triggerAt, targetUser, message, recurrence, timezone, channelId } = reminderData;
+    const targetType = reminderData.targetType === 'CHANNEL' ? 'CHANNEL' : 'MEMBER';
+    if (!triggerAt || !message || (targetType === 'MEMBER' ? !targetUser : !channelId)) {
+      throw new BadRequestError(targetType === 'MEMBER' ? 'Pick a member, a time and a message.' : 'Pick a channel, a time and a message.');
     }
 
     const reminder = await remindersRepository.create({
       communityId,
-      triggerAt,
-      targetUser,
+      triggerAt: new Date(triggerAt).toISOString(),
+      targetType,
+      targetUser: targetType === 'MEMBER' ? targetUser : '',
+      targetUserName: targetType === 'MEMBER' ? String(reminderData.targetUserName || '').slice(0, 64) : undefined,
+      channelId: targetType === 'CHANNEL' ? channelId : undefined,
       message,
       status: 'PENDING',
       recurrence: recurrence || 'ONCE',
@@ -575,12 +585,15 @@ export class EngagementSchedulerService {
       if (this.executedKeys.has(idempotencyKey)) continue;
       this.executedKeys.add(idempotencyKey);
 
-      await remindersRepository.update(rem.id, { status: 'SENT', updatedAt: new Date().toISOString() });
+      const r: any = rem;
+      const repeatDays = r.recurrence === 'DAILY' ? 1 : r.recurrence === 'WEEKLY' ? 7 : 0;
+      const nextAt = repeatDays ? new Date(new Date(r.triggerAt).getTime() + repeatDays * 86400_000).toISOString() : null;
+      await remindersRepository.update(rem.id, (nextAt ? { triggerAt: nextAt, lastSentAt: nowStr, updatedAt: nowStr } : { status: 'SENT', updatedAt: nowStr }) as any);
       const deliver = await EngagementDeliveryService.deliverMessage({
         communityId: rem.communityId,
         actorUserId: 'scheduler',
         actorRole: 'OWNER',
-        targetUserId: rem.targetUser,
+        ...(r.targetType === 'CHANNEL' ? { targetChannelId: r.channelId } : { targetUserId: rem.targetUser }),
         content: rem.message,
         featureKey: 'REMINDERS',
       });
@@ -597,6 +610,16 @@ export class EngagementSchedulerService {
       } else {
         await remindersRepository.update(rem.id, { status: 'FAILED', updatedAt: new Date().toISOString() });
       }
+    }
+
+    // 3b. Native polls that have ended: store results and post the outcome.
+    try {
+      const polls: any[] = await pollsRepository.list();
+      for (const p of polls.filter((x) => x.status === 'ACTIVE' && x.messageId && x.endsAt && x.endsAt <= nowStr)) {
+        await EngagementPollService.finalize(p).catch((e: any) => logger.warn(`[SchedulerService] poll ${p.id}: ${e?.message}`));
+      }
+    } catch (err: any) {
+      logger.warn(`[SchedulerService] polls pass skipped: ${err?.message}`);
     }
 
     // 4. Event Reminders
