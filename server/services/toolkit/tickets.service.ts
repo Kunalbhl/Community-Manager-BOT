@@ -7,7 +7,7 @@
  */
 import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, ModalBuilder, PermissionFlagsBits,
-  StringSelectMenuBuilder, TextInputBuilder, TextInputStyle,
+  StringSelectMenuBuilder, TextInputBuilder, TextInputStyle, LabelBuilder, UserSelectMenuBuilder,
 } from 'discord.js';
 import { FirestoreRepository } from '../../repositories/firestore.repository.js';
 import { logger } from '../../logging/logger.js';
@@ -61,18 +61,20 @@ export const ticketService = {
     return new ModalBuilder()
       .setCustomId(`cm:ticket:form:${typeKey}`)
       .setTitle(label.slice(0, 45))
-      .addComponents(
-        new ActionRowBuilder<TextInputBuilder>().addComponents(
-          new TextInputBuilder().setCustomId('subject').setLabel('Subject').setStyle(TextInputStyle.Short).setMaxLength(100).setRequired(true),
-        ),
-        new ActionRowBuilder<TextInputBuilder>().addComponents(
-          new TextInputBuilder().setCustomId('details').setLabel('Details (who, what, where, links)').setStyle(TextInputStyle.Paragraph).setMaxLength(1500).setRequired(true),
-        ),
+      .addLabelComponents(
+        new LabelBuilder().setLabel('Subject').setTextInputComponent(
+          new TextInputBuilder().setCustomId('subject').setStyle(TextInputStyle.Short).setMaxLength(100).setRequired(true)),
+        new LabelBuilder().setLabel('Member(s) involved').setDescription('Pick from this server (optional). Only staff see who you picked.').setUserSelectMenuComponent(
+          new UserSelectMenuBuilder().setCustomId('members').setPlaceholder('Search a member').setMinValues(0).setMaxValues(5).setRequired(false)),
+        new LabelBuilder().setLabel('Not in this server?').setDescription('Any name you know: Discord name, game name, or both (optional)').setTextInputComponent(
+          new TextInputBuilder().setCustomId('outside').setStyle(TextInputStyle.Short).setMaxLength(200).setRequired(false).setPlaceholder('e.g. ShadowX (in game), @shadow_x')),
+        new LabelBuilder().setLabel('Details').setDescription('What happened, where and when. Add message links or screenshots.').setTextInputComponent(
+          new TextInputBuilder().setCustomId('details').setStyle(TextInputStyle.Paragraph).setMaxLength(1500).setRequired(true)),
       );
   },
 
   /** Creates the private ticket channel. */
-  async open(params: { communityId: string; guild: any; member: any; typeKey: string; subject: string; details: string }): Promise<TicketDoc> {
+  async open(params: { communityId: string; guild: any; member: any; typeKey: string; subject: string; details: string; involvedIds?: string[]; outsideNames?: string }): Promise<TicketDoc> {
     const { communityId, guild, member, typeKey } = params;
     const cfg = await getToolkit(communityId);
     if (!cfg.tickets.enabled) throw new Error('Tickets are turned off on this server.');
@@ -109,9 +111,25 @@ export const ticketService = {
 
     const ticket = await ticketsRepository.create({
       communityId, guildId: guild.id, number, type: type.key, typeLabel: type.label,
-      subject: params.subject, details: params.details, openerId: member.id, openerName: member.user?.username || member.id,
+      subject: params.subject, details: params.details, involvedIds: params.involvedIds || [], outsideNames: params.outsideNames || '', openerId: member.id, openerName: member.user?.username || member.id,
       channelId: channel.id, status: 'OPEN', createdAt: new Date().toISOString(),
     } as any);
+
+    // Tell staff at once if anyone named is already on the blacklist.
+    let blacklistNote = '';
+    try {
+      const g = await import('../blacklist/blacklistGuard.service.js');
+      const notes: string[] = [];
+      for (const id of params.involvedIds || []) {
+        const m = await g.findMatches(communityId, { userId: id });
+        if (m.length) notes.push(`<@${id}> is on the blacklist: ${String(m[0].entry.reason || '').slice(0, 120)}`);
+      }
+      for (const name of (params.outsideNames || '').split(/[,/|]| and /).map((x) => x.trim().replace(/^@/, '')).filter((x) => x.length >= 3)) {
+        const hits = await g.search(communityId, name);
+        if (hits[0]?.score >= 70) notes.push(`“${name}” matches **${g.entryLabel(hits[0].entry)}**: ${String(hits[0].entry.reason || '').slice(0, 120)}`);
+      }
+      blacklistNote = notes.join('\n');
+    } catch { /* blacklist check is optional */ }
 
     const buttons = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId(`cm:ticket:claim:${ticket.id}`).setLabel('Claim').setEmoji('✋').setStyle(ButtonStyle.Primary),
@@ -123,7 +141,13 @@ export const ticketService = {
       embeds: [{
         title: `${type.emoji} ${type.label} · #${String(number).padStart(4, '0')}`,
         color: 0xff5c8a,
-        fields: [{ name: 'Subject', value: params.subject.slice(0, 1024) }, { name: 'Details', value: params.details.slice(0, 1024) }],
+        fields: [
+          { name: 'Subject', value: params.subject.slice(0, 1024) },
+          ...(params.involvedIds?.length ? [{ name: 'Members involved', value: params.involvedIds.map((id) => `<@${id}> · \`${id}\``).join('\n').slice(0, 1024) }] : []),
+          ...(params.outsideNames ? [{ name: 'Not in the server', value: params.outsideNames.slice(0, 1024) }] : []),
+          ...(blacklistNote ? [{ name: '🚫 Blacklist', value: blacklistNote.slice(0, 1024) }] : []),
+          { name: 'Details', value: params.details.slice(0, 1024) },
+        ],
         footer: { text: 'Staff: press Claim to take this ticket. Anyone here can close it when it is solved.' },
       }],
       components: [buttons],
