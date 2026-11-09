@@ -1199,7 +1199,7 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         
         {/* Workspace navigation sidebar */}
-        <div className={`${embedded ? 'hidden' : ''} lg:col-span-1 rounded-xl border border-slate-200 bg-white p-4 h-fit space-y-4">
+        <div className={`${embedded ? 'hidden' : ''} lg:col-span-1 rounded-xl border border-slate-200 bg-white p-4 h-fit space-y-4`}>
           <div className="pb-2 border-b border-slate-100">
             <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Recruitment Workspaces</h3>
             <p className="text-xs text-slate-500">Coordinated operator views</p>
