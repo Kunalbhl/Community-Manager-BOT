@@ -1,5 +1,6 @@
 import { takeOpenTab, goTo } from './SetupGuideView.js';
 import { MemberName } from '../../common/DiscordPickers.js';
+import { TicketPanelDesigner, TicketTypeExtras } from './TicketPanelDesigner.js';
 import { TemplateField, RECRUIT_VARS } from '../../common/TemplateField.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -84,7 +85,7 @@ export function ServerToolsView({ communityId, only }: { communityId: string; on
       {config && res && (
         <>
           {tab === 'recruit' && <RecruitTab api={api} cfg={config.recruitment} rooms={config.reviewRooms} res={res} onSave={(v) => save('recruitment', v)} onSaveRooms={(v) => save('reviewRooms', v)} goRooms={() => setTab('rooms')} />}
-          {tab === 'tickets' && <TicketsTab api={api} cfg={config.tickets} res={res} onSave={(v) => save('tickets', v)} />}
+          {tab === 'tickets' && <TicketsTab communityId={communityId} api={api} cfg={config.tickets} res={res} onSave={(v) => save('tickets', v)} />}
           {tab === 'warnings' && <WarningsTab communityId={communityId} api={api} cfg={config.warnings} onSave={(v) => save('warnings', v)} />}
           {tab === 'roles' && <RoleRulesTab cfg={config.roleRules} res={res} onSave={(v) => save('roleRules', v)} />}
           {tab === 'rooms' && <ReviewRoomsTab communityId={communityId} api={api} cfg={config.reviewRooms} res={res} onSave={(v) => save('reviewRooms', v)} />}
@@ -181,10 +182,9 @@ export const fmtDate = (s?: string) => (s ? new Date(s).toLocaleString(undefined
 /* ------------------------------------------------------------------ */
 /* Tickets                                                             */
 /* ------------------------------------------------------------------ */
-function TicketsTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Resources; onSave: (v: any) => Promise<void> }) {
+function TicketsTab({ communityId, api, cfg, res, onSave }: { communityId: string; api: any; cfg: any; res: Resources; onSave: (v: any) => Promise<void> }) {
   const [c, setC] = useState(cfg);
-  const [panelChannel, setPanelChannel] = useState('');
-  const [panelMsg, setPanelMsg] = useState('');
+  const [openType, setOpenType] = useState<number | null>(null);
   const [tickets, setTickets] = useState<any[] | null>(null);
   const roles = res.roles.map((r) => ({ ...r }));
 
@@ -194,6 +194,10 @@ function TicketsTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Resour
   const setType = (i: number, patch: any) => setC({ ...c, types: c.types.map((t: any, n: number) => (n === i ? { ...t, ...patch } : t)) });
 
   return (
+    <div className="space-y-6">
+      <Card title="Ticket panel" desc="What members see in Discord: dropdown or buttons, your own embed with images and colours, and who gets notified. The preview updates as you type.">
+        <TicketPanelDesigner communityId={communityId} c={c} setC={setC} api={api} />
+      </Card>
     <div className="grid gap-6 2xl:grid-cols-[1.3fr_1fr]">
       <div className="space-y-6">
         <Card title="Ticket settings" right={<Toggle on={c.enabled} onChange={(v) => setC({ ...c, enabled: v })} label={c.enabled ? 'On' : 'Off'} />}>
@@ -208,28 +212,22 @@ function TicketsTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Resour
           right={<button className={ghost} onClick={() => setC({ ...c, types: [...c.types, { key: '', label: 'New type', emoji: '🎫', description: '', staffRoleIds: [] }] })}><Plus className="h-4 w-4" /> Add type</button>}>
           <div className="space-y-3">
             {c.types.map((t: any, i: number) => (
-              <div key={i} className="grid gap-3 rounded-xl border border-slate-200 p-4 lg:grid-cols-[70px_1fr_1.4fr_1.2fr_auto] lg:items-start">
+              <div key={i} className="rounded-xl border border-slate-200 p-4"><div className="grid gap-3 lg:grid-cols-[70px_1fr_1.4fr_1.2fr_auto_auto] lg:items-start">
                 <input className={input} value={t.emoji} onChange={(e) => setType(i, { emoji: e.target.value })} aria-label="Emoji" />
                 <input className={input} value={t.label} onChange={(e) => setType(i, { label: e.target.value })} placeholder="Label" />
                 <input className={input} value={t.description} onChange={(e) => setType(i, { description: e.target.value })} placeholder="Short description" />
                 <MultiPick options={roles} value={t.staffRoleIds || []} onChange={(v) => setType(i, { staffRoleIds: v })} placeholder="Extra team" prefix="@" />
                 <button className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setC({ ...c, types: c.types.filter((_: any, n: number) => n !== i) })} aria-label="Delete type"><Trash2 className="h-4 w-4" /></button>
+                <button className="rounded-lg px-2 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50" onClick={() => setOpenType(openType === i ? null : i)}>{openType === i ? 'Less' : 'More'}</button>
+              </div>
+              {openType === i && <TicketTypeExtras communityId={communityId} t={t} set={(patch) => setType(i, patch)} />}
               </div>
             ))}
           </div>
           <div className="mt-5"><SaveBar onSave={() => onSave(c)} /></div>
         </Card>
 
-        <Card title="Post the ticket panel" desc="Members open tickets from this panel or with /ticket.">
-          <div className="flex flex-wrap gap-3">
-            <div className="min-w-[240px] flex-1"><Pick options={res.textChannels} value={panelChannel} onChange={setPanelChannel} placeholder="Choose a channel" /></div>
-            <button className={btn} disabled={!panelChannel} onClick={async () => {
-              setPanelMsg('');
-              try { await api('/tickets/panel', 'POST', { channelId: panelChannel }); setPanelMsg('Panel posted.'); } catch (e: any) { setPanelMsg(e.message); }
-            }}><Send className="h-4 w-4" /> Post panel</button>
-          </div>
-          {panelMsg && <p className="mt-3 text-sm text-slate-600">{panelMsg}</p>}
-        </Card>
+
       </div>
 
       <Card title="Recent tickets" right={<button className={ghost} onClick={loadTickets}><RefreshCw className="h-4 w-4" /> Refresh</button>}>
@@ -250,6 +248,7 @@ function TicketsTab({ api, cfg, res, onSave }: { api: any; cfg: any; res: Resour
           </ul>
         )}
       </Card>
+    </div>
     </div>
   );
 }

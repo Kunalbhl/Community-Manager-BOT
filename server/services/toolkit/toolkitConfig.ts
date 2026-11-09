@@ -6,7 +6,32 @@ import { FirestoreRepository } from '../../repositories/firestore.repository.js'
 import { communitiesRepository } from '../../repositories/index.js';
 import { discordService } from '../../integrations/discord/discord.service.js';
 
-export interface TicketType { key: string; label: string; emoji: string; description: string; staffRoleIds: string[] }
+export interface TicketType {
+  key: string; label: string; emoji: string; description: string; staffRoleIds: string[];
+  /** Button colour when the panel uses buttons. */
+  buttonStyle?: 'PRIMARY' | 'SECONDARY' | 'SUCCESS' | 'DANGER';
+  /** Extra people and roles pinged when this type is opened. */
+  pingRoleIds?: string[]; pingUserIds?: string[];
+  /** First message inside the ticket. Variables: {member} {type} {number} {subject} {server}. */
+  welcomeTitle?: string; welcomeMessage?: string;
+}
+export interface TicketEmbed {
+  title: string; description: string; color: string; url?: string;
+  authorName?: string; authorIcon?: string; thumbnail?: string; image?: string;
+  footerText?: string; footerIcon?: string; timestamp?: boolean;
+  /** Add the list of ticket types under the description. */
+  listTypes: boolean;
+}
+export interface TicketPanel {
+  style: 'DROPDOWN' | 'BUTTONS';
+  placeholder: string;
+  /** Text above the embed; mentions here notify people when the panel is posted. */
+  content: string;
+  embed: TicketEmbed;
+  /** Ping the staff roles when a ticket opens. */
+  pingStaff: boolean;
+  channelId?: string; messageId?: string;
+}
 export interface WarningReason { key: string; label: string; points: number }
 export type PunishAction = 'TIMEOUT' | 'KICK' | 'BAN';
 export interface WarningThreshold { points: number; action: PunishAction; durationMinutes?: number }
@@ -23,12 +48,16 @@ export interface RoleRule {
   addRoleIds: string[];
   removeRoleIds: string[];
 }
+export const DEFAULT_TICKET_PANEL: TicketPanel = {
+  style: 'DROPDOWN', placeholder: 'Choose what you need help with', content: '', pingStaff: true,
+  embed: { title: '🎫 Need help? Open a ticket', description: 'Pick a type below and a private channel opens for you and our staff.', color: '#7c8cff', listTypes: true, timestamp: false },
+};
 export interface ReviewTier { name: string; roleIds: string[] }
 
 export interface ToolkitConfig {
   id: string;
   communityId: string;
-  tickets: { enabled: boolean; categoryId?: string; logChannelId?: string; staffRoleIds: string[]; types: TicketType[]; counter: number; panelPostedAt?: string };
+  tickets: { enabled: boolean; categoryId?: string; logChannelId?: string; staffRoleIds: string[]; types: TicketType[]; counter: number; panelPostedAt?: string; panel?: TicketPanel };
   warnings: { enabled: boolean; expiryDays: number; dmMember: boolean; reasons: WarningReason[]; thresholds: WarningThreshold[] };
   roleRules: { enabled: boolean; rules: RoleRule[] };
   reviewRooms: { enabled: boolean; categoryId?: string; applicantCanSee: boolean; tiers: ReviewTier[]; deleteAfterHours: number; specialMemberIds?: string[] };

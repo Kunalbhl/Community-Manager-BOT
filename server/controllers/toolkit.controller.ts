@@ -21,6 +21,22 @@ const int = (v: unknown, min: number, max: number, def: number) => {
   const n = Math.round(Number(v));
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
 };
+const url = (v: unknown) => { const x = str(v, 500); return /^https:\/\/\S+$/i.test(x) ? x : ''; };
+function cleanPanel(p: any, cur: any): any {
+  const e = p?.embed || {};
+  return {
+    style: p?.style === 'BUTTONS' ? 'BUTTONS' : 'DROPDOWN',
+    placeholder: str(p?.placeholder, 100) || 'Choose what you need help with',
+    content: str(p?.content, 2000),
+    pingStaff: p?.pingStaff !== false,
+    embed: {
+      title: str(e.title, 256), description: str(e.description, 4000), color: /^#[0-9a-f]{6}$/i.test(e.color || '') ? e.color : '#7c8cff', url: url(e.url),
+      authorName: str(e.authorName, 256), authorIcon: url(e.authorIcon), thumbnail: url(e.thumbnail), image: url(e.image),
+      footerText: str(e.footerText, 2048), footerIcon: url(e.footerIcon), timestamp: !!e.timestamp, listTypes: e.listTypes !== false,
+    },
+    channelId: cur?.channelId, messageId: cur?.messageId,
+  };
+}
 const key = (v: unknown) => str(v, 32).toLowerCase().replace(/[^a-z0-9_-]/g, '') || `k${Math.random().toString(36).slice(2, 7)}`;
 
 /** Server roles + channels for the pickers. */
@@ -69,9 +85,13 @@ export async function saveToolkitSectionHandler(req: Request, res: Response) {
         logChannelId: isSnowflake(b.logChannelId) ? b.logChannelId : undefined,
         staffRoleIds: ids(b.staffRoleIds),
         types: (Array.isArray(b.types) ? b.types : []).slice(0, 25).map((t: any) => ({
-          key: key(t.key || t.label), label: str(t.label, 80) || 'Ticket', emoji: str(t.emoji, 8) || '🎫',
+          key: key(t.key || t.label), label: str(t.label, 80) || 'Ticket', emoji: str(t.emoji, 32) || '🎫',
           description: str(t.description, 100), staffRoleIds: ids(t.staffRoleIds),
+          buttonStyle: ['PRIMARY', 'SECONDARY', 'SUCCESS', 'DANGER'].includes(t.buttonStyle) ? t.buttonStyle : 'SECONDARY',
+          pingRoleIds: ids(t.pingRoleIds), pingUserIds: ids(t.pingUserIds),
+          welcomeTitle: str(t.welcomeTitle, 256), welcomeMessage: str(t.welcomeMessage, 2000),
         })),
+        panel: cleanPanel(b.panel, current.tickets.panel),
       } };
       if (!patch.tickets!.types.length) throw new Error('Add at least one ticket type.');
     } else if (section === 'warnings') {
@@ -144,10 +164,8 @@ export async function postTicketPanelHandler(req: Request, res: Response) {
     if (!guild) throw new Error('The bot is not connected to this server right now.');
     const channel = isSnowflake(req.body?.channelId) ? guild.channels.cache.get(req.body.channelId) : null;
     if (!channel) throw new Error('Pick a channel for the ticket panel.');
-    await ticketService.postPanel(communityId, channel);
-    const tk2 = await getToolkit(communityId);
-    await saveToolkit(communityId, { tickets: { ...tk2.tickets, panelPostedAt: new Date().toISOString() } as any });
-    ok(res, { posted: true });
+    const r = await ticketService.postPanel(communityId, channel, req.body?.mode === 'NEW');
+    ok(res, { posted: true, updated: r.updated, url: r.url });
   } catch (err) { fail(res, err); }
 }
 
