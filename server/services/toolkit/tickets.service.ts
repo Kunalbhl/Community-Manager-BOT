@@ -95,9 +95,16 @@ export const ticketService = {
       const old = await channel.messages.fetch(p.messageId).catch(() => null);
       if (old) { sent = await old.edit({ ...msg, allowedMentions: { parse: [] } }); updated = true; }
     }
-    if (!sent) sent = await channel.send(msg);
+    if (!sent) {
+      sent = await channel.send(msg);
+      // Only one panel: remove the previous one (also when it was in another channel), unless asked to keep a copy.
+      if (!forceNew && p.messageId && p.channelId) {
+        const oldCh: any = channel.guild.channels.cache.get(p.channelId);
+        await oldCh?.messages?.fetch(p.messageId).then((m: any) => m.delete()).catch(() => undefined);
+      }
+    }
     await saveToolkit(communityId, { tickets: { ...cfg.tickets, panel: { ...DEFAULT_TICKET_PANEL, ...p, channelId: channel.id, messageId: sent.id }, panelPostedAt: new Date().toISOString() } as any });
-    return { updated, url: sent.url };
+    return { updated, url: sent.url, channelId: channel.id, messageId: sent.id };
   },
 
   modal(typeKey: string, label: string) {
