@@ -74,6 +74,7 @@ import { PortalMode, PlatformSection, CommunitySection } from './types/ui.js';
 import { UserRole, Permission } from '../shared/types/rbac.js';
 import { hasPermission } from '../server/security/rbac.js';
 import { getDiscordLoginUrl } from './lib/discordUrls.js';
+import { UpdateBar } from './components/common/UpdateBar.js';
 
 // Community section permission mapping
 const COMMUNITY_SECTION_PERMISSIONS: Partial<Record<CommunitySection, Permission>> = {
@@ -699,6 +700,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-slate-50 font-sans text-slate-800 antialiased">
+      <UpdateBar />
       {/* Sidebar with Dual Modes & Role Filtering */}
       <Sidebar
         portalMode={portalMode}
