@@ -259,7 +259,7 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
       if (wanted && Array.isArray(appsData)) {
         const hit = appsData.find((a: any) => a.id === wanted);
         if (hit) setSelectedApp(hit);
-        window.history.replaceState(null, '', window.location.pathname);
+        { const u = new URL(window.location.href); u.searchParams.delete('application'); window.history.replaceState(null, '', u.toString()); }
       }
       setRecruiterCodes(Array.isArray(codesData) ? codesData : []);
       setInterviews(Array.isArray(interviewsData) ? interviewsData : []);

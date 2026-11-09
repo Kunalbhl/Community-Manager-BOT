@@ -45,10 +45,34 @@ interface NotificationItem {
   title: string;
   body: string;
   route?: string;
+  resourceType?: string;
+  resourceId?: string;
+  metadata?: any;
   channel?: string;
   deliveryStatus?: string;
   read: boolean;
   createdAt: string;
+}
+
+/** Where a notification leads: its own route, or worked out from what it is about. */
+function targetOf(n: NotificationItem): { section: string; applicationId?: string } | null {
+  const vars = n.metadata?.templateVariables || {};
+  const type = String(n.type || '').toUpperCase();
+  const rt = String(n.resourceType || '').toLowerCase();
+  const applicationId = vars.applicationId || n.metadata?.applicationId || (rt.includes('application') ? n.resourceId : undefined);
+  if (n.route) {
+    const parts = n.route.split(/[/?#]/).filter(Boolean);
+    const known = ['reports', 'discord-ops'];
+    const seg = parts[0] === 'community' ? parts.slice(2).find((p) => !known.includes(p)) || parts[2] : parts[parts.length - 1];
+    if (seg) return { section: seg === 'discord-ops' ? 'settings' : seg === 'reports' ? 'insights-ai' : seg, applicationId };
+  }
+  if (applicationId || type.startsWith('APPLICATION')) return { section: 'applications', applicationId };
+  if (type.includes('INTERVIEW')) return { section: 'interviews' };
+  if (type.includes('BLACKLIST')) return { section: 'blacklist' };
+  if (type.includes('WARN')) return { section: 'warnings' };
+  if (type.includes('REFERRAL') || type.includes('RECRUITER') || type.includes('REWARD') || type.includes('BENEFIT')) return { section: 'recruiters' };
+  const byCat: Record<string, string> = { RECRUITMENT: 'applications', MODERATION: 'moderation', SECURITY: 'moderation', EVENTS: 'events', ENGAGEMENT: 'engagement', AUTOMATION: 'automation', INTEGRATIONS: 'integrations', INSIGHTS: 'insights-ai' };
+  return n.category && byCat[n.category] ? { section: byCat[n.category] } : null;
 }
 
 export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
@@ -164,10 +188,15 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
     if (!n.read) {
       handleMarkAsRead(n.id);
     }
-    if (n.route && onNavigateToSection) {
-      onNavigateToSection(n.route);
-      onClose();
+    const t = targetOf(n);
+    if (!t || !onNavigateToSection) return;
+    if (t.applicationId) {
+      const u = new URL(window.location.href);
+      u.searchParams.set('application', t.applicationId);
+      window.history.replaceState(null, '', u.toString());
     }
+    onNavigateToSection(t.section);
+    onClose();
   };
 
   if (!isOpen) return null;
