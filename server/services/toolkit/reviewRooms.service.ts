@@ -85,6 +85,8 @@ export const reviewRooms = {
     const applicantName = app.applicantUsernameSnapshot || app.applicantUsername || 'applicant';
     const rec = (await getToolkit(app.communityId)).recruitment;
     const staff = [...new Set([...rolesUpTo(cfg.tiers, 0), ...rec.reviewerRoleIds])].filter((id) => isSnowflake(id) && guild.roles.cache.has(id));
+    // Members with standing special access (set in the dashboard) join every application.
+    const special = ((cfg as any).specialMemberIds || []).filter((id: string) => isSnowflake(id) && id !== applicantId && guild.members.cache.has(id));
     const applicantInServer = cfg.applicantCanSee && isSnowflake(applicantId) && (await guild.members.fetch(applicantId).catch(() => null));
 
     const channel = await guild.channels.create({
@@ -97,17 +99,22 @@ export const reviewRooms = {
         { id: guild.members.me.id, allow: [...VIEW, PermissionFlagsBits.ManageChannels] },
         ...staff.map((id) => ({ id, allow: VIEW })),
         ...(applicantInServer ? [{ id: applicantId, allow: VIEW }] : []),
+        ...special.map((id) => ({ id, allow: VIEW })),
       ],
     });
 
     const room = await reviewRoomsRepository.create(applicationId, {
       communityId: app.communityId, guildId: guild.id, applicationId, applicantId, applicantName,
-      channelId: channel.id, tier: 0, status: 'OPEN', history: [{ at: new Date().toISOString(), by: 'system', event: 'Room opened' }],
+      channelId: channel.id, tier: 0, status: 'OPEN', invited: special, history: [{ at: new Date().toISOString(), by: 'system', event: 'Room opened' }],
       createdAt: new Date().toISOString(),
     } as any);
 
     const { applicationFlow } = await import('../recruitment/applicationFlow.service.js');
     await applicationFlow.begin(room.id, staff, Boolean(applicantInServer)).catch((err) => logger.warn(`[ReviewRooms] flow start failed: ${err?.message}`));
+    if (special.length) {
+      const thread: any = await applicationFlow.staffThread(room.id).catch(() => null);
+      for (const id of special) await thread?.members.add(id).catch(() => undefined);
+    }
     return room;
   },
 
@@ -227,6 +234,19 @@ export const reviewRooms = {
     await reviewRoomsRepository.update(roomId, { invited, history: [...room.history, { at: new Date().toISOString(), by: actor.id, event: `${add ? 'Invited' : 'Removed'} <@${userId}>` }] } as any);
     await thread?.send({ content: add ? `➕ <@${actor.id}> gave <@${userId}> special access to this application.` : `➖ <@${actor.id}> removed <@${userId}>’s special access.`, allowedMentions: { users: add ? [userId] : [] } }).catch(() => undefined);
     return add ? 'Access given.' : 'Access removed.';
+  },
+
+  async removeAccessFromDashboard(communityId: string, roomId: string, userId: string, by?: string) {
+    const room = await reviewRoomsRepository.getById(roomId);
+    if (!room || room.communityId !== communityId) throw new Error('Room not found.');
+    const guild: any = await guildFor(communityId);
+    await guild?.channels.cache.get(room.channelId)?.permissionOverwrites.delete(userId).catch(() => undefined);
+    const { applicationFlow } = await import('../recruitment/applicationFlow.service.js');
+    const thread: any = await applicationFlow.staffThread(roomId).catch(() => null);
+    await thread?.members.remove(userId).catch(() => undefined);
+    await thread?.send({ content: `➖ <@${userId}>’s special access was removed from the dashboard${by ? ` by <@${by}>` : ''}.`, allowedMentions: { parse: [] } }).catch(() => undefined);
+    await reviewRoomsRepository.update(roomId, { invited: (room.invited || []).filter((x) => x !== userId), history: [...room.history, { at: new Date().toISOString(), by: by || 'dashboard', event: `Removed <@${userId}>` }] } as any);
+    return { removed: true };
   },
 
   /** Called after any approve/reject (dashboard, slash command or room button). */

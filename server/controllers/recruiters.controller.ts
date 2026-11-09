@@ -91,9 +91,25 @@ export async function getRecruiterMe(req: Request, res: Response, next: NextFunc
       where: [{ field: 'recruiterUserId', operator: '==', value: user.userId }],
     });
 
-    const referrals = await referralsRepository.listForTenant(targetCommunityId, {
+    // Referral history comes from real applications that used one of this recruiter's codes.
+    const stored = await referralsRepository.listForTenant(targetCommunityId, {
       where: [{ field: 'recruiterUserId', operator: '==', value: user.userId }],
     });
+    const myCodes = new Set((codes as any[]).map((c) => String(c.code).toUpperCase()));
+    const { applicationsRepository } = await import('../repositories/index.js');
+    const apps: any[] = myCodes.size ? await (applicationsRepository as any).listForTenant(targetCommunityId) : [];
+    const fromApps = apps
+      .filter((a) => myCodes.has(String(a.recruiterCodeUsed || a.recruiterCode || '').toUpperCase()))
+      .map((a) => ({
+        id: `app_${a.id}`,
+        code: String(a.recruiterCodeUsed || a.recruiterCode).toUpperCase(),
+        referredUserId: a.applicantDisplayNameSnapshot || a.applicantUsername || a.applicantDiscordUserId,
+        status: a.status === 'APPROVED' ? 'CONVERTED' : a.status === 'REJECTED' ? 'REVOKED' : 'PENDING',
+        createdAt: a.createdAt,
+      }));
+    const seen = new Set(fromApps.map((r) => r.code + r.referredUserId));
+    const referrals = [...fromApps, ...(stored as any[]).filter((r) => !seen.has(String(r.code).toUpperCase() + r.referredUserId))]
+      .sort((x: any, y: any) => String(y.createdAt).localeCompare(String(x.createdAt)));
 
     const rewards = await rewardsRepository.listForTenant(targetCommunityId, {
       where: [{ field: 'recruiterUserId', operator: '==', value: user.userId }],
