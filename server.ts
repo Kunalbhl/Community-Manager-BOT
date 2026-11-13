@@ -60,6 +60,11 @@ async function startServer() {
   app.get('/health/ready', getReadiness);
   app.get('/health/external', getExternalDependenciesHealth);
   // 200 only on the instance actively running the bot (used by the VM's front door during handoffs).
+  // Logged in to Discord (active or hot standby): the updater waits for this before stopping the old bot.
+  app.get('/health/gateway', (_req: Request, res: Response) => {
+    const ok = discordService.isReady();
+    res.status(ok ? 200 : 503).json({ ok });
+  });
   app.get('/health/active', (_req: Request, res: Response) => {
     const ok = getLeadershipStatus().isLeader && discordService.isReady();
     res.status(ok ? 200 : 503).json({ active: ok });
@@ -148,8 +153,17 @@ async function startServer() {
     );
   });
 
+  // Hot standby (VM containers): log in to Discord right away but stay quiet until this instance is the
+  // active bot. The handoff on deploy then only waits for the lease (~2 s), not for a fresh login.
+  const hotStandby = String(process.env.BOT_HOT_STANDBY || '').toLowerCase() === 'true' && String(process.env.BOT_ENABLED ?? 'true').toLowerCase() !== 'false';
+  if (hotStandby) {
+    (globalThis as any).__cmBotActive = false;
+    setTimeout(() => { void connectDiscordBot(); }, 1000);
+  }
+
   startLeadership({
     onBecomeLeader: async () => {
+      (globalThis as any).__cmBotActive = true;
       await connectDiscordBot();
       EngagementSchedulerService.startScheduler();
       startReminderScheduler();
@@ -167,6 +181,7 @@ async function startServer() {
     onLoseLeadership: async () => {
       EngagementSchedulerService.stopScheduler();
       stopReminderScheduler();
+      if (hotStandby) { (globalThis as any).__cmBotActive = false; return; } // stay connected, quiet
       await discordService.disconnect();
     },
   }).catch((err) => logger.error('[Leadership] Failed to start:', undefined, { error: err?.message }));
