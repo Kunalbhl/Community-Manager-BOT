@@ -441,6 +441,7 @@ router.post('/communities/:communityId/team/member', requireTenantAccess(), requ
 router.get('/communities/:communityId/setup-guide', requireTenantAccess(), requirePermission('community.view'), setupGuideHandler);
 router.post(`${tk}/workspace`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.provisionWorkspaceHandler);
 router.get(`${tk}/gate`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateStatusHandler);
+router.get(`${tk}/gate/diagnose`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateDiagnoseHandler);
 router.post(`${tk}/gate/lock`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateLockHandler);
 router.post(`${tk}/gate/undo`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateUndoHandler);
 router.post(`${tk}/gate/confirm`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateConfirmHandler);
