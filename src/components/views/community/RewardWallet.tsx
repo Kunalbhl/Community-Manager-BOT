@@ -75,7 +75,7 @@ export function RewardWallet({ communityId, api }: { communityId: string; api: (
         </Card>
       )}
 
-      {w.items.length > 0 && <div className="grid gap-5 lg:grid-cols-2"><RecordUse communityId={communityId} items={w.items} api={api} done={(t: string, ok = true) => { flash(ok, t); load(); }} /><Adjust communityId={communityId} items={w.items} api={api} done={(t: string, ok = true) => { flash(ok, t); load(); }} /></div>}
+      {w.items.length > 0 && <div className="grid gap-5 lg:grid-cols-2"><RecordUse communityId={communityId} items={w.items} api={api} done={(t: string, ok = true) => { if (t) flash(ok, t); load(); }} /><Adjust communityId={communityId} items={w.items} api={api} done={(t: string, ok = true) => { if (t) flash(ok, t); load(); }} /></div>}
 
       <Card title="Balances" desc="Per member: what they earned (and from which recruiter code), what was taken back, used, waiting, and what they can still use. Click a row for the full history.">
         <div className="mb-3 grid gap-2 md:grid-cols-[1fr_auto]">
@@ -170,6 +170,7 @@ function RecordUse({ communityId, items, api, done }: any) {
   const [n, setN] = useState(1);
   const [ev, setEv] = useState('');
   const [key, setKey] = useState(0);
+  const [m, setM] = useState<{ ok: boolean; t: string } | null>(null);
   return (
     <Card title="Record use" desc="After an event, mark who used rewards. Pick several members at once.">
       <div className="space-y-3">
@@ -180,10 +181,12 @@ function RecordUse({ communityId, items, api, done }: any) {
           try {
             const r: any[] = await api('/rewards/wallet/use', 'POST', { itemId, memberIds: ids, amount: n, forEvent: ev });
             const bad = r.filter((x) => !x.ok);
-            done(bad.length ? `Recorded ${r.length - bad.length}. Not recorded: ${bad.map((x) => x.error).join('; ')}` : `Recorded for ${r.length} member${r.length === 1 ? '' : 's'}.`, !bad.length);
+            const t = bad.length ? `Recorded ${r.length - bad.length}. Not recorded: ${bad.map((x) => x.error).join('; ')}` : `Recorded for ${r.length} member${r.length === 1 ? '' : 's'}.`;
+            setM({ ok: !bad.length, t }); done('');
             setIds([]); setKey((k) => k + 1);
-          } catch (e: any) { done(e.message, false); }
+          } catch (e: any) { setM({ ok: false, t: e.message }); }
         }}><Minus className="h-4 w-4" />Record use</button>
+        {m && <p className={`text-sm font-semibold ${m.ok ? 'text-emerald-700' : 'text-rose-700'}`}>{m.ok ? '✓ ' : '⚠️ '}{m.t}</p>}
       </div>
     </Card>
   );
@@ -194,13 +197,17 @@ function Adjust({ communityId, items, api, done }: any) {
   const [who, setWho] = useState('');
   const [n, setN] = useState(1);
   const [note, setNote] = useState('');
+  const [m, setM] = useState<{ ok: boolean; t: string } | null>(null);
+  const [busy, setBusy] = useState(false);
   return (
     <Card title="Add or correct" desc="Give extra (events, giveaways) or fix a mistake with a minus number. A reason is required.">
       <div className="space-y-3">
         <select className={input} value={itemId} onChange={(e) => setItemId(e.target.value)}>{items.map((i: any) => <option key={i.id} value={i.id}>{i.emoji} {i.name}</option>)}</select>
         <MemberSelect communityId={communityId} value={who} onChange={(id) => setWho(id)} placeholder="Search a member" />
         <div className="grid grid-cols-[110px_1fr] gap-2"><input type="number" className={input} value={n} onChange={(e) => setN(Number(e.target.value))} aria-label="Amount" /><input className={input} value={note} maxLength={200} onChange={(e) => setNote(e.target.value)} placeholder="Reason" /></div>
-        <button className={primary} onClick={async () => { try { await api('/rewards/wallet/adjust', 'POST', { itemId, memberId: who, amount: n, note }); setNote(''); done('Saved.'); } catch (e: any) { done(e.message, false); } }}>Save</button>
+        <button className={primary} disabled={busy || !who || !n || !note.trim()} onClick={async () => { setBusy(true); setM(null); try { await api('/rewards/wallet/adjust', 'POST', { itemId, memberId: who, amount: n, note }); setNote(''); setM({ ok: true, t: `Saved: ${n > 0 ? '+' : ''}${n} added to their balance.` }); done(''); } catch (e: any) { setM({ ok: false, t: e.message }); } finally { setBusy(false); } }}>{busy ? 'Saving…' : 'Save'}</button>
+        {!note.trim() && who && <p className="text-xs text-amber-700">Add a reason to save.</p>}
+        {m && <p className={`text-sm font-semibold ${m.ok ? 'text-emerald-700' : 'text-rose-700'}`}>{m.ok ? '✓ ' : '⚠️ '}{m.t}</p>}
       </div>
     </Card>
   );
