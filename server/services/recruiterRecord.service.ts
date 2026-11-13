@@ -362,7 +362,9 @@ export class RecruiterRecordService {
       recruiterName: record.recruiterDisplayNameSnapshot || record.recruiterUsernameSnapshot,
       recruiterMention: config.mentionRecruiter ? `<@${record.recruiterDiscordUserId}>` : record.recruiterUsernameSnapshot,
       recruiterCode: record.recruiterCode,
-      applicantName: record.applicantDisplayNameSnapshot || record.applicantUsernameSnapshot,
+      // New members are shown as a clickable mention.
+      applicantName: /^\d{15,22}$/.test(String(record.applicantDiscordUserId)) ? `<@${record.applicantDiscordUserId}>` : (record.applicantDisplayNameSnapshot || record.applicantUsernameSnapshot),
+      applicantMention: /^\d{15,22}$/.test(String(record.applicantDiscordUserId)) ? `<@${record.applicantDiscordUserId}>` : (record.applicantDisplayNameSnapshot || record.applicantUsernameSnapshot),
       applicantDiscordUserId: record.applicantDiscordUserId,
       applicationId: record.applicationId,
       applicationStatus: record.applicationStatus,
@@ -374,19 +376,18 @@ export class RecruiterRecordService {
       pendingBenefitCount,
       communityName: config.communityId,
     };
+    if (/^\d{15,22}$/.test(String(record.recruiterDiscordUserId))) context.recruiterMention = `<@${record.recruiterDiscordUserId}>`;
 
     const formattedMessage = this.renderTemplate(config.initialMessageTemplate, context);
 
     try {
-      const sent = await notificationService.send({
-        communityId: record.communityId,
-        recipientUserId: record.recruiterDiscordUserId,
-        type: 'SYSTEM_NOTIFICATION',
-        channel: 'DISCORD_CHANNEL',
-        title: 'Recruiter Record',
-        body: formattedMessage,
-      });
-
+      // Post straight into the chosen channel, with real (clickable) mentions.
+      const { guildFor } = await import('./toolkit/toolkitConfig.js');
+      const guild: any = await guildFor(record.communityId);
+      const ch: any = guild?.channels.cache.get(config.channelId) || (await guild?.channels.fetch(config.channelId).catch(() => null));
+      if (!ch?.send) throw new Error('Announcement channel not found or not a text channel.');
+      const users = [record.recruiterDiscordUserId, record.applicantDiscordUserId].filter((id) => /^\d{15,22}$/.test(String(id)));
+      const sent: any = await ch.send({ content: formattedMessage.slice(0, 2000), allowedMentions: { users } });
       const messageId = sent.id || `msg_rec_init_${record.id}`;
 
       await recruiterRecordsRepository.update(record.id, {

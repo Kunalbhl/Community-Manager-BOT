@@ -129,8 +129,22 @@ export async function evaluateHandler(req: Request, res: Response) {
       const txs: any[] = await walletTxRepository.list({ where: [{ field: 'communityId', operator: '==', value: c }] });
       for (const t of txs) if (!/^\d{15,22}$/.test(String(t.memberId)) && owner(t.recruiterCode)) { const o = owner(t.recruiterCode)!; await walletTxRepository.update(t.id, { memberId: o.id, memberName: o.name } as any); }
     } catch { /* best effort */ }
+    // Recruiter announcements that never reached the channel: send them now.
+    let announced = 0;
+    try {
+      const { recruiterRecordsRepository } = await import('../repositories/index.js');
+      const { recruiterRecordService } = await import('../services/recruiterRecord.service.js');
+      const cfg: any = await recruiterRecordService.getOrCreateConfig(c);
+      if (cfg.enabled && cfg.channelId) {
+        const recs: any[] = await recruiterRecordsRepository.list({ where: [{ field: 'communityId', operator: '==', value: c }] });
+        for (const rec of recs) {
+          if (/^\d{15,22}$/.test(String(rec.initialRecordMessageId || '')) || !/^\d{15,22}$/.test(String(rec.recruiterDiscordUserId))) continue;
+          await recruiterRecordService.retryRecordMessage(c, rec.id, 'system').then(() => announced++).catch(() => undefined);
+        }
+      }
+    } catch { /* best effort */ }
     const r = await inviteRewards.evaluate(c);
-    ok(res, { ...r, credited: credited + fixed });
+    ok(res, { ...r, credited: credited + fixed, announced });
   } catch (err) { fail(res, err); }
 }
 
