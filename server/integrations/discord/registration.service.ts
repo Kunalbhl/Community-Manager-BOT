@@ -1,3 +1,4 @@
+import { PermissionFlagsBits } from 'discord.js';
 import { REST, Routes } from 'discord.js';
 import { discordCommands } from './commands/index.js';
 import { config } from '../../config/env.js';
@@ -87,8 +88,21 @@ export async function registerSlashCommands(guildId?: string): Promise<CommandRe
 
   // Idempotent duplicate-safe command deduplication
   const uniqueMap = new Map<string, any>();
+  // Who sees which command, decided by Discord permissions (Discord hides a command from anyone without them).
+  // Staff tools need Timeout Members (the usual moderator permission) or Manage Server; member tools stay open.
+  // Server owners can still fine-tune per role in Server Settings → Integrations.
+  const MOD = PermissionFlagsBits.ModerateMembers.toString();
+  const ADMIN = PermissionFlagsBits.ManageGuild.toString();
+  const STAFF_ONLY: Record<string, string> = {
+    applications: MOD, interview: MOD, approve: MOD, reject: MOD, escalate: MOD,
+    blacklist: MOD, sheet: MOD,
+    'create-recruiter-code': ADMIN,
+  };
   for (const c of discordCommands) {
-    uniqueMap.set(c.data.name, c.data.toJSON());
+    const json: any = c.data.toJSON();
+    if (STAFF_ONLY[json.name] && json.default_member_permissions == null) json.default_member_permissions = STAFF_ONLY[json.name];
+    json.contexts = [0]; // server only, not in DMs
+    uniqueMap.set(json.name, json);
   }
   const commandData = Array.from(uniqueMap.values());
 

@@ -53,8 +53,13 @@ export class ReferralLifecycleService {
     if (codes.length > 0) {
       recruiterUserId = codes[0].recruiterUserId;
       const recruiter = await recruitersRepository.getById(codes[0].recruiterUserId);
-      if (recruiter) {
+      if (recruiter?.discordId) {
         recruiterDiscordId = recruiter.discordId;
+      } else {
+        // Codes made in the dashboard store the owner's Discord ID directly.
+        const c: any = codes[0];
+        const direct = c.recruiterDiscordId || (/^\d{15,22}$/.test(String(c.recruiterUserId || '')) ? c.recruiterUserId : '');
+        if (direct) recruiterDiscordId = direct;
       }
     }
 

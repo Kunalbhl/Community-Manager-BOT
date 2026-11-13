@@ -181,7 +181,7 @@ export const inviteRewards = {
     const by = new Map<string, { id: string; name: string; joined: number; left: number; bonus: number; recs: Rec[] }>();
     const get = (id: string, name?: string) => { let e = by.get(id); if (!e) { e = { id, name: name || id, joined: 0, left: 0, bonus: 0, recs: [] }; by.set(id, e); } if (name && e.name === id) e.name = name; return e; };
     for (const r of records) {
-      if (!r.recruiterDiscordUserId) continue;
+      if (!r.recruiterDiscordUserId || !/^\d{15,22}$/.test(String(r.recruiterDiscordUserId))) continue; // unattributed recruits earn nobody a reward
       const e = get(r.recruiterDiscordUserId, r.recruiterDisplayNameSnapshot || r.recruiterUsernameSnapshot);
       e.recs.push(r); if (r.leftAt) e.left++; else e.joined++;
     }

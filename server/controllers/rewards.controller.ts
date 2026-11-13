@@ -112,8 +112,25 @@ export async function evaluateHandler(req: Request, res: Response) {
         if (r) { credited++; done.add(uid); }
       }
     } catch { /* best effort */ }
+    // Fix credit that went to "unattributed" although the code has an owner.
+    let fixed = 0;
+    try {
+      const { recruiterRecordsRepository, recruiterCodesRepository, referralLifecycleRepository } = await import('../repositories/index.js') as any;
+      const { rewardGrantsRepository } = await import('../services/rewards/inviteRewards.service.js');
+      const { walletTxRepository } = await import('../services/rewards/wallet.service.js');
+      const codes: any[] = await recruiterCodesRepository.list({ where: [{ field: 'communityId', operator: '==', value: c }] });
+      const owner = (code: string) => { const d = codes.find((x) => x.code === String(code || '').toUpperCase()); const id = d?.recruiterDiscordId || d?.recruiterUserId; return /^\d{15,22}$/.test(String(id || '')) ? { id, name: d.recruiterName || id } : null; };
+      const recs: any[] = await recruiterRecordsRepository.list({ where: [{ field: 'communityId', operator: '==', value: c }] });
+      for (const r of recs) if (!/^\d{15,22}$/.test(String(r.recruiterDiscordUserId || '')) && owner(r.recruiterCode)) { const o = owner(r.recruiterCode)!; await recruiterRecordsRepository.update(r.id, { recruiterDiscordUserId: o.id, recruiterDisplayNameSnapshot: o.name } as any); fixed++; }
+      const refs: any[] = await referralLifecycleRepository.list({ where: [{ field: 'communityId', operator: '==', value: c }] }).catch(() => []);
+      for (const r of refs) if (r.recruiterDiscordId === 'disc_unattributed' && owner(r.recruiterCode)) await referralLifecycleRepository.update(r.id, { recruiterDiscordId: owner(r.recruiterCode)!.id } as any).catch(() => undefined);
+      const grants: any[] = await rewardGrantsRepository.list({ where: [{ field: 'communityId', operator: '==', value: c }] });
+      for (const g of grants) if (!/^\d{15,22}$/.test(String(g.recruiterId)) && owner(g.recruiterCode)) { const o = owner(g.recruiterCode)!; await rewardGrantsRepository.update(g.id, { recruiterId: o.id, recruiterName: o.name } as any); }
+      const txs: any[] = await walletTxRepository.list({ where: [{ field: 'communityId', operator: '==', value: c }] });
+      for (const t of txs) if (!/^\d{15,22}$/.test(String(t.memberId)) && owner(t.recruiterCode)) { const o = owner(t.recruiterCode)!; await walletTxRepository.update(t.id, { memberId: o.id, memberName: o.name } as any); }
+    } catch { /* best effort */ }
     const r = await inviteRewards.evaluate(c);
-    ok(res, { ...r, credited });
+    ok(res, { ...r, credited: credited + fixed });
   } catch (err) { fail(res, err); }
 }
 
