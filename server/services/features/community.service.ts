@@ -215,6 +215,10 @@ export interface ButtonRolePanel {
   id: string; communityId: string; title: string; description: string;
   mode: 'TOGGLE' | 'ONE_ONLY';
   buttons: { roleId: string; label: string; emoji?: string }[];
+  /** Only members with at least one of these roles can use the panel (empty = everyone). */
+  requiredRoleIds?: string[];
+  /** Members with any of these roles can't use it. */
+  blockedRoleIds?: string[];
   channelId?: string; messageId?: string; createdAt: string;
 }
 export const buttonRolePanelsRepository = new FirestoreRepository<ButtonRolePanel>('buttonRolePanels');
@@ -242,16 +246,21 @@ export const buttonRoles = {
   async press(panelId: string, roleId: string, member: any): Promise<string> {
     const panel = await buttonRolePanelsRepository.getById(panelId).catch(() => null);
     if (!panel || !panel.buttons.some((b) => b.roleId === roleId)) return '⚠️ This button is no longer active.';
+    const req = (panel.requiredRoleIds || []).filter((id) => member.guild.roles.cache.has(id));
+    if (req.length && !req.some((id) => member.roles.cache.has(id))) return `🔒 This is only for members with ${req.map((id) => `<@&${id}>`).join(' or ')}.`;
+    const blocked = (panel.blockedRoleIds || []).find((id) => member.roles.cache.has(id));
+    if (blocked) return `🔒 Members with <@&${blocked}> can't use this.`;
     try {
       if (member.roles.cache.has(roleId)) {
         await member.roles.remove(roleId, 'Button role');
         return `Removed <@&${roleId}>.`;
       }
+      const removed: string[] = [];
       if (panel.mode === 'ONE_ONLY') {
-        for (const b of panel.buttons) if (b.roleId !== roleId && member.roles.cache.has(b.roleId)) await member.roles.remove(b.roleId, 'Button role (one only)').catch(() => undefined);
+        for (const b of panel.buttons) if (b.roleId !== roleId && member.roles.cache.has(b.roleId)) { const ok = await member.roles.remove(b.roleId, 'Button role (one only)').then(() => true).catch(() => false); if (ok) removed.push(b.roleId); }
       }
       await member.roles.add(roleId, 'Button role');
-      return `Added <@&${roleId}>.`;
+      return `Added <@&${roleId}>${removed.length ? ` and removed ${removed.map((id) => `<@&${id}>`).join(', ')}` : ''}.`;
     } catch {
       return '⚠️ I could not change that role. The bot’s role must be above it.';
     }

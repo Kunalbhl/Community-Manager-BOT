@@ -2,6 +2,8 @@ import { takeOpenTab } from './SetupGuideView.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { TrendingUp, Gift, MousePointerClick, BadgeCheck, ScrollText, Star, Cake, TerminalSquare, Plus, Trash2, Send, RefreshCw, Trophy } from 'lucide-react';
 import { Banner, Card, Toggle, Pick, MultiPick, SaveBar, input, btn, ghost, fmtDate, Resources } from './ServerToolsView.js';
+import { MessageComposer } from '../../common/MessageComposer.js';
+import { RoleSelect, useDiscordResources } from '../../common/DiscordPickers.js';
 
 export type Tab = 'levels' | 'giveaways' | 'buttonRoles' | 'verification' | 'logs' | 'starboard' | 'birthdays' | 'custom';
 const TABS: { id: Tab; label: string; icon: any; hint: string }[] = [
@@ -70,7 +72,7 @@ export function CommunityFeaturesView({ communityId, only }: { communityId: stri
         <>
           {tab === 'levels' && <LevelsTab api={api} cfg={cfg.levels} res={res} onSave={(v) => save('levels', v)} />}
           {tab === 'giveaways' && <GiveawaysTab api={api} res={res} />}
-          {tab === 'buttonRoles' && <ButtonRolesTab api={api} res={res} />}
+          {tab === 'buttonRoles' && <ButtonRolesTab api={api} res={res} communityId={communityId} />}
           {tab === 'verification' && <VerificationTab api={api} cfg={cfg.verification} res={res} onSave={(v) => save('verification', v)} />}
           {tab === 'logs' && <LogsTab cfg={cfg.logs} res={res} onSave={(v) => save('logs', v)} />}
           {tab === 'starboard' && <StarboardTab cfg={cfg.starboard} res={res} onSave={(v) => save('starboard', v)} />}
@@ -203,7 +205,17 @@ function GiveawaysTab({ api, res }: any) {
 }
 
 /* ---------------- Button roles ---------------- */
-function ButtonRolesTab({ api, res }: any) {
+function RoleChipsField({ communityId, label, hint, ids, onChange }: any) {
+  const r: any = useDiscordResources(communityId);
+  return (
+    <div className="text-sm font-semibold text-slate-700">{label}<div className="text-xs font-normal text-slate-500">{hint}</div>
+      <div className="mt-1 flex flex-wrap gap-1.5">{ids.map((id: string) => <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">@{r?.roles?.find((x: any) => x.id === id)?.name || 'role'}<button type="button" onClick={() => onChange(ids.filter((x: string) => x !== id))}>×</button></span>)}</div>
+      <div className="mt-1"><RoleSelect communityId={communityId} value="" exclude={ids} onChange={(id) => id && onChange([...ids, id])} placeholder="Add a role" /></div>
+    </div>
+  );
+}
+
+function ButtonRolesTab({ api, res, communityId }: any) {
   const blank = { title: 'Pick your roles', description: '', mode: 'TOGGLE', buttons: [{ roleId: '', label: '', emoji: '' }], channelId: '' };
   const [panels, setPanels] = useState<any[]>([]);
   const [f, setF] = useState<any>(blank);
@@ -219,7 +231,7 @@ function ButtonRolesTab({ api, res }: any) {
             <Label t="Title"><input className={input} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></Label>
             <Label t="Mode"><select className={input} value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="TOGGLE">Pick any (press again to remove)</option><option value="ONE_ONLY">Pick one only</option></select></Label>
           </div>
-          <Label t="Description"><textarea rows={2} className={input} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Label>
+          <Label t="Description"><MessageComposer communityId={communityId} value={f.description} onChange={(v) => setF({ ...f, description: v })} rows={8} maxLength={4000} /></Label>
           <div className="space-y-2">
             {f.buttons.map((b: any, i: number) => (
               <div key={i} className="grid grid-cols-[70px_1fr_1fr_auto] gap-2">
@@ -230,6 +242,11 @@ function ButtonRolesTab({ api, res }: any) {
               </div>
             ))}
             {f.buttons.length < 25 && <button className={ghost} onClick={() => setF({ ...f, buttons: [...f.buttons, { roleId: '', label: '', emoji: '' }] })}><Plus className="h-4 w-4" /> Add button</button>}
+          </div>
+          <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 md:grid-cols-2">
+            <RoleChipsField communityId={communityId} label="Who can use it" hint="Only members with any of these roles. Empty = everyone who can see the channel." ids={f.requiredRoleIds || []} onChange={(l: string[]) => setF({ ...f, requiredRoleIds: l })} />
+            <RoleChipsField communityId={communityId} label="Who can’t use it" hint="Members with any of these roles are refused." ids={f.blockedRoleIds || []} onChange={(l: string[]) => setF({ ...f, blockedRoleIds: l })} />
+            <p className="text-xs text-slate-500 md:col-span-2">Who can <b>see</b> the panel is set by the channel’s own permissions in Discord. Picking a role in “Pick one only” mode removes the other roles of this panel, and the member is told exactly what was added and removed.</p>
           </div>
           <Label t="Post or update in channel"><Pick options={res.textChannels} value={f.channelId} onChange={(v) => setF({ ...f, channelId: v })} placeholder="Save without posting" /></Label>
           <button className={btn} onClick={async () => { setMsg(''); try { const p = await api('/features/button-roles', 'POST', f); setF({ ...p, channelId: p.channelId || '' }); setMsg(f.channelId ? 'Saved and posted.' : 'Saved.'); load(); } catch (e: any) { setMsg(e.message); } }}><Send className="h-4 w-4" /> Save panel</button>
