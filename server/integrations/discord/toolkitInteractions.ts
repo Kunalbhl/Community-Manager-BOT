@@ -129,6 +129,13 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
 
   // ---------- recruitment: apply ----------
   if (area === 'apply') {
+    // From a DM there is no guild: the server id rides on the button (start:<gid>, next:<page>:<gid>, page:<page>:<gid>).
+    if (!interaction.guildId) {
+      const parts = id.split(':');
+      const gid = action === 'start' ? parts[3] : parts[4];
+      if (!/^\d{15,22}$/.test(gid || '')) { await interaction.reply({ content: 'Please press Apply in the server.', ephemeral: true }).catch(() => undefined); return true; }
+      (interaction as any).__gid = gid;
+    }
     if (action === 'start') { await discordRecruitment.start(interaction); return true; }
     if (action === 'next') { await discordRecruitment.next(interaction, Number(arg) || 0); return true; }
     if (action === 'page' && interaction.isModalSubmit()) { await discordRecruitment.pageSubmitted(interaction, Number(arg) || 0); return true; }

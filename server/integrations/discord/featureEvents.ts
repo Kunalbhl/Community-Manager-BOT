@@ -62,6 +62,13 @@ export function attachFeatureHandlers(client: Client) {
     const { inviteRewards } = await import('../../services/rewards/inviteRewards.service.js');
     await inviteRewards.onMemberLeft(await communityOf(member.guild.id), member.id);
   }));
+  client.on(Events.GuildMemberAdd, (member: any) => safe('apply DM', async () => {
+    if (member.user?.bot) return;
+    await new Promise((r) => setTimeout(r, 4000)); // let the blacklist check act first
+    if (!member.guild.members.cache.has(member.id)) return; // removed meanwhile
+    const { discordRecruitment } = await import('../../services/recruitment/discordRecruitment.service.js');
+    await discordRecruitment.welcomeDm(await communityOf(member.guild.id), member);
+  }));
   client.on(Events.GuildMemberAdd, (member: any) => safe('blacklist join', async () => {
     const { onJoin } = await import('../../services/blacklist/blacklistGuard.service.js');
     await onJoin(await communityOf(member.guild.id), member);
