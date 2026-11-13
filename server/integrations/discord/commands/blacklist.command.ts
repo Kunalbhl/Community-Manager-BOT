@@ -2,7 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, Permiss
 import { SlashCommandDefinition, CommandContext } from './types.js';
 
 /**
- * /blacklist check — anyone allowed (Ban Members, Manage Server, or a lookup role set in the dashboard)
+ * /blacklist-check — anyone allowed (Ban Members, Manage Server, or a lookup role set in the dashboard)
  * types a Discord name, game name or ID and sees whether that person is on the server blacklist.
  * In a lookup channel the answer is posted for the team; elsewhere only the asker sees it.
  * /blacklist add — quick add by name or game name (Ban Members or Manage Server).
@@ -10,9 +10,7 @@ import { SlashCommandDefinition, CommandContext } from './types.js';
 export const blacklistCommand: SlashCommandDefinition = {
   data: new SlashCommandBuilder()
     .setName('blacklist')
-    .setDescription('Check or add people on the server blacklist')
-    .addSubcommand((sub) => sub.setName('check').setDescription('Is this person blacklisted? Search by Discord name, game name or ID')
-      .addStringOption((o) => o.setName('name').setDescription('Discord name, in-game name or Discord user ID').setRequired(true).setMaxLength(64)))
+    .setDescription('Add people to the server blacklist (moderators)')
     .addSubcommand((sub) => sub.setName('add').setDescription('Add someone to the blacklist')
       .addStringOption((o) => o.setName('reason').setDescription('Why they are blacklisted').setRequired(true).setMaxLength(500))
       .addUserOption((o) => o.setName('member').setDescription('Their Discord account, if you know it'))
