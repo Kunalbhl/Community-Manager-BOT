@@ -343,6 +343,10 @@ export const discordRecruitment = {
       if (member) {
         const { applicationWorkflowService } = await import('../applicationWorkflow.service.js');
         await applicationWorkflowService.confirmDiscordJoin(app.communityId, applicantId).catch((err: any) => logger.warn(`[Recruitment] auto-join confirm failed: ${err?.message}`));
+        // Already in the server (waiting room), so no join event will come: credit the recruiter now
+        // (recruiter record, invite rewards, wallet).
+        const { referralLifecycleService } = await import('../referralLifecycle.service.js');
+        await referralLifecycleService.confirmMemberJoin(app.communityId, applicantId).catch((err: any) => logger.warn(`[Recruitment] recruiter credit failed: ${err?.message}`));
       }
     }
 

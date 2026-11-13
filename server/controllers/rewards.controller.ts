@@ -92,7 +92,29 @@ export async function creditHandler(req: Request, res: Response) {
 }
 
 export async function evaluateHandler(req: Request, res: Response) {
-  try { ok(res, await inviteRewards.evaluate(req.params.communityId)); } catch (err) { fail(res, err); }
+  try {
+    const c = req.params.communityId;
+    // Catch up recruiter credit for approved applicants who were already in the server when approved.
+    let credited = 0;
+    try {
+      const { applicationsRepository } = await import('../repositories/index.js');
+      const { referralLifecycleService } = await import('../services/referralLifecycle.service.js');
+      const { recruiterRecordsRepository } = await import('../repositories/index.js');
+      const records: any[] = await recruiterRecordsRepository.list({ where: [{ field: 'communityId', operator: '==', value: c }] });
+      const done = new Set(records.map((r) => r.applicantDiscordUserId));
+      const guild: any = await guildFor(c);
+      const apps: any[] = await applicationsRepository.list({ where: [{ field: 'communityId', operator: '==', value: c }] } as any);
+      for (const a of apps) {
+        const uid = a.applicantDiscordUserId || a.applicantDiscordId;
+        if (!uid || done.has(uid) || !['APPROVED', 'JOINED', 'JOIN_PENDING'].includes(a.status) || !(a.recruiterCodeUsed || a.recruiterCode)) continue;
+        if (!(await guild?.members.fetch(uid).catch(() => null))) continue;
+        const r = await referralLifecycleService.confirmMemberJoin(c, uid).catch(() => null);
+        if (r) { credited++; done.add(uid); }
+      }
+    } catch { /* best effort */ }
+    const r = await inviteRewards.evaluate(c);
+    ok(res, { ...r, credited });
+  } catch (err) { fail(res, err); }
 }
 
 /* ------------------------------ Reward wallet ------------------------------ */

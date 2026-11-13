@@ -96,7 +96,7 @@ export function RewardsView({ communityId }: { communityId: string }) {
             <t.icon className="h-4 w-4" />{t.label}{t.n ? <span className={`rounded-full px-1.5 text-xs ${sub === t.id ? 'bg-white/20' : t.id === 'queue' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100'}`}>{t.n}</span> : null}
           </button>
         ))}
-        <button className={`${ghost} ml-auto`} onClick={async () => { try { const r = await api('/rewards/evaluate', 'POST'); flash(true, r.granted ? `${r.granted} new reward${r.granted === 1 ? '' : 's'} found.` : 'Everyone is up to date.'); load(); } catch (e: any) { flash(false, e.message); } }}><RefreshCw className="h-4 w-4" />Check now</button>
+        <button className={`${ghost} ml-auto`} onClick={async () => { try { const r = await api('/rewards/evaluate', 'POST'); flash(true, `${r.credited ? `${r.credited} missed recruit${r.credited === 1 ? '' : 's'} credited. ` : ''}${r.granted ? `${r.granted} new reward${r.granted === 1 ? '' : 's'} given.` : r.credited ? '' : 'Everyone is up to date.'}`); load(); } catch (e: any) { flash(false, e.message); } }}><RefreshCw className="h-4 w-4" />Check now</button>
       </div>
       {msg && <p className={`flex items-center gap-2 text-sm font-semibold ${msg.ok ? 'text-emerald-700' : 'text-rose-700'}`}>{msg.ok ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}{msg.text}</p>}
 
