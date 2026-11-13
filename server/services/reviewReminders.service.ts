@@ -158,6 +158,7 @@ export function startReminderScheduler() {
         const { communityForGuild } = await import('./toolkit/toolkitConfig.js');
         const { inviteRewards } = await import('./rewards/inviteRewards.service.js');
         await inviteRewards.expireRoles().catch(() => undefined);
+        if (ticks % 360 === 3) await import('./recruitment/webApply.service.js').then(({ webApply }) => webApply.purge()).catch(() => undefined);
         for (const gid of Array.from((discordService.client as any)?.guilds?.cache?.keys?.() || []) as string[]) {
           await inviteRewards.evaluate(await communityForGuild(gid)).catch(() => undefined);
         }

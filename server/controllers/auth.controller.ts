@@ -161,6 +161,11 @@ export async function authLogin(req: Request, res: Response, next: NextFunction)
 }
 
 export async function authCallback(req: Request, res: Response, next: NextFunction) {
+  // Website applicants (Apply → Continue with Discord) share this callback; their state starts with "join_".
+  if (typeof req.query.state === 'string' && req.query.state.startsWith('join_')) {
+    const { joinCallback } = await import('./webApply.controller.js');
+    return joinCallback(req, res);
+  }
   const traceId = `trace_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const startTime = Date.now();
 

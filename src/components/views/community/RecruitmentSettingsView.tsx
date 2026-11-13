@@ -43,6 +43,10 @@ export function RecruitmentSettingsView({ communityId }: { communityId: string }
     <div className="space-y-6">
       {msg && <p role="status" className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${msg.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{msg.ok && <CheckCircle2 className="h-4 w-4" />}{msg.text}</p>}
 
+      <Card title="Apply link (website)" desc="The easiest way in: new people open this link, sign in with Discord, read the rules, take the quiz and answer your questions. When you approve, the bot adds them to the server by itself. No invite or waiting room needed.">
+        <ApplyLink communityId={communityId} />
+      </Card>
+
       <Card title="Applications" desc="Whether people can apply right now, and whether they enter a recruiter code.">
         {!basics ? <div className="h-24 animate-pulse rounded-xl bg-slate-200/60" /> : <div className="space-y-5">
           <div>
@@ -92,6 +96,24 @@ export function RecruitmentSettingsView({ communityId }: { communityId: string }
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
         <p><b>Always on:</b> every application is checked against your Blacklist (Moderation → Blacklist), and people with an application already in review can’t apply twice.</p>
       </div>
+    </div>
+  );
+}
+
+/** The public apply link, with an optional recruiter code built in. */
+function ApplyLink({ communityId }: { communityId: string }) {
+  const [code, setCode] = useState('');
+  const [copied, setCopied] = useState(false);
+  const url = `${window.location.origin}/join/${encodeURIComponent(communityId)}${code ? `?code=${encodeURIComponent(code.toUpperCase())}` : ''}`;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <input readOnly value={url} className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 font-mono text-sm text-slate-700" onFocus={(e) => e.currentTarget.select()} />
+        <button className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700" onClick={() => { navigator.clipboard?.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>{copied ? 'Copied ✓' : 'Copy'}</button>
+        <a href={url} target="_blank" rel="noreferrer" className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">Open</a>
+      </div>
+      <label className="flex flex-wrap items-center gap-2 text-sm text-slate-600">Build a link for a recruiter code: <input value={code} onChange={(e) => setCode(e.target.value.replace(/[^\w-]/g, '').slice(0, 32))} placeholder="e.g. KP-007" className="w-40 rounded-lg border border-slate-300 px-2 py-1 font-mono uppercase" /></label>
+      <p className="text-xs text-slate-500">Recruiters can also share their own link: <code>/mycode</code> shows it. Turn off Discord’s own “Apply to Join” so people aren’t asked twice.</p>
     </div>
   );
 }
