@@ -344,6 +344,14 @@ export async function gateLockHandler(req: Request, res: Response) {
   try {
     const { secureGate } = await import('../services/recruitment/secureGate.service.js');
     const b = req.body || {};
+    {
+      const { getGate } = await import('../services/recruitment/secureGate.service.js');
+      const g0: any = await getGate(req.params.communityId);
+      if (b.memberRoleId && b.memberRoleId === g0.applicantRoleId) throw new Error('The Member role must be different from the Applicant role (Applicant is what newcomers get before approval).');
+      const t0: any = await getToolkit(req.params.communityId);
+      const staff = [t0.recruitment.reviewChannelId, t0.recruitment.logChannelId].filter(Boolean);
+      if (ids(b.publicChannelIds, 10).some((id: string) => staff.includes(id))) throw new Error('Staff channels (applications, recruitment log) can’t be public.');
+    }
     await secureGate.lock(req.params.communityId, { memberRoleId: isSnowflake(b.memberRoleId) ? b.memberRoleId : undefined, createMemberRole: Boolean(b.createMemberRole), publicChannelIds: ids(b.publicChannelIds, 10), actorId: actor(req) });
     await auditService.log({ communityId: req.params.communityId, actorUserId: actor(req), actorRole: 'OWNER', action: 'SECURE_SETUP_LOCK' as any, targetType: 'guild', targetId: req.params.communityId }).catch(() => undefined);
     ok(res, { started: true });
@@ -351,6 +359,15 @@ export async function gateLockHandler(req: Request, res: Response) {
 }
 export async function gateDiagnoseHandler(req: Request, res: Response) {
   try { const { secureGate } = await import('../services/recruitment/secureGate.service.js'); ok(res, await secureGate.diagnose(req.params.communityId)); } catch (err) { fail(res, err); }
+}
+export async function gateRepairHandler(req: Request, res: Response) {
+  try {
+    if (!isSnowflake(req.body?.memberRoleId)) throw new Error('Choose the role approved members get.');
+    const { secureGate } = await import('../services/recruitment/secureGate.service.js');
+    const r = await secureGate.repairRoles(req.params.communityId, { memberRoleId: req.body.memberRoleId, actorId: actor(req) });
+    await auditService.log({ communityId: req.params.communityId, actorUserId: actor(req), actorRole: 'OWNER', action: 'SECURE_SETUP_REPAIR' as any, targetType: 'guild', targetId: req.params.communityId }).catch(() => undefined);
+    ok(res, r);
+  } catch (err) { fail(res, err); }
 }
 export async function gateUndoHandler(req: Request, res: Response) {
   try {

@@ -188,6 +188,83 @@ export const secureGate = {
     };
   },
 
+  /**
+   * Fixes a setup where the same role was used for newcomers (Applicant) and approved members.
+   * - The access the Applicant role had on channels moves to the new Member role.
+   * - Current members (anyone holding another role besides Applicant) get the Member role and lose Applicant;
+   *   people with only Applicant stay newcomers.
+   * - Staff channels (applications review, recruitment log) are taken off the public list and hidden.
+   * - A private #apply channel is created that only the Applicant role (and staff) can see, with the Apply panel.
+   */
+  async repairRoles(communityId: string, params: { memberRoleId: string; actorId: string }) {
+    const guild: any = await guildFor(communityId);
+    if (!guild) throw new Error('The bot is not connected to this server right now.');
+    const g = await getGate(communityId);
+    const applicant: any = g.applicantRoleId ? guild.roles.cache.get(g.applicantRoleId) : guild.roles.cache.find((r: any) => r.name === 'Applicant');
+    const member: any = guild.roles.cache.get(params.memberRoleId);
+    if (!applicant) throw new Error('No Applicant role found.');
+    if (!member || member.id === applicant.id || member.managed || member.id === guild.id) throw new Error('Choose a different role for approved members.');
+    const me = guild.members.me;
+    if (member.position >= me.roles.highest.position || applicant.position >= me.roles.highest.position) throw new Error('Move the bot’s role above both roles first (Server Settings → Roles).');
+    const { getToolkit } = await import('../toolkit/toolkitConfig.js');
+    const rc: any = (await getToolkit(communityId)).recruitment;
+    const staffChannelIds = [rc.reviewChannelId, rc.logChannelId].filter(Boolean);
+    const report = { channelsMoved: 0, membersUpdated: [] as string[], keptAsApplicants: [] as string[], staffChannelsHidden: [] as string[], applyChannel: '' };
+    const V = PermissionFlagsBits.ViewChannel;
+
+    // 1. Channel access: Applicant's view access moves to Member (staff channels: removed, not moved).
+    for (const c of Array.from(guild.channels.cache.values()) as any[]) {
+      const ow = c.permissionOverwrites?.cache?.get(applicant.id);
+      if (!ow || !ow.allow.has(V)) continue;
+      if (!staffChannelIds.includes(c.id)) {
+        await c.permissionOverwrites.edit(member, { ViewChannel: true }, { reason: 'Secure Setup repair: member access' }).catch(() => undefined);
+        report.channelsMoved++;
+      }
+      await c.permissionOverwrites.delete(applicant, 'Secure Setup repair: Applicant is for newcomers only').catch(() => undefined);
+    }
+    // 2. Staff channels never public; hidden from everyone except staff (their own overwrites stay).
+    for (const id of staffChannelIds) {
+      const c: any = guild.channels.cache.get(id);
+      if (!c) continue;
+      await c.permissionOverwrites.edit(guild.roles.everyone, { ViewChannel: false }, { reason: 'Secure Setup repair: staff only' }).catch(() => undefined);
+      await c.permissionOverwrites.delete(member, 'Secure Setup repair: staff only').catch(() => undefined);
+      report.staffChannelsHidden.push(c.name);
+    }
+    // 3. People: existing members get Member and lose Applicant; plain newcomers keep Applicant.
+    const all = await guild.members.fetch();
+    for (const m of Array.from(all.values()) as any[]) {
+      if (m.user.bot || !m.roles.cache.has(applicant.id)) continue;
+      const others = m.roles.cache.filter((r: any) => r.id !== guild.id && r.id !== applicant.id);
+      if (!others.size) { report.keptAsApplicants.push(m.user.username); continue; }
+      await m.roles.add(member.id, 'Secure Setup repair').catch(() => undefined);
+      await m.roles.remove(applicant.id, 'Secure Setup repair').catch(() => undefined);
+      report.membersUpdated.push(m.user.username);
+    }
+    // 4. Private apply channel for newcomers.
+    let apply: any = guild.channels.cache.find((c: any) => c.type === ChannelType.GuildText && /(^|[^a-z])apply([^a-z]|$)/i.test(c.name) && c.permissionOverwrites?.cache?.get(applicant.id)?.allow?.has(V));
+    if (!apply) {
+      apply = await guild.channels.create({
+        name: '📋・apply', type: ChannelType.GuildText, position: 0, reason: 'Secure Setup: where newcomers apply',
+        topic: 'Press Apply to join. Only new people waiting for approval can see this channel.',
+        permissionOverwrites: [
+          { id: guild.roles.everyone.id, deny: [V] },
+          { id: applicant.id, allow: [V, PermissionFlagsBits.ReadMessageHistory], deny: [PermissionFlagsBits.SendMessages, PermissionFlagsBits.AddReactions, PermissionFlagsBits.CreatePublicThreads] },
+          { id: member.id, deny: [V] },
+          { id: me.id, allow: [V, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory] },
+        ],
+      });
+    }
+    report.applyChannel = apply.name;
+    const pubs = (g.publicChannelIds || []).filter((id: string) => !staffChannelIds.includes(id));
+    await saveGate(communityId, { memberRoleId: member.id, applicantRoleId: applicant.id, publicChannelIds: pubs, applyChannelId: apply.id } as any);
+    // 5. Apply panel in it (once).
+    const { discordRecruitment } = await import('./discordRecruitment.service.js');
+    const recent = await apply.messages.fetch({ limit: 20 }).catch(() => null);
+    const hasPanel = recent && Array.from(recent.values()).some((m: any) => m.author?.id === me.id && m.components?.length);
+    if (!hasPanel) await apply.send(discordRecruitment.panel(rc)).catch(() => undefined);
+    return report;
+  },
+
   /** Restore every channel's permissions from the snapshot. */
   async undo(communityId: string) {
     const guild = await guildFor(communityId);
@@ -228,7 +305,7 @@ export const secureGate = {
   /** Approved: open the server for them. */
   async onApproved(communityId: string, discordUserId: string) {
     const g = await getGate(communityId);
-    if (!g.memberRoleId) return;
+    if (!g.memberRoleId || g.memberRoleId === g.applicantRoleId) return;
     const guild = await guildFor(communityId);
     const m = await guild?.members.fetch(discordUserId).catch(() => null);
     if (!m) return;
