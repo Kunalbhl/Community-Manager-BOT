@@ -293,7 +293,7 @@ export const secureGate = {
    * Access roles = the approved role + every role that some channel denies (the game roles).
    * dryRun lists the changes without making them.
    */
-  async gameAccess(communityId: string, dryRun: boolean) {
+  async gameAccess(communityId: string, dryRun: boolean, only?: { roleIds?: string[]; excludeChannels?: string[] }) {
     const guild: any = await guildFor(communityId);
     if (!guild) throw new Error('The bot is not connected to this server right now.');
     const g = await getGate(communityId);
@@ -310,7 +310,8 @@ export const secureGate = {
       if (c.permissionsFor(guild.roles.everyone)?.has(V)) continue; // public anyway
       const denied = new Set(deniesOf(c));
       if (!denied.size) continue; // private/staff channel: leave as it is
-      const allow = Array.from(gameRoles).filter((id) => !denied.has(id) && !c.permissionOverwrites.cache.get(id)?.allow?.has(V));
+      if (only?.excludeChannels?.some((n) => c.name.includes(n))) continue;
+      const allow = Array.from(gameRoles).filter((id) => (!only?.roleIds?.length || only.roleIds.includes(id)) && !denied.has(id) && !c.permissionOverwrites.cache.get(id)?.allow?.has(V));
       if (!allow.length) continue;
       plan.push({ channel: c.name, allow });
       if (!dryRun) for (const id of allow) await c.permissionOverwrites.edit(id, { ViewChannel: true }, { reason: 'Secure Setup: game-role access' }).catch(() => undefined);
