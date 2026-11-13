@@ -284,6 +284,45 @@ export const secureGate = {
     };
   },
 
+  /**
+   * Game-role access after Secure Setup. Before the lock, many channels were open to @everyone and a
+   * game channel was kept apart by DENYING the other games' roles (e.g. Minecraft channels deny @GTA).
+   * Hiding them from @everyone broke that. This rebuilds it with allows, keeping the separation:
+   * - channel was open to everyone and denied nobody      -> allow the approved role (general channel)
+   * - channel was open to everyone but denied some roles   -> allow each access role that was NOT denied
+   * Access roles = the approved role + every role that some channel denies (the game roles).
+   * dryRun lists the changes without making them.
+   */
+  async gameAccess(communityId: string, dryRun: boolean) {
+    const guild: any = await guildFor(communityId);
+    if (!guild) throw new Error('The bot is not connected to this server right now.');
+    const g = await getGate(communityId);
+    if (!g.snapshot?.length) throw new Error('No saved permissions from before Secure Setup.');
+    if (!g.memberRoleId) throw new Error('Set the approved role first.');
+    const V = PermissionFlagsBits.ViewChannel;
+    const everyone = guild.id;
+    const before = new Map(g.snapshot.map((s) => [s.channelId, s.overwrites]));
+    const wasOpen = (ows: any[]) => { const e = ows.find((o) => o.id === everyone); return !e || !(BigInt(e.deny) & V); };
+    const deniedIn = (ows: any[]) => ows.filter((o) => o.type === 0 && o.id !== everyone && (BigInt(o.deny) & V)).map((o) => o.id);
+    const gameRoles = new Set<string>();
+    for (const ows of before.values()) if (wasOpen(ows)) deniedIn(ows).forEach((id: string) => gameRoles.add(id));
+    for (const id of [g.applicantRoleId, guild.members.me.roles.highest.id]) if (id) gameRoles.delete(id);
+    const plan: { channel: string; allow: string[] }[] = [];
+    for (const [cid, ows] of before.entries()) {
+      const c: any = guild.channels.cache.get(cid);
+      if (!c || !VISIBLE_TYPES.has(c.type) || !wasOpen(ows)) continue;
+      if (c.permissionsFor(guild.roles.everyone)?.has(V)) continue; // still public
+      const denied = new Set(deniedIn(ows));
+      const allow = denied.size ? Array.from(gameRoles).filter((id) => !denied.has(id) && guild.roles.cache.has(id)) : [g.memberRoleId];
+      const missing = allow.filter((id) => !c.permissionOverwrites.cache.get(id)?.allow?.has(V));
+      if (!missing.length) continue;
+      plan.push({ channel: c.name, allow: missing });
+      if (!dryRun) for (const id of missing) await c.permissionOverwrites.edit(id, { ViewChannel: true }, { reason: 'Secure Setup: game-role access' }).catch(() => undefined);
+    }
+    const name = (id: string) => guild.roles.cache.get(id)?.name || id;
+    return { gameRoles: Array.from(gameRoles).map(name), changes: plan.length, plan: plan.slice(0, 120).map((p) => ({ channel: p.channel, allow: p.allow.map(name) })), applied: !dryRun };
+  },
+
   /** Change the newcomer / approved roles without re-locking. */
   async setRoles(communityId: string, p: { applicantRoleId: string; memberRoleId: string; approvedExtraRoleIds: string[] }) {
     const guild: any = await guildFor(communityId);
