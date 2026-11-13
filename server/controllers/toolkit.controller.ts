@@ -604,7 +604,7 @@ async function dmCode(communityId: string, discordId: string, code: string) {
   try {
     const guild: any = await guildFor(communityId);
     const user = await guild?.client?.users?.fetch(discordId);
-    await user?.send(`🎟️ Your recruiter code for **${guild?.name || 'the server'}** is **${code}**.\nShare it with people you invite: they enter it when they apply, and you get credit when they join. Use \`/mycode\` in the server any time to see it again (only you can see the reply).`);
+    await user?.send(`🎟️ Your recruiter code for [**${guild?.name || 'the server'}**](https://discord.com/channels/${guild?.id || ''}) is **${code}**.\nShare it with people you invite: they enter it when they apply, and you get credit when they join. Use \`/mycode\` in the server any time to see it again (only you can see the reply).`);
     return true;
   } catch { return false; }
 }

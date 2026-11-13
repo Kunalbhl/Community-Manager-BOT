@@ -23,10 +23,10 @@ export const recruitmentLog = {
     const guild = await guildFor(communityId);
     const name = app.applicantDisplayNameSnapshot || app.applicantUsername || 'Someone';
     const text = event === 'APPLIED'
-      ? `📨 **${name}** applied to **${guild?.name || 'the server'}** with your recruiter code **${app.recruiterCodeUsed}**. You will hear when it is decided.`
+      ? `📨 **${name}** applied to [**${guild?.name || 'the server'}**](https://discord.com/channels/${guild?.id || ''}) with your recruiter code **${app.recruiterCodeUsed}**. You will hear when it is decided.`
       : event === 'APPROVED'
-        ? `🎉 **${name}**, whom you referred with code **${app.recruiterCodeUsed}**, was **approved** in **${guild?.name || 'the server'}**. This counts toward your recruiter benefits.`
-        : `ℹ️ **${name}**, whom you referred with code **${app.recruiterCodeUsed}**, was not approved this time in **${guild?.name || 'the server'}**.`;
+        ? `🎉 **${name}**, whom you referred with code **${app.recruiterCodeUsed}**, was **approved** in [**${guild?.name || 'the server'}**](https://discord.com/channels/${guild?.id || ''}). This counts toward your recruiter benefits.`
+        : `ℹ️ **${name}**, whom you referred with code **${app.recruiterCodeUsed}**, was not approved this time in [**${guild?.name || 'the server'}**](https://discord.com/channels/${guild?.id || ''}).`;
     await discordService.sendDM(rid, text).catch(() => undefined);
   },
 };

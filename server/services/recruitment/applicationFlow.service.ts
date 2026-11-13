@@ -133,7 +133,7 @@ export const applicationFlow = {
     const rules = (await communityQuestionsService.listGuidelines(r.communityId).catch(() => [])).filter((g: any) => g.enabled !== false);
     const fields = rules.slice(0, 20).map((g: any) => ({ name: clip(`${g.category === 'RULE' ? '📜' : g.category === 'DISCIPLINARY' || g.category === 'DISQUALIFYING' ? '⛔' : '📘'} ${g.title}`, 256), value: clip(g.description || '—', 1024) }));
     await chat?.send({
-      content: `👋 Welcome <@${r.applicantId}>! I'm **Community Manager**, and I'll guide you through your application to **${guild?.name}** until the team takes over.`,
+      content: `👋 Welcome <@${r.applicantId}>! I'm **Community Manager**, and I'll guide you through your application to [**${guild?.name || 'the server'}**](https://discord.com/channels/${guild?.id || ''}) until the team takes over.`,
       allowedMentions: { users: [r.applicantId] },
       embeds: [{
         title: '📜 Rules and guide',

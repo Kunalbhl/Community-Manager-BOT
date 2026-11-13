@@ -283,7 +283,7 @@ export const ticketService = {
     const closed = await ticketsRepository.update(ticketId, { status: 'CLOSED', closedBy: closer.id, closeReason: reason, transcript, closedAt: new Date().toISOString() } as any);
     if (guild) {
       const opener = await guild.client.users.fetch(t.openerId).catch(() => null);
-      await opener?.send(`🔒 Your ticket **#${String(t.number).padStart(4, '0')} · ${t.typeLabel}** in **${guild.name}** was closed by ${closer.username}. Reason: ${reason}`).catch(() => undefined);
+      await opener?.send(`🔒 Your ticket **#${String(t.number).padStart(4, '0')} · ${t.typeLabel}** in [**${guild.name || 'the server'}**](https://discord.com/channels/${guild.id || ''}) was closed by <@${closer.id}>. Reason: ${reason}`).catch(() => undefined);
       await this.log(t.communityId, guild, `🔒 Ticket #${t.number} closed by <@${closer.id}> · ${reason}`);
       if (channel) setTimeout(() => channel.delete('Ticket closed').catch(() => undefined), 5000);
     }

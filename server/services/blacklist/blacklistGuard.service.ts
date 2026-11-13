@@ -186,7 +186,7 @@ export async function onAlertButton(interaction: any, action: string, arg: strin
   if (action === 'clear') {
     if (entry) await blacklistEntriesRepository.update(entry.id, { clearedUserIds: Array.from(new Set([...(entry.clearedUserIds || []), userId])), updatedAt: new Date().toISOString() } as any);
     clearCache(entry?.communityId || '');
-    text = `✅ Marked <@${userId}> as **not** this person by ${by}. They won’t be flagged for this entry again.`;
+    text = `✅ Marked <@${userId}> as **not** this person by <@${interaction.user.id}>. They won’t be flagged for this entry again.`;
   } else {
     const reason = `Blacklisted (${by}): ${String(entry?.reason || '').slice(0, 400)}`;
     const ok = action === 'ban'
@@ -196,7 +196,7 @@ export async function onAlertButton(interaction: any, action: string, arg: strin
       // The name entry now has a confirmed account: remember it so future checks match by ID.
       await blacklistEntriesRepository.update(entry.id, { linkedUserIds: Array.from(new Set([...(entry.linkedUserIds || []), userId])) } as any).catch(() => undefined);
     }
-    text = ok ? `${action === 'ban' ? '🔨 Banned' : '👢 Kicked'} <@${userId}> by ${by}.` : `⚠️ Could not ${action} <@${userId}>. Move the bot’s role above theirs and give it ${action === 'ban' ? 'Ban' : 'Kick'} Members.`;
+    text = ok ? `${action === 'ban' ? '🔨 Banned' : '👢 Kicked'} <@${userId}> by <@${interaction.user.id}>.` : `⚠️ Could not ${action} <@${userId}>. Move the bot’s role above theirs and give it ${action === 'ban' ? 'Ban' : 'Kick'} Members.`;
   }
   await interaction.update({ components: [] }).catch(() => undefined);
   return interaction.followUp({ content: text, allowedMentions: { parse: [] } });

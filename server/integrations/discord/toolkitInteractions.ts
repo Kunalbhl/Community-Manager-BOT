@@ -54,8 +54,8 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
       } else if (action === 'ok' || action === 'no') {
         const p = interaction.memberPermissions;
         if (!(p?.has('ManageGuild') || p?.has('ManageRoles') || p?.has('ModerateMembers'))) { await interaction.reply({ content: '⛔ Only staff can approve.', ephemeral: true }); return true; }
-        const r = await wallet.decide(communityId, rest, action === 'ok', interaction.user.username);
-        await interaction.update({ content: `${action === 'ok' ? '✅ Approved' : '❌ Declined'} by ${interaction.user.username}. <@${r.tx.memberId}> has **${r.available}** left.`, components: [], allowedMentions: { parse: [] } });
+        const r = await wallet.decide(communityId, rest, action === 'ok', interaction.user.username, interaction.user.id);
+        await interaction.update({ content: `${action === 'ok' ? '✅ Approved' : '❌ Declined'} by <@${interaction.user.id}>. <@${r.tx.memberId}> has **${r.available}** left.`, components: [], allowedMentions: { parse: [] } });
       } else return false;
     } catch (e: any) {
       const m = { content: `⚠️ ${e.message}`, ephemeral: true };
