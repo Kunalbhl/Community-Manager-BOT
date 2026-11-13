@@ -381,7 +381,7 @@ export async function gateAccessHandler(req: Request, res: Response) {
   try { const { secureGate } = await import('../services/recruitment/secureGate.service.js'); ok(res, await secureGate.access(req.params.communityId, isSnowflake(req.query.roleId) ? String(req.query.roleId) : undefined)); } catch (err) { fail(res, err); }
 }
 export async function gateGameAccessHandler(req: Request, res: Response) {
-  try { const { secureGate } = await import('../services/recruitment/secureGate.service.js'); ok(res, await secureGate.gameAccess(req.params.communityId, req.body?.apply !== true)); } catch (err) { fail(res, err); }
+  try { const { secureGate } = await import('../services/recruitment/secureGate.service.js'); ok(res, await secureGate.gameAccess(req.params.communityId, req.body?.apply !== true, { roleIds: ids(req.body?.roleIds, 10), excludeChannels: (Array.isArray(req.body?.excludeChannels) ? req.body.excludeChannels : []).map(String).slice(0, 30) })); } catch (err) { fail(res, err); }
 }
 export async function gateUndoHandler(req: Request, res: Response) {
   try {
