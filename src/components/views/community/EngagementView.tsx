@@ -18,7 +18,22 @@ const STATUS: Record<string, string> = {
   SCHEDULED: 'bg-amber-50 text-amber-700', PENDING: 'bg-amber-50 text-amber-700', PROCESSING: 'bg-sky-50 text-sky-700',
   PAUSED: 'bg-slate-100 text-slate-600', CLOSED: 'bg-slate-100 text-slate-600', FAILED: 'bg-rose-50 text-rose-700', CANCELLED: 'bg-slate-100 text-slate-600',
 };
-const Badge = ({ s }: { s: string }) => <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${STATUS[s] || 'bg-slate-100 text-slate-600'}`}>{s.charAt(0) + s.slice(1).toLowerCase()}</span>;
+/** What a delivery problem means and how to fix it. */
+const WHY: Record<string, string> = {
+  MENTION_NOT_ALLOWED: 'It mentions @everyone or @here, which was blocked. This is now allowed; send it again.',
+  BOT_NOT_CONNECTED: 'The bot was offline or restarting at that moment. Send it again.',
+  CHANNEL_NOT_FOUND: 'The channel was deleted or the bot can’t see it. Pick another channel, or give the bot View Channel there.',
+  ENTITLEMENT_LIMIT_REACHED: 'Your plan’s limit for this feature was reached.',
+  COMMUNITY_NOT_FOUND: 'The server is no longer connected to the bot.',
+  INVALID_DELIVERY_TARGET: 'No channel or member was chosen.',
+};
+const why = (code?: string) => !code ? '' : WHY[code] || (/50013|Missing Permissions/i.test(code) ? 'The bot doesn’t have permission to post there. Give it Send Messages (and Mention Everyone for @everyone) in that channel.' : /50007/.test(code) ? 'The member has DMs closed.' : code);
+const Badge = ({ s, err }: { s: string; err?: string }) => (
+  <span className="inline-flex flex-col gap-0.5">
+    <span className={`w-max rounded-full px-2.5 py-0.5 text-[11px] font-bold ${STATUS[s] || 'bg-slate-100 text-slate-600'}`}>{s.charAt(0) + s.slice(1).toLowerCase()}</span>
+    {s === 'FAILED' && err && <span className="max-w-xs text-[11px] text-rose-700">{why(err)}</span>}
+  </span>
+);
 
 export const EngagementView: React.FC<EngagementViewProps> = ({ communityId, initialTab = 'announcements', only }) => {
   const [tab, setTab] = useState<Tab>(only || initialTab);
@@ -133,7 +148,7 @@ function Announcements({ communityId, data, run, api, busy, chanName }: P) {
       </form>}
       list={!data.length ? <Empty text="No announcements yet." /> : data.map((a) => (
         <div key={a.id} className="rounded-xl border border-slate-200 p-4">
-          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{a.title}</span><Badge s={a.status} /></div>
+          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{a.title}</span><Badge s={a.status} err={a.errorDetails || a.failureReason || a.lastError} /></div>
           <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm text-slate-600">{a.content}</p>
           <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-500"><span>#{chanName?.(a.channelId) || 'channel'}</span><span>{a.status === 'SCHEDULED' ? `Sends ${when(a.scheduledAt)}` : when(a.createdAt)}</span></div>
           {a.status === 'SCHEDULED' && <button className="mt-2 text-xs font-semibold text-rose-600 hover:underline" onClick={() => run(() => api(`announcements/${a.id}/cancel`, 'POST'), 'Announcement cancelled.')}>Cancel</button>}
@@ -224,7 +239,7 @@ function Campaigns({ communityId, data, run, api, busy, chanName, roleName }: P)
       </form>}
       list={!data.length ? <Empty text="No campaigns yet." /> : data.map((c) => (
         <div key={c.id} className="rounded-xl border border-slate-200 p-4">
-          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{c.name}</span><Badge s={c.status} /></div>
+          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{c.name}</span><Badge s={c.status} err={c.errorDetails || c.failureReason || c.lastError} /></div>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
             <span>{target(c)}</span><span>{describeFreq(c)}</span>
             {['SCHEDULED', 'PAUSED'].includes(c.status) && <span>Next: {when(c.scheduledAt)}</span>}
@@ -281,7 +296,7 @@ function Reminders({ communityId, data, run, api, busy, chanName }: P) {
         <div key={r.id} className="rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-bold text-slate-900">{r.targetType === 'CHANNEL' ? `#${chanName?.(r.channelId) || 'channel'}` : <>@<MemberName id={r.targetUser} communityId={communityId} fallback={r.targetUserName} /></>}</span>
-            <Badge s={r.status} />
+            <Badge s={r.status} err={r.errorDetails || r.failureReason || r.lastError} />
           </div>
           <div className="mt-1 text-xs text-slate-500">{r.status === 'PENDING' ? `Sends ${when(r.triggerAt)}` : `Sent ${when(r.updatedAt)}`}{r.recurrence && r.recurrence !== 'ONCE' ? ` · repeats ${r.recurrence === 'DAILY' ? 'daily' : 'weekly'}` : ''}</div>
           <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm text-slate-600">{r.message}</p>
@@ -334,7 +349,7 @@ function Polls({ communityId, data, run, api, busy, chanName }: P) {
         const total = (p.results || []).reduce((n: number, r: any) => n + r.votes, 0);
         return (
           <div key={p.id} className="rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{p.question}</span><Badge s={p.status} /></div>
+            <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{p.question}</span><Badge s={p.status} err={p.errorDetails || p.failureReason || p.lastError} /></div>
             <div className="mt-1 text-xs text-slate-500">#{chanName?.(p.channelId) || 'channel'} · {p.status === 'ACTIVE' ? `Closes ${when(p.endsAt)}` : `${total} vote${total === 1 ? '' : 's'}`}</div>
             {p.results ? (
               <div className="mt-3 space-y-1.5">
