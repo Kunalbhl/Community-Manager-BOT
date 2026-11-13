@@ -307,7 +307,7 @@ export const inviteRewards = {
       if (rule.actions.announceMessage && rule.actions.announceChannelId) {
         const ch: any = guild.channels.cache.get(rule.actions.announceChannelId);
         if (!ch?.send) problems.push('the announcement channel is missing');
-        else await ch.send({ content: render(rule.actions.announceMessage, vars).slice(0, 2000), allowedMentions: { users: [g.recruiterId] } }).catch(() => problems.push(`could not post in #${ch.name}`));
+        else await ch.send({ content: render(rule.actions.announceMessage, vars).slice(0, 2000), allowedMentions: { users: [g.recruiterId] } }).catch(() => problems.push(`could not post in <#${ch.id}>`));
       }
     }
     const fatal = (needsMember && (!guild || !member)) || (rule.actions.addRoleIds.length > 0 && !given.length) || (!!rule.actions.credit?.itemId && !credited);
@@ -323,7 +323,7 @@ export const inviteRewards = {
     const member: any = guild ? await guild.members.fetch(g.recruiterId).catch(() => null) : null;
     if (status === 'REVOKED') await import('./wallet.service.js').then(({ wallet }) => wallet.reverse(g.communityId, g.id, why)).catch(() => undefined);
     if (member) for (const id of g.roleIdsGiven || []) await member.roles.remove(id, `Invite reward ${status.toLowerCase()}: ${g.ruleName}`).catch(() => undefined);
-    if (member && status === 'REVOKED' && rule) await member.send({ content: `ℹ️ Your reward **${g.emoji} ${g.ruleName}** in **${guild.name}** was taken back. ${why}` }).catch(() => undefined);
+    if (member && status === 'REVOKED' && rule) await member.send({ content: `ℹ️ Your reward **${g.emoji} ${g.ruleName}** in [**${guild.name || 'the server'}**](https://discord.com/channels/${guild.id || ''}) was taken back. ${why}` }).catch(() => undefined);
     return rewardGrantsRepository.update(g.id, { status, error: why, decidedBy: by, decidedAt: nowIso(), updatedAt: nowIso() } as any);
   },
 

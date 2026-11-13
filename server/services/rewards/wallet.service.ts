@@ -169,7 +169,7 @@ export const wallet = {
     else await this.log(communityId, tx, `🎯 <@${p.memberId}> used **${amount}× ${item.emoji} ${item.name}**${tx.forEvent ? ` for *${tx.forEvent}*` : ''}${p.byStaff ? ` (recorded by ${p.by})` : ''}. **${left}** left.`);
     return { tx, item, left, pending };
   },
-  async decide(communityId: string, txId: string, approve: boolean, by: string) {
+  async decide(communityId: string, txId: string, approve: boolean, by: string, byId?: string) {
     const tx = await walletTxRepository.getById(txId).catch(() => null);
     if (!tx || tx.communityId !== communityId || tx.kind !== 'CLAIM') throw new Error('Request not found.');
     if (tx.status !== 'PENDING') throw new Error(`Already ${tx.status === 'APPROVED' ? 'approved' : 'handled'}${tx.decidedBy ? ` by ${tx.decidedBy}` : ''}.`);
@@ -178,7 +178,7 @@ export const wallet = {
     const bal = await this.balance(communityId, tx.memberId, tx.itemId);
     const guild: any = await guildFor(communityId);
     const member: any = guild ? await guild.members.fetch(tx.memberId).catch(() => null) : null;
-    await member?.send({ content: approve ? `✅ Your use of **${-tx.amount}× ${item?.emoji} ${item?.name}** in **${guild.name}** was approved by ${by}. You have **${bal.available}** left.` : `❌ Your request to use **${-tx.amount}× ${item?.emoji} ${item?.name}** in **${guild.name}** was declined by ${by}. Nothing was taken; you still have **${bal.available}**.` }).catch(() => undefined);
+    await member?.send({ content: approve ? `✅ Your use of **${-tx.amount}× ${item?.emoji} ${item?.name}** in [**${guild.name || 'the server'}**](https://discord.com/channels/${guild.id || ''}) was approved by ${byId ? `<@${byId}>` : by}. You have **${bal.available}** left.` : `❌ Your request to use **${-tx.amount}× ${item?.emoji} ${item?.name}** in [**${guild.name || 'the server'}**](https://discord.com/channels/${guild.id || ''}) was declined by ${byId ? `<@${byId}>` : by}. Nothing was taken; you still have **${bal.available}**.` }).catch(() => undefined);
     return { tx: out, available: bal.available };
   },
   async cancel(communityId: string, txId: string, memberId: string) {

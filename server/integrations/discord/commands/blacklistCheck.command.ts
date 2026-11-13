@@ -29,7 +29,7 @@ export const blacklistCheckCommand: SlashCommandDefinition = {
     for (const h of hits.slice(0, isLookup ? 5 : 3)) {
       const e = h.entry;
       const known = isLookup
-        ? [e.discordUserId && `ID \`${e.discordUserId}\``, (e.discordUsername || e.displayName) && `Discord **${e.displayName || e.discordUsername}**`, e.gameNames?.length && `Game: ${e.gameNames.join(', ')}`, e.aliases?.length && `Also: ${e.aliases.join(', ')}`].filter(Boolean).join(' · ')
+        ? [e.discordUserId && `ID \`${e.discordUserId}\``, (e.discordUsername || e.displayName || e.discordUserId) && `Discord ${e.discordUserId ? `<@${e.discordUserId}> ` : ''}**${e.displayName || e.discordUsername || ''}**`, e.gameNames?.length && `Game: ${e.gameNames.join(', ')}`, e.aliases?.length && `Also: ${e.aliases.join(', ')}`].filter(Boolean).join(' · ')
         : '';
       embed.addFields({ name: `${h.score >= 100 ? '🔴 Exact' : h.score >= 70 ? '🟠 Close' : '🟡 Similar'} · ${g.entryLabel(e)}${e.category ? ` · ${e.category}` : ''}`.slice(0, 250), value: `${known ? `${known}\n` : ''}Matched ${h.matched}\nReason: ${String(e.reason || '—').slice(0, 300)}`.slice(0, 1000) });
     }
