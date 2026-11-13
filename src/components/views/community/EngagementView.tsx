@@ -20,14 +20,14 @@ const STATUS: Record<string, string> = {
 };
 /** What a delivery problem means and how to fix it. */
 const WHY: Record<string, string> = {
-  MENTION_NOT_ALLOWED: 'It mentions @everyone or @here, which was blocked. This is now allowed; send it again.',
+  MENTION_NOT_ALLOWED: 'It mentions @everyone or @here, which was blocked at that time. Send it again; the bot now gives itself Mention Everyone in that channel when needed.',
   BOT_NOT_CONNECTED: 'The bot was offline or restarting at that moment. Send it again.',
   CHANNEL_NOT_FOUND: 'The channel was deleted or the bot can’t see it. Pick another channel, or give the bot View Channel there.',
   ENTITLEMENT_LIMIT_REACHED: 'Your plan’s limit for this feature was reached.',
   COMMUNITY_NOT_FOUND: 'The server is no longer connected to the bot.',
   INVALID_DELIVERY_TARGET: 'No channel or member was chosen.',
 };
-const why = (code?: string) => !code ? '' : WHY[code] || (/50013|Missing Permissions/i.test(code) ? 'The bot doesn’t have permission to post there. Give it Send Messages (and Mention Everyone for @everyone) in that channel.' : /50007/.test(code) ? 'The member has DMs closed.' : code);
+const why = (code?: string) => !code ? '' : code.startsWith('DISCORD_PERMISSION_REQUIRED: ') ? code.slice(29) : WHY[code] || (/50013|Missing Permissions/i.test(code) ? 'The bot doesn’t have permission to post there. Give it Send Messages (and Mention Everyone for @everyone) in that channel.' : /50007/.test(code) ? 'The member has DMs closed.' : code);
 const Badge = ({ s, err }: { s: string; err?: string }) => (
   <span className="inline-flex flex-col gap-0.5">
     <span className={`w-max rounded-full px-2.5 py-0.5 text-[11px] font-bold ${STATUS[s] || 'bg-slate-100 text-slate-600'}`}>{s.charAt(0) + s.slice(1).toLowerCase()}</span>
