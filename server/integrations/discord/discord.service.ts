@@ -383,6 +383,12 @@ export class RealDiscordProvider implements DiscordProvider {
         };
       }
 
+      // Respect the server's settings: only give the bot itself what it is missing (never @everyone).
+      {
+        const { ensureSelfAccess } = await import('./selfAccess.js');
+        const problem = await ensureSelfAccess(channel, content);
+        if (problem) return { messageId: '', channelId, sentAt: new Date().toISOString(), success: false, failureReason: `DISCORD_PERMISSION_REQUIRED: ${problem}` };
+      }
       const msg = await (channel as unknown as { send: (c: string) => Promise<{ id: string; channelId: string; createdAt: Date }> }).send(content);
       return {
         messageId: msg.id,

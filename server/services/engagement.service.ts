@@ -415,6 +415,7 @@ export class EngagementPollService {
 
     const ch: any = await (discordService as any).client?.channels?.fetch(channelId).catch(() => null);
     if (!ch?.send) throw new BadRequestError('The bot cannot post in that channel.');
+    { const { ensureSelfAccess } = await import('../integrations/discord/selfAccess.js'); const problem = await ensureSelfAccess(ch, ''); if (problem) throw new Error(problem); }
     const msg = await ch.send({
       poll: { question: { text: question }, answers: options.map((text) => ({ text })), duration: hours, allowMultiselect: !!pollData.allowMultiselect },
     });
