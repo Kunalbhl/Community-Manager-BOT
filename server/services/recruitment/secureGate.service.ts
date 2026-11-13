@@ -297,30 +297,26 @@ export const secureGate = {
     const guild: any = await guildFor(communityId);
     if (!guild) throw new Error('The bot is not connected to this server right now.');
     const g = await getGate(communityId);
-    if (!g.snapshot?.length) throw new Error('No saved permissions from before Secure Setup.');
-    if (!g.memberRoleId) throw new Error('Set the approved role first.');
     const V = PermissionFlagsBits.ViewChannel;
     const everyone = guild.id;
-    const before = new Map(g.snapshot.map((s) => [s.channelId, s.overwrites]));
-    const wasOpen = (ows: any[]) => { const e = ows.find((o) => o.id === everyone); return !e || !(BigInt(e.deny) & V); };
-    const deniedIn = (ows: any[]) => ows.filter((o) => o.type === 0 && o.id !== everyone && (BigInt(o.deny) & V)).map((o) => o.id);
+    const skip = new Set([everyone, g.applicantRoleId, g.memberRoleId].filter(Boolean) as string[]);
+    const chans = Array.from(guild.channels.cache.values()).filter((c: any) => VISIBLE_TYPES.has(c.type)) as any[];
+    const deniesOf = (c: any) => Array.from(c.permissionOverwrites.cache.values()).filter((o: any) => o.type === 0 && !skip.has(o.id) && o.deny.has(V)).map((o: any) => o.id) as string[];
+    // Game roles: roles some channel explicitly hides from (that is how game sections were kept apart).
     const gameRoles = new Set<string>();
-    for (const ows of before.values()) if (wasOpen(ows)) deniedIn(ows).forEach((id: string) => gameRoles.add(id));
-    for (const id of [g.applicantRoleId, guild.members.me.roles.highest.id]) if (id) gameRoles.delete(id);
+    for (const c of chans) for (const id of deniesOf(c)) { const r = guild.roles.cache.get(id); if (r && !r.managed) gameRoles.add(id); }
     const plan: { channel: string; allow: string[] }[] = [];
-    for (const [cid, ows] of before.entries()) {
-      const c: any = guild.channels.cache.get(cid);
-      if (!c || !VISIBLE_TYPES.has(c.type) || !wasOpen(ows)) continue;
-      if (c.permissionsFor(guild.roles.everyone)?.has(V)) continue; // still public
-      const denied = new Set(deniedIn(ows));
-      const allow = denied.size ? Array.from(gameRoles).filter((id) => !denied.has(id) && guild.roles.cache.has(id)) : [g.memberRoleId];
-      const missing = allow.filter((id) => !c.permissionOverwrites.cache.get(id)?.allow?.has(V));
-      if (!missing.length) continue;
-      plan.push({ channel: c.name, allow: missing });
-      if (!dryRun) for (const id of missing) await c.permissionOverwrites.edit(id, { ViewChannel: true }, { reason: 'Secure Setup: game-role access' }).catch(() => undefined);
+    for (const c of chans) {
+      if (c.permissionsFor(guild.roles.everyone)?.has(V)) continue; // public anyway
+      const denied = new Set(deniesOf(c));
+      if (!denied.size) continue; // private/staff channel: leave as it is
+      const allow = Array.from(gameRoles).filter((id) => !denied.has(id) && !c.permissionOverwrites.cache.get(id)?.allow?.has(V));
+      if (!allow.length) continue;
+      plan.push({ channel: c.name, allow });
+      if (!dryRun) for (const id of allow) await c.permissionOverwrites.edit(id, { ViewChannel: true }, { reason: 'Secure Setup: game-role access' }).catch(() => undefined);
     }
     const name = (id: string) => guild.roles.cache.get(id)?.name || id;
-    return { gameRoles: Array.from(gameRoles).map(name), changes: plan.length, plan: plan.slice(0, 120).map((p) => ({ channel: p.channel, allow: p.allow.map(name) })), applied: !dryRun };
+    return { gameRoles: Array.from(gameRoles).map(name), changes: plan.length, plan: plan.slice(0, 150).map((p) => ({ channel: p.channel, allow: p.allow.map(name) })), applied: !dryRun };
   },
 
   /** Change the newcomer / approved roles without re-locking. */
