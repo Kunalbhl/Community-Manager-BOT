@@ -122,8 +122,11 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
       else if (action === 'iend') { await applicationFlow.endInterview(arg, interaction.member); await interaction.editReply('🎤 Interview ended. Summary posted in this thread.'); }
       else await interaction.editReply('Unknown action.');
     } catch (err: any) {
-      await interaction.editReply(`⚠️ ${err?.message || err}`);
+      await interaction.editReply({ content: `⚠️ ${err?.message || err}`, allowedMentions: { parse: [] } });
     }
+    // Keep the buttons on the panel that was pressed in step with the real state (no stale "Start interview").
+    const fresh = await applicationFlow.currentPanel(arg).catch(() => null);
+    if (fresh && interaction.message?.editable !== false) await interaction.message?.edit({ components: fresh }).catch(() => undefined);
     return true;
   }
 

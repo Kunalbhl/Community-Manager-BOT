@@ -135,7 +135,7 @@ export const reviewRooms = {
       : [{ id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] }];
     const vc = await guild.channels.create({ name: `🎙️ interview-${room.applicantName}`.slice(0, 90), type: ChannelType.GuildVoice, parent: text?.parentId, permissionOverwrites: overwrites });
     await reviewRoomsRepository.update(roomId, { voiceChannelId: vc.id, voiceEmptySince: Date.now(), history: [...room.history, { at: new Date().toISOString(), by: actor.id, event: 'Voice room created' }] } as any);
-    return `🎙️ Voice room ready: <#${vc.id}>. Only people in this room can join. It is deleted automatically 10 minutes after everyone leaves.`;
+    return `🎙️ Voice room ready: <#${vc.id}> · [open it](https://discord.com/channels/${guild.id}/${vc.id}). Only people in this room can join. It is deleted automatically 10 minutes after everyone leaves.`;
   },
 
   async escalate(roomId: string, actor: any): Promise<string> {
@@ -154,7 +154,9 @@ export const reviewRooms = {
       const vc: any = guild?.channels.cache.get(room.voiceChannelId);
       for (const id of nextRoles) await vc?.permissionOverwrites.edit(id, { ViewChannel: true, Connect: true, Speak: true }).catch(() => undefined);
     }
-    const updated = await reviewRoomsRepository.update(roomId, { tier: next, history: [...room.history, { at: new Date().toISOString(), by: actor.id, event: `Escalated to ${cfg.tiers[next].name}` }] } as any);
+    await reviewRoomsRepository.update(roomId, { tier: next, history: [...room.history, { at: new Date().toISOString(), by: actor.id, event: `Escalated to ${cfg.tiers[next].name}` }] } as any);
+    // Re-read so the new panel shows the real state (interview running, voice room open, ...).
+    const updated = (await reviewRoomsRepository.getById(roomId)) || ({ ...room, tier: next } as any);
     await applicationsRepository.update(room.applicationId, { status: 'ESCALATED', escalationTier: next, escalationTierName: cfg.tiers[next].name, updatedAt: new Date().toISOString() } as any).catch(() => undefined);
     const { applicationFlow, staffPanel } = await import('../recruitment/applicationFlow.service.js');
     const thread: any = await applicationFlow.staffThread(roomId);
