@@ -214,7 +214,7 @@ export const customCommands = {
 export interface ButtonRolePanel {
   id: string; communityId: string; title: string; description: string;
   mode: 'TOGGLE' | 'ONE_ONLY';
-  buttons: { roleId: string; label: string; emoji?: string }[];
+  buttons: { roleId: string; label: string; emoji?: string; requiredRoleIds?: string[]; blockedRoleIds?: string[] }[];
   /** Only members with at least one of these roles can use the panel (empty = everyone). */
   requiredRoleIds?: string[];
   /** Members with any of these roles can't use it. */
@@ -250,6 +250,12 @@ export const buttonRoles = {
     if (req.length && !req.some((id) => member.roles.cache.has(id))) return `🔒 This is only for members with ${req.map((id) => `<@&${id}>`).join(' or ')}.`;
     const blocked = (panel.blockedRoleIds || []).find((id) => member.roles.cache.has(id));
     if (blocked) return `🔒 Members with <@&${blocked}> can't use this.`;
+    // Per-button conditions.
+    const btn = panel.buttons.find((b) => b.roleId === roleId)!;
+    const breq = (btn.requiredRoleIds || []).filter((id) => member.guild.roles.cache.has(id));
+    if (breq.length && !breq.some((id) => member.roles.cache.has(id)) && !member.roles.cache.has(roleId)) return `🔒 <@&${roleId}> is only for members with ${breq.map((id) => `<@&${id}>`).join(' or ')}.`;
+    const bblk = (btn.blockedRoleIds || []).find((id) => member.roles.cache.has(id));
+    if (bblk && !member.roles.cache.has(roleId)) return `🔒 Members with <@&${bblk}> can't take <@&${roleId}>.`;
     try {
       if (member.roles.cache.has(roleId)) {
         await member.roles.remove(roleId, 'Button role');
