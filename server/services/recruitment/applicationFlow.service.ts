@@ -78,6 +78,14 @@ export function staffPanel(r: ReviewRoomDoc & { flow?: FlowState }, tierCount: n
 }
 
 export const applicationFlow = {
+  /** Fresh staff panel for the room's current state (used to correct buttons on older panels). */
+  async currentPanel(roomId: string) {
+    const r: any = await room(roomId);
+    if (!r) return null;
+    const t = await getToolkit(r.communityId);
+    return staffPanel(r, t.reviewRooms.tiers.length);
+  },
+
   /** Room just opened: create the private staff thread, then greet the applicant and ask for consent. */
   async begin(roomId: string, staffRoleIds: string[], applicantInServer: boolean) {
     const r = await room(roomId);
@@ -292,6 +300,9 @@ export const applicationFlow = {
   async startInterview(roomId: string, interviewer: any | null) {
     const r = await room(roomId);
     if (!r || r.status !== 'OPEN') throw new Error('This application is closed.');
+    if (interviewer && (r.flow?.stage === 'INTERVIEW_MANUAL' || r.flow?.stage === 'INTERVIEW_AUTO')) {
+      throw new Error(`An interview is already running${r.flow?.interview?.interviewerId ? ` (started by <@${r.flow.interview.interviewerId}>)` : ''}. Press **End interview** when it is finished.`);
+    }
     const t = await getToolkit(r.communityId);
     const { chat, staff } = await channels(r);
     if (!interviewer) {
@@ -336,7 +347,7 @@ export const applicationFlow = {
 
   async endInterview(roomId: string, by: any | null) {
     const r = await room(roomId);
-    if (!r?.flow?.interview) throw new Error('No interview is running.');
+    if (!r?.flow?.interview || !['INTERVIEW_MANUAL', 'INTERVIEW_AUTO'].includes(String(r.flow.stage))) throw new Error('No interview is running.');
     const t = await getToolkit(r.communityId);
     const iv = r.flow.interview;
     await saveFlow(roomId, { ...r.flow, stage: 'AWAITING_DECISION', interview: { ...iv } });
