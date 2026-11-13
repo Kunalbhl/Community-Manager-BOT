@@ -320,6 +320,23 @@ export const discordRecruitment = {
       await discordService.sendDM(applicantId, fillMsg(approved ? cfg.messages.approved : cfg.messages.rejected, vars)).catch(() => undefined);
     }
 
+    // 2a. Rejected while waiting in the server: remove them (after the DM above, so they still get the message).
+    //     Only newcomers are removed: anyone holding the member role, a staff role or any role besides Applicant stays.
+    if (!approved && guild && isSnowflake(applicantId) && (cfg as any).kickOnReject !== false) {
+      const m: any = await guild.members.fetch(applicantId).catch(() => null);
+      if (m && !m.user?.bot) {
+        const { getGate } = await import('./secureGate.service.js');
+        const gate: any = await getGate(app.communityId).catch(() => ({}));
+        const otherRoles = m.roles.cache.filter((r: any) => r.id !== guild.id && r.id !== gate.applicantRoleId);
+        if (!otherRoles.size) {
+          await new Promise((r) => setTimeout(r, 1500));
+          const kicked = await m.kick(`Application rejected${reason ? `: ${String(reason).slice(0, 300)}` : ''}`).then(() => true).catch(() => false);
+          const { recruitmentLog } = await import('./recruitmentLog.service.js');
+          await recruitmentLog.post(app.communityId, kicked ? `👢 **${vars.applicant}** was removed from the server after the rejection.` : `⚠️ Could not remove **${vars.applicant}** after the rejection: give the bot Kick Members and put its role above theirs.`).catch(() => undefined);
+        }
+      }
+    }
+
     // 2b. Already in the server? Then they have joined: mark it and run join-time role rules.
     if (approved && guild && isSnowflake(applicantId)) {
       const member = await guild.members.fetch(applicantId).catch(() => null);
