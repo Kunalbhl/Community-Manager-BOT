@@ -267,6 +267,23 @@ export const secureGate = {
     return report;
   },
 
+  /** Read-only: which roles open which hidden channels, and what one role can see. */
+  async access(communityId: string, roleId?: string) {
+    const guild: any = await guildFor(communityId);
+    if (!guild) throw new Error('The bot is not connected to this server right now.');
+    const V = PermissionFlagsBits.ViewChannel;
+    const chans = Array.from(guild.channels.cache.values()).filter((c: any) => VISIBLE_TYPES.has(c.type)) as any[];
+    const hidden = chans.filter((c) => !c.permissionsFor(guild.roles.everyone)?.has(V));
+    const opens = new Map<string, number>();
+    for (const c of hidden) for (const o of c.permissionOverwrites.cache.values() as any) if (o.type === 0 && o.allow.has(V)) opens.set(o.id, (opens.get(o.id) || 0) + 1);
+    const role = roleId ? guild.roles.cache.get(roleId) : null;
+    return {
+      hiddenChannels: hidden.length, totalChannels: chans.length,
+      rolesOpeningHidden: Array.from(opens.entries()).sort((a, b) => b[1] - a[1]).slice(0, 15).map(([id, n]) => ({ id, name: guild.roles.cache.get(id)?.name || id, channels: n })),
+      role: role ? { name: role.name, canSee: chans.filter((c) => c.permissionsFor(role)?.has(V)).map((c) => c.name).slice(0, 60), explicitlyDenied: chans.filter((c) => c.permissionOverwrites.cache.get(role.id)?.deny?.has(V)).map((c) => c.name) } : null,
+    };
+  },
+
   /** Change the newcomer / approved roles without re-locking. */
   async setRoles(communityId: string, p: { applicantRoleId: string; memberRoleId: string; approvedExtraRoleIds: string[] }) {
     const guild: any = await guildFor(communityId);
