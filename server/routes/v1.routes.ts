@@ -445,6 +445,7 @@ router.get(`${tk}/gate/diagnose`, requireTenantAccess(), requirePermission('sett
 router.post(`${tk}/gate/repair`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateRepairHandler);
 router.put(`${tk}/gate/roles`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateRolesHandler);
 router.get(`${tk}/gate/access`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateAccessHandler);
+router.post(`${tk}/gate/game-access`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateGameAccessHandler);
 router.post(`${tk}/gate/lock`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateLockHandler);
 router.post(`${tk}/gate/undo`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateUndoHandler);
 router.post(`${tk}/gate/confirm`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateConfirmHandler);
