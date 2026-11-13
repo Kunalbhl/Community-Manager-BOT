@@ -22,9 +22,9 @@ export interface BlacklistSettings {
   communityId: string;
   /** Where match alerts are posted (falls back to the recruitment log channel). */
   alertChannelId?: string;
-  /** Channels where /blacklist check posts its answer for the team. Empty = private replies anywhere. */
+  /** Channels where /blacklist-check posts its answer for the team. Empty = private replies anywhere. */
   lookupChannelIds: string[];
-  /** Roles allowed to use /blacklist check (Ban Members / Manage Server can always use it). */
+  /** Roles allowed to use /blacklist-check (Ban Members / Manage Server can always use it). */
   lookupRoleIds: string[];
   /** What happens when someone on the list by Discord ID joins. */
   onIdJoin: 'BAN' | 'KICK' | 'ALERT';
@@ -98,7 +98,7 @@ export async function findMatches(communityId: string, who: { userId?: string; n
   return out;
 }
 
-/** Search for the dashboard and /blacklist check: exact, contains and close spellings. */
+/** Search for the dashboard and /blacklist-check: exact, contains and close spellings. */
 export async function search(communityId: string, q: string, includeInactive = false) {
   const list = includeInactive ? await blacklistEntriesRepository.listForTenant(communityId) : await entriesFor(communityId);
   const nq = norm(q);
