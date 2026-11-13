@@ -377,6 +377,9 @@ export async function gateRolesHandler(req: Request, res: Response) {
     ok(res, { applicantRoleId: g.applicantRoleId, memberRoleId: g.memberRoleId, approvedExtraRoleIds: g.approvedExtraRoleIds || [] });
   } catch (err) { fail(res, err); }
 }
+export async function gateAccessHandler(req: Request, res: Response) {
+  try { const { secureGate } = await import('../services/recruitment/secureGate.service.js'); ok(res, await secureGate.access(req.params.communityId, isSnowflake(req.query.roleId) ? String(req.query.roleId) : undefined)); } catch (err) { fail(res, err); }
+}
 export async function gateUndoHandler(req: Request, res: Response) {
   try {
     const { secureGate } = await import('../services/recruitment/secureGate.service.js');
