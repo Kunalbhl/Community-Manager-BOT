@@ -98,6 +98,12 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
 
   // Core Recruitment States
   const [applications, setApplications] = useState<ApplicationDocument[]>([]);
+  const [codeOwners, setCodeOwners] = useState<Record<string, string>>({});
+  useEffect(() => {
+    fetch(`/api/v1/communities/${encodeURIComponent(communityId)}/toolkit/codes`, { credentials: 'include', headers: { 'x-community-id': communityId } })
+      .then((r) => r.json()).then((j) => { const m: Record<string, string> = {}; for (const c of j?.data?.codes || []) { const id = c.recruiterDiscordId || c.recruiterUserId; if (/^\d{15,22}$/.test(String(id || ''))) m[String(c.code).toUpperCase()] = id; } setCodeOwners(m); }).catch(() => undefined);
+  }, [communityId]);
+  const codeOwner = (code?: string) => (code ? codeOwners[String(code).toUpperCase()] : undefined);
   const [recruiterCodes, setRecruiterCodes] = useState<any[]>([]);
   const [interviews, setInterviews] = useState<any[]>([]);
   const [recruiterBenefits, setRecruiterBenefits] = useState<any[]>([]);
@@ -1663,11 +1669,11 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                                 />
                               </th>
                               <th className="px-6 py-3.5">Applicant</th>
-                              <th className="px-6 py-3.5">Recruitment Score</th>
-                              <th className="px-6 py-3.5">SLA / Operational Triage</th>
-                              <th className="px-6 py-3.5">Recruiter Attribution</th>
-                              <th className="px-6 py-3.5">Pipeline Stage</th>
-                              <th className="px-6 py-3.5">Assigned Reviewer</th>
+                              <th className="px-6 py-3.5">Quiz score</th>
+                              <th className="px-6 py-3.5">Waiting time</th>
+                              <th className="px-6 py-3.5">Recruiter</th>
+                              <th className="px-6 py-3.5">Status</th>
+                              <th className="px-6 py-3.5">Reviewer</th>
                               <th className="px-6 py-3.5 text-right">Actions</th>
                             </tr>
                           </thead>
@@ -1696,8 +1702,8 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                                         {app.applicantUsername.slice(0, 1).toUpperCase()}
                                       </div>
                                       <div>
-                                        <div>{app.applicantUsername}</div>
-                                        <div className="text-[10px] text-slate-400 font-mono">FILE: {app.id.slice(-8)}</div>
+                                        <div>{(app as any).applicantDisplayNameSnapshot || app.applicantUsername}</div>
+                                        <div className="text-[11px] font-normal text-slate-500">@{app.applicantUsername} · applied {new Date((app as any).submittedAt || app.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</div>
                                         {(app as any).discordReviewUrl && <a href={(app as any).discordReviewUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[11px] font-semibold text-indigo-600 hover:underline">Open in Discord ↗</a>}
                                       </div>
                                     </div>
@@ -1745,16 +1751,14 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                                       )}
                                     </div>
                                   </td>
-                                  <td className="px-6 py-4 font-mono text-xs text-slate-600">
-                                    {app.applicantDiscordId}
-                                  </td>
                                   <td className="px-6 py-4">
                                     {app.recruiterCodeUsed ? (
-                                      <span className="inline-flex items-center gap-1 font-mono text-[10px] font-black text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-100">
-                                        {app.recruiterCodeUsed}
-                                      </span>
+                                      <div className="space-y-1">
+                                        {codeOwner(app.recruiterCodeUsed) && <div className="text-xs font-semibold text-slate-800"><MemberName id={codeOwner(app.recruiterCodeUsed)!} communityId={communityId} /></div>}
+                                        <span className="inline-flex items-center gap-1 font-mono text-[10px] font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">{app.recruiterCodeUsed}</span>
+                                      </div>
                                     ) : (
-                                      <span className="text-[10px] text-slate-400">Direct Entry</span>
+                                      <span className="text-[11px] text-slate-400">No code</span>
                                     )}
                                   </td>
                                   <td className="px-6 py-4">
