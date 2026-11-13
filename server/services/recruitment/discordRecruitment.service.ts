@@ -274,6 +274,12 @@ export const discordRecruitment = {
       await msg?.edit({ content: msg.content || undefined, embeds: [this.reviewEmbed(app, { status, by: isSnowflake(reviewerDiscordId) ? reviewerDiscordId : undefined, reason })], components: this.reviewButtons(app.id, true), allowedMentions: { parse: [] } }).catch(() => undefined);
     }
 
+    // 1b. Applied on the website? Add them to the server now (or prepare an invite); then drop their stored login.
+    if (isSnowflake(applicantId)) {
+      const { webApply } = await import('./webApply.service.js');
+      await webApply.onDecided(app.communityId, applicantId, approved).catch((e: any) => logger.warn(`[Recruitment] web join failed: ${e?.message}`));
+    }
+
     // 2. Message the applicant with the server's own text.
     if (isSnowflake(applicantId)) {
       await discordService.sendDM(applicantId, fillMsg(approved ? cfg.messages.approved : cfg.messages.rejected, vars)).catch(() => undefined);

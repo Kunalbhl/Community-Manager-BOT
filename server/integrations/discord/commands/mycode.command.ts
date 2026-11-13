@@ -19,6 +19,9 @@ export const myCodeCommand: SlashCommandDefinition = {
       const active = (c.status || (c.isActive === false ? 'INACTIVE' : 'ACTIVE')) === 'ACTIVE';
       return `🎟️ **${c.code}** · ${active ? 'active' : 'paused'} · used ${c.totalUses || 0}×${c.usesRemaining ? ` of ${c.usesRemaining}` : ''}`;
     });
-    await interaction.reply({ content: `${lines.join('\n')}\n\nShare it with people you invite. They enter it when they apply, and you get credit when they join.`, ephemeral: true });
+    const base = 'https://community-manager-bot-720940628402.asia-southeast1.run.app';
+    const active = mine.find((c) => (c.status || 'ACTIVE') === 'ACTIVE' && c.isActive !== false) || mine[0];
+    const link = `${process.env.APP_URL || base}/join/${encodeURIComponent(context.communityId)}?code=${encodeURIComponent(active.code)}`;
+    await interaction.reply({ content: `${lines.join('\n')}\n\n🔗 **Your invite link:** ${link}\nPeople who open it apply on the website with your code already filled in, and get added to the server when approved. You get the credit.`, ephemeral: true });
   },
 };

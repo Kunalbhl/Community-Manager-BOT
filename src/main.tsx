@@ -1,12 +1,15 @@
-import {StrictMode} from 'react';
+import {StrictMode, Suspense, lazy} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { initTheme } from './lib/theme.js';
 initTheme();
 
+const JoinPage = lazy(() => import('./pages/JoinPage.tsx'));
+const isJoin = window.location.pathname.startsWith('/join/');
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {isJoin ? <Suspense fallback={<div className="min-h-screen bg-[#0b0d17]" />}><JoinPage /></Suspense> : <App />}
   </StrictMode>,
 );

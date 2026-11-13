@@ -209,6 +209,7 @@ import {
 } from '../controllers/platform.controller.js';
 import { recruiterRecordsController } from '../controllers/recruiterRecords.controller.js';
 import { getPublicContact, postPublicContact } from '../controllers/publicContact.controller.js';
+import * as WebApply from '../controllers/webApply.controller.js';
 import * as Team from '../controllers/team.controller.js';
 import { setupGuideHandler } from '../controllers/setupGuide.controller.js';
 import * as Toolkit from '../controllers/toolkit.controller.js';
@@ -321,6 +322,12 @@ router.post('/workspaces/:id/deletion', WorkspaceController.protectedDeletionWor
 
 // Public contact page (no login)
 router.get('/public/contact', getPublicContact);
+// Apply on the website (no dashboard account): sign in with Discord, quiz, form; the bot adds them on approval.
+router.get('/public/join/:communityId', WebApply.infoHandler);
+router.get('/public/join/:communityId/login', WebApply.loginHandler);
+router.post('/public/join/:communityId/quiz', WebApply.quizHandler);
+router.post('/public/join/:communityId/submit', WebApply.submitHandler);
+router.post('/public/join/:communityId/logout', WebApply.logoutHandler);
 router.post('/public/contact', postPublicContact);
 
 // 1. Health checks (public)
