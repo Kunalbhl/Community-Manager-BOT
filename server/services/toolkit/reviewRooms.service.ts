@@ -251,6 +251,52 @@ export const reviewRooms = {
     return { removed: true };
   },
 
+  /** Reads every message of the room and its staff thread, stores them, and posts a transcript to the applications log. */
+  async archive(room: any, decision: string, byId: string, channel: any, thread: any) {
+    const read = async (ch: any) => {
+      if (!ch?.messages) return [] as any[];
+      const out: any[] = [];
+      let before: string | undefined;
+      for (let i = 0; i < 20; i++) {
+        const batch: any = await ch.messages.fetch({ limit: 100, before }).catch(() => null);
+        if (!batch?.size) break;
+        out.push(...batch.values());
+        before = batch.last()?.id;
+        if (batch.size < 100) break;
+      }
+      return out.reverse().map((m: any) => ({
+        at: new Date(m.createdTimestamp).toISOString(), authorId: m.author?.id, author: m.member?.displayName || m.author?.username, bot: !!m.author?.bot,
+        content: [m.content, ...m.embeds.map((e: any) => [e.title, e.description, ...(e.fields || []).map((f: any) => `${f.name}: ${f.value}`)].filter(Boolean).join('\n'))].filter(Boolean).join('\n'),
+        attachments: Array.from(m.attachments?.values?.() || []).map((a: any) => a.url),
+      }));
+    };
+    if (!channel && !thread) return false;
+    const [chat, staff] = await Promise.all([read(channel), read(thread)]);
+    const { FirestoreRepository } = await import('../../repositories/firestore.repository.js');
+    const repo = new FirestoreRepository<any>('applicationTranscripts');
+    await repo.create({ id: room.applicationId, communityId: room.communityId, applicationId: room.applicationId, applicantId: room.applicantId, applicantName: room.applicantName, decision, decidedBy: byId, chat, staff, history: room.history, createdAt: new Date().toISOString() });
+    const line = (m: any) => `[${m.at.replace('T', ' ').slice(0, 16)}] ${m.author}${m.bot ? ' (bot)' : ''}: ${m.content}${m.attachments.length ? ` [files: ${m.attachments.join(' ')}]` : ''}`;
+    const text = [
+      `Application ${room.applicationId}`, `Applicant: ${room.applicantName} (${room.applicantId})`, `Decision: ${decision} by ${byId}`, `Closed: ${new Date().toISOString()}`,
+      '', '=== Applicant chat ===', ...chat.map(line), '', '=== Staff discussion ===', ...staff.map(line),
+      '', '=== History ===', ...(room.history || []).map((h: any) => `[${String(h.at).replace('T', ' ').slice(0, 16)}] ${h.event}${h.by ? ` (by ${h.by})` : ''}`),
+    ].join('\n');
+    const guild = channel?.guild || thread?.guild;
+    const cfg: any = (await getToolkit(room.communityId)).recruitment;
+    const log: any = guild?.channels.cache.get(cfg.reviewChannelId) || guild?.channels.cache.get(cfg.logChannelId);
+    if (!log?.send) return true; // stored even without a log channel
+    await log.send({
+      embeds: [{
+        title: `${decision === 'APPROVED' ? '✅' : '✖️'} Closed application · ${room.applicantName}`,
+        color: decision === 'APPROVED' ? 0x7fe0b0 : 0xff5c8a,
+        description: `<@${room.applicantId}> · ${decision === 'APPROVED' ? 'approved' : 'rejected'} by <@${byId}>\n${chat.filter((m: any) => !m.bot).length} chat messages · ${staff.filter((m: any) => !m.bot).length} staff messages. Full transcript attached; it is also saved with the application.`,
+      }],
+      files: [{ attachment: Buffer.from(text, 'utf8'), name: `application-${String(room.applicantName).replace(/[^\w-]/g, '').slice(0, 40) || room.applicantId}.txt` }],
+      allowedMentions: { parse: [] },
+    });
+    return true;
+  },
+
   /** Called after any approve/reject (dashboard, slash command or room button). */
   async closeForApplication(applicationId: string, decision: 'APPROVED' | 'REJECTED', byId: string) {
     const room = await reviewRoomsRepository.getById(applicationId).catch(() => null);
@@ -263,10 +309,12 @@ export const reviewRooms = {
     const { applicationFlow } = await import('../recruitment/applicationFlow.service.js');
     await applicationFlow.markDecided(applicationId).catch(() => undefined);
     const thread: any = await applicationFlow.staffThread(applicationId).catch(() => null);
-    await thread?.send({ content: `${decision === 'APPROVED' ? '✅ **Approved**' : '✖️ **Rejected**'} by <@${byId}>. The applicant was messaged. This chat closes in ${cfg.deleteAfterHours} hour(s).`, allowedMentions: { parse: [] } }).catch(() => undefined);
-    await channel?.send({ content: `This application is now closed. Thank you! The decision has been sent to the applicant by DM.`, allowedMentions: { parse: [] } }).catch(() => undefined);
-    if (channel) await channel.setName(`closed-${channel.name}`.slice(0, 100)).catch(() => undefined);
-    await reviewRoomsRepository.update(applicationId, { status: 'CLOSED', decision, voiceChannelId: null, closedAt: new Date().toISOString(), history: [...room.history, { at: new Date().toISOString(), by: byId, event: decision }] } as any);
+    await thread?.send({ content: `${decision === 'APPROVED' ? '✅ **Approved**' : '✖️ **Rejected**'} by <@${byId}>. The applicant was messaged. The full conversation is saved to the applications log and this room is removed.`, allowedMentions: { parse: [] } }).catch(() => undefined);
+    // Save the whole conversation (applicant chat + staff thread), post it to the applications log, then remove the room.
+    const archived = await this.archive(room, decision, byId, channel, thread).catch((e: any) => { logger.warn(`[ReviewRooms] archive failed: ${e?.message}`); return false; });
+    await reviewRoomsRepository.update(applicationId, { status: 'CLOSED', decision, voiceChannelId: null, closedAt: new Date().toISOString(), archived, history: [...room.history, { at: new Date().toISOString(), by: byId, event: decision }] } as any);
+    if (archived && channel) setTimeout(() => void channel.delete('Application decided; transcript saved').catch(() => undefined), 5_000);
+    else if (channel) await channel.setName(`closed-${channel.name}`.slice(0, 100)).catch(() => undefined);
   },
 
   /** Applicant joined the server after applying: let them into their chat and start the guided flow. */
@@ -297,6 +345,16 @@ export const reviewRooms = {
           else if (Date.now() - room.voiceEmptySince > 10 * 60_000) {
             await vc.delete('Voice room empty for 10 minutes').catch(() => undefined);
             await reviewRoomsRepository.update(room.id, { voiceChannelId: null, voiceEmptySince: null } as any);
+          }
+        }
+        if (room.status === 'CLOSED' && room.closedAt && !(room as any).archived) {
+          // Rooms closed before transcripts existed: save them now, then remove the channel.
+          const ch: any = guild.channels.cache.get(room.channelId);
+          if (ch) {
+            const { applicationFlow } = await import('../recruitment/applicationFlow.service.js');
+            const th: any = await applicationFlow.staffThread(room.id).catch(() => null);
+            const ok = await this.archive(room, (room as any).decision || 'DECIDED', room.history?.[room.history.length - 1]?.by || 'staff', ch, th).catch(() => false);
+            if (ok) { await reviewRoomsRepository.update(room.id, { archived: true } as any); await ch.delete('Transcript saved').catch(() => undefined); continue; }
           }
         }
         if (room.status === 'CLOSED' && room.closedAt) {
