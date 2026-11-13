@@ -108,7 +108,7 @@ export async function savePanelHandler(req: Request, res: Response) {
     const b = req.body || {};
     const buttons = (Array.isArray(b.buttons) ? b.buttons : []).filter((x: any) => isSnowflake(x?.roleId)).slice(0, 25).map((x: any) => ({ roleId: x.roleId, label: str(x.label, 80) || 'Role', emoji: str(x.emoji, 64) || undefined }));
     if (!buttons.length) throw new Error('Add at least one role button.');
-    const data = { communityId, title: str(b.title, 200) || 'Pick your roles', description: str(b.description, 2000), mode: b.mode === 'ONE_ONLY' ? 'ONE_ONLY' : 'TOGGLE', buttons };
+    const data = { communityId, title: str(b.title, 200) || 'Pick your roles', description: str(b.description, 4000), mode: b.mode === 'ONE_ONLY' ? 'ONE_ONLY' : 'TOGGLE', buttons, requiredRoleIds: (Array.isArray(b.requiredRoleIds) ? b.requiredRoleIds : []).filter(isSnowflake).slice(0, 10), blockedRoleIds: (Array.isArray(b.blockedRoleIds) ? b.blockedRoleIds : []).filter(isSnowflake).slice(0, 10) };
     let panel: any;
     if (b.id) {
       const existing = await buttonRolePanelsRepository.getById(String(b.id)).catch(() => null);
