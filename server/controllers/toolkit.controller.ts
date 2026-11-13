@@ -517,15 +517,30 @@ async function codeLog(communityId: string, codeId: string, code: string, action
  */
 function seriesCode(s: any, n: number, name = '') { return buildCode(s, n, name); }
 
-async function nextSeriesCode(communityId: string, name = '') {
+/** Picks the series for a member: the first role-based series whose roles they have, else the default. */
+async function pickSeries(t: any, communityId: string, discordId?: string): Promise<{ series: any; ruleId: string | null }> {
+  const rules: any[] = (t.recruitment as any).codeRules || [];
+  if (discordId && rules.some((r) => r.enabled !== false && r.roleIds?.length)) {
+    const guild: any = await guildFor(communityId);
+    const member: any = guild ? await guild.members.fetch(discordId).catch(() => null) : null;
+    const has = (id: string) => !!member?.roles?.cache?.has(id);
+    const rule = rules.find((r) => r.enabled !== false && (r.roleIds || []).some(has));
+    if (rule) return { series: { ...rule.series, enabled: true }, ruleId: rule.id };
+  }
+  return { series: (t.recruitment as any).codeSeries || {}, ruleId: null };
+}
+
+async function nextSeriesCode(communityId: string, name = '', discordId?: string) {
   const t = await getToolkit(communityId);
-  const s: any = (t.recruitment as any).codeSeries || {};
+  const { series: s, ruleId } = await pickSeries(t, communityId, discordId);
   if (!s.enabled) return null;
   const { codes } = await codeRepos();
   const existing = new Set((await codes.listForTenant(communityId)).map((c: any) => c.code));
   let n = Math.max(1, Number(s.next) || 1);
   while (existing.has(seriesCode(s, n, name))) n++;
-  await saveToolkit(communityId, { recruitment: { ...t.recruitment, codeSeries: { ...s, next: n + 1 } } as any });
+  const rec: any = t.recruitment;
+  if (ruleId) await saveToolkit(communityId, { recruitment: { ...rec, codeRules: (rec.codeRules || []).map((r: any) => (r.id === ruleId ? { ...r, series: { ...r.series, next: n + 1 } } : r)) } as any });
+  else await saveToolkit(communityId, { recruitment: { ...rec, codeSeries: { ...s, next: n + 1 } } as any });
   return seriesCode(s, n, name);
 }
 
@@ -539,7 +554,7 @@ export async function issueMemberCode(communityId: string, discordId: string, na
   const { codes } = await codeRepos();
   const mine = (await codes.listForTenant(communityId)).find((c: any) => (c.recruiterDiscordId || c.recruiterUserId) === discordId);
   if (mine) return mine.code;
-  let code = await nextSeriesCode(communityId, name);
+  let code = await nextSeriesCode(communityId, name, discordId);
   if (!code) code = seriesCode({ mode: 'FIRST', firstN: 4, padding: 3, prefix: '' }, Math.floor(100 + Math.random() * 900), name);
   const doc = await codes.create({
     communityId, code, recruiterUserId: discordId, recruiterDiscordId: discordId, recruiterName: String(name).slice(0, 64),
@@ -566,22 +581,36 @@ export async function listCodesHandler(req: Request, res: Response) {
     const { codes } = await codeRepos();
     const t = await getToolkit(communityId);
     const list = (await codes.listForTenant(communityId)).sort((a: any, b: any) => String(b.createdAt).localeCompare(String(a.createdAt)));
-    ok(res, { codes: list, series: (t.recruitment as any).codeSeries || { enabled: false, mode: 'FIXED', prefix: 'REC-', padding: 3, next: 1, suffix: '', separator: '-', firstN: 3, lastM: 2 }, dmOnCreate: !!(t.recruitment as any).codeDmOnCreate, codeForNewMembers: !!(t.recruitment as any).codeForNewMembers });
+    ok(res, { codes: list, rules: (t.recruitment as any).codeRules || [], series: (t.recruitment as any).codeSeries || { enabled: false, mode: 'FIXED', prefix: 'REC-', padding: 3, next: 1, suffix: '', separator: '-', firstN: 3, lastM: 2 }, dmOnCreate: !!(t.recruitment as any).codeDmOnCreate, codeForNewMembers: !!(t.recruitment as any).codeForNewMembers });
   } catch (err) { fail(res, err, 500); }
+}
+
+function cleanSeries(x: any) {
+  return {
+    mode: ['FIXED', 'INITIALS', 'FIRST', 'FIRST_LAST'].includes(x?.mode) ? x.mode : 'FIXED',
+    prefix: String(x?.prefix || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 16),
+    suffix: String(x?.suffix || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 8),
+    separator: ['-', '_', ''].includes(x?.separator) ? x.separator : '-',
+    firstN: Math.max(1, Math.min(8, Number(x?.firstN) || 3)), lastM: Math.max(1, Math.min(8, Number(x?.lastM) || 2)),
+    padding: Math.max(1, Math.min(8, Number(x?.padding) || 3)), next: Math.max(1, Number(x?.next) || 1),
+  };
 }
 
 export async function codeSettingsHandler(req: Request, res: Response) {
   try {
     const { communityId } = req.params;
     const b = req.body || {};
-    const prefix = String(b.series?.prefix || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 16);
-    const suffix = String(b.series?.suffix || '').toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 8);
-    const mode = ['FIXED', 'INITIALS', 'FIRST', 'FIRST_LAST'].includes(b.series?.mode) ? b.series.mode : 'FIXED';
-    const separator = ['-', '_', ''].includes(b.series?.separator) ? b.series.separator : '-';
-    const series = { enabled: !!b.series?.enabled, mode, prefix, suffix, separator, firstN: Math.max(1, Math.min(8, Number(b.series?.firstN) || 3)), lastM: Math.max(1, Math.min(8, Number(b.series?.lastM) || 2)), padding: Math.max(1, Math.min(8, Number(b.series?.padding) || 3)), next: Math.max(1, Number(b.series?.next) || 1) };
+    const series = { ...cleanSeries(b.series), enabled: !!b.series?.enabled };
+    const rules = (Array.isArray(b.rules) ? b.rules : []).slice(0, 20).map((r: any, i: number) => ({
+      id: String(r.id || `r${Date.now().toString(36)}${i}`).replace(/[^\w-]/g, '').slice(0, 32),
+      name: String(r.name || '').trim().slice(0, 60) || `Series ${i + 1}`,
+      enabled: r.enabled !== false,
+      roleIds: (Array.isArray(r.roleIds) ? r.roleIds : []).filter(isSnowflake).slice(0, 10),
+      series: cleanSeries(r.series),
+    }));
     const t = await getToolkit(communityId);
-    await saveToolkit(communityId, { recruitment: { ...t.recruitment, codeSeries: series, codeDmOnCreate: !!b.dmOnCreate, codeForNewMembers: !!b.codeForNewMembers } as any });
-    ok(res, { series, dmOnCreate: !!b.dmOnCreate, codeForNewMembers: !!b.codeForNewMembers, example: seriesCode(series, series.next, 'Kunal Pareek') });
+    await saveToolkit(communityId, { recruitment: { ...t.recruitment, codeSeries: series, codeRules: rules, codeDmOnCreate: !!b.dmOnCreate, codeForNewMembers: !!b.codeForNewMembers } as any });
+    ok(res, { series, rules, dmOnCreate: !!b.dmOnCreate, codeForNewMembers: !!b.codeForNewMembers, example: seriesCode(series, series.next, 'Kunal Pareek') });
   } catch (err) { fail(res, err); }
 }
 
@@ -593,7 +622,7 @@ export async function createCodeHandler(req: Request, res: Response) {
     const { codes } = await codeRepos();
     if (!isSnowflake(b.recruiterDiscordId)) throw new Error('Pick the recruiter (Discord member) who owns this code.');
     let code = String(b.code || '').trim().toUpperCase();
-    if (!code) code = (await nextSeriesCode(communityId, String(b.recruiterName || ''))) || '';
+    if (!code) code = (await nextSeriesCode(communityId, String(b.recruiterName || ''), b.recruiterDiscordId)) || '';
     if (!code) throw new Error('Type a code, or turn on a naming series to create codes automatically.');
     if (!CODE_RE.test(code)) throw new Error('Codes can use letters, numbers, - and _ (2–32 characters).');
     const all = await codes.listForTenant(communityId);
