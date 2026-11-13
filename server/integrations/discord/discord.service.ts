@@ -130,6 +130,15 @@ export class RealDiscordProvider implements DiscordProvider {
           partials: [Partials.Channel, Partials.Message, Partials.User, Partials.Reaction, Partials.GuildMember],
         });
 
+        // Hot standby: a waiting instance stays logged in to Discord but ignores events until it becomes
+        // the active bot, so a handoff takes about two seconds instead of a full login.
+        {
+          const pass = new Set(['ready', 'clientReady', 'error', 'warn', 'debug', 'invalidated', 'shardReady', 'shardResume', 'shardDisconnect', 'shardReconnecting', 'shardError']);
+          const c: any = this.client;
+          const orig = c.emit.bind(c);
+          c.emit = (event: string, ...args: any[]) => ((globalThis as any).__cmBotActive === false && !pass.has(event) ? false : orig(event, ...args));
+        }
+
         // Attach all real Gateway event listeners
         attachGatewayEventHandlers(this.client);
 

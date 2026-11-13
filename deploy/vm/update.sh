@@ -40,7 +40,7 @@ create_bot() { # name image-tag
   docker create --name "$1" --network "$NET" --network-alias "$1" \
     --env-file "$ENV_FILE" \
     -e NODE_ENV=production -e APP_RUNTIME_MODE=PRODUCTION -e BOT_INSTANCE_ROLE=vm \
-    -e BOT_LEADER_PRIORITY=100 -e BOT_ENABLED=true -e BOT_STANDBY_POLL_MS=2000 \
+    -e BOT_LEADER_PRIORITY=100 -e BOT_ENABLED=true -e BOT_HOT_STANDBY=true -e BOT_STANDBY_POLL_MS=2000 \
     -e DB_POOL_MAX=4 -e PORT=3000 -e GIT_SHA="$3" \
     --memory 450m --restart unless-stopped \
     --log-driver json-file --log-opt max-size=10m --log-opt max-file=5 \
@@ -105,6 +105,8 @@ if [ -n "$ACTIVE" ] && [ "$MEM_FREE" -ge 380 ]; then
   # Overlap: new one boots fully as a standby, then the old one hands over.
   docker start "$NEXT" >/dev/null
   wait_for "$NEXT" /health/live 120 || rollback "new version did not start"
+  # Hot standby: let the new one finish logging in to Discord first, so the switch takes ~2 s.
+  wait_for "$NEXT" /health/gateway 60 || log "new version not logged in to Discord yet; switching anyway"
   docker stop -t 25 "$ACTIVE" >/dev/null
   wait_for "$NEXT" /health/active 60 || rollback "new version did not take over"
 else
