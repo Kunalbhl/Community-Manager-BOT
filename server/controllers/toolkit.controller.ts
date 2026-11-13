@@ -369,6 +369,14 @@ export async function gateRepairHandler(req: Request, res: Response) {
     ok(res, r);
   } catch (err) { fail(res, err); }
 }
+export async function gateRolesHandler(req: Request, res: Response) {
+  try {
+    const b = req.body || {};
+    const { secureGate } = await import('../services/recruitment/secureGate.service.js');
+    const g: any = await secureGate.setRoles(req.params.communityId, { applicantRoleId: String(b.applicantRoleId || ''), memberRoleId: String(b.memberRoleId || ''), approvedExtraRoleIds: ids(b.approvedExtraRoleIds, 10) });
+    ok(res, { applicantRoleId: g.applicantRoleId, memberRoleId: g.memberRoleId, approvedExtraRoleIds: g.approvedExtraRoleIds || [] });
+  } catch (err) { fail(res, err); }
+}
 export async function gateUndoHandler(req: Request, res: Response) {
   try {
     const { secureGate } = await import('../services/recruitment/secureGate.service.js');

@@ -182,6 +182,32 @@ export const fmtDate = (s?: string) => (s ? new Date(s).toLocaleString(undefined
 /* ------------------------------------------------------------------ */
 /* Tickets                                                             */
 /* ------------------------------------------------------------------ */
+/** Which role newcomers get, and which roles approved members get (changeable any time, no re-lock). */
+function GateRoles({ api, res, g, onSaved }: any) {
+  const [a, setA] = useState(g.applicantRoleId || '');
+  const [m, setM] = useState(g.memberRoleId || '');
+  const [extra, setExtra] = useState<string[]>(g.approvedExtraRoleIds || []);
+  const [err, setErr] = useState('');
+  const sel = 'mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm';
+  const opts = (exclude: string[]) => res.roles.filter((r: any) => !exclude.includes(r.id)).map((r: any) => <option key={r.id} value={r.id}>@{r.name}</option>);
+  return (
+    <div className="mt-5 rounded-xl border border-indigo-200 bg-white p-4">
+      <div className="text-sm font-bold text-slate-900">Roles on join and on approval</div>
+      <p className="mt-0.5 text-xs text-slate-500">Set per server. Change them any time; it doesn’t re-lock anything.</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <label className="text-sm font-medium text-slate-700">When someone joins, give<select className={sel} value={a} onChange={(e) => setA(e.target.value)}><option value="">Choose a role</option>{opts([])}</select><span className="text-xs text-slate-500">They see only public channels and the private apply channel.</span></label>
+        <label className="text-sm font-medium text-slate-700">When approved, replace it with<select className={sel} value={m} onChange={(e) => setM(e.target.value)}><option value="">Choose a role</option>{opts([a])}</select><span className="text-xs text-slate-500">The newcomer role is removed at the same time.</span></label>
+        <div className="text-sm font-medium text-slate-700">Also give on approval <span className="font-normal text-slate-500">(optional)</span>
+          <div className="mt-1 flex flex-wrap gap-1.5">{extra.map((id) => <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">@{res.roles.find((r: any) => r.id === id)?.name || 'role'}<button type="button" onClick={() => setExtra(extra.filter((x) => x !== id))}>×</button></span>)}</div>
+          <select className={sel} value="" onChange={(e) => e.target.value && setExtra([...extra, e.target.value])}><option value="">Add a role</option>{opts([a, m, ...extra])}</select>
+        </div>
+      </div>
+      {err && <p className="mt-2 text-sm font-semibold text-rose-700">{err}</p>}
+      <button className="mt-3 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700" onClick={async () => { setErr(''); try { await api('/gate/roles', 'PUT', { applicantRoleId: a, memberRoleId: m, approvedExtraRoleIds: extra }); onSaved('Roles saved.'); } catch (e: any) { setErr(e.message); } }}>Save roles</button>
+    </div>
+  );
+}
+
 function TicketsTab({ communityId, api, cfg, res, onSave }: { communityId: string; api: any; cfg: any; res: Resources; onSave: (v: any) => Promise<void> }) {
   const [c, setC] = useState(cfg);
   const [openType, setOpenType] = useState<number | null>(null);
@@ -880,6 +906,8 @@ function SecureSetupCard({ api, res }: { api: any; res: Resources }) {
       </div>
 
       {!!s.problems?.length && <div className="mt-4"><Banner tone="error">{s.problems.map((p: string) => <div key={p}>{p.replace(/\*\*/g, '')}</div>)}</Banner></div>}
+
+      {verified && <GateRoles api={api} res={res} g={g} onSaved={(t: string) => { setMsg(t); load(); }} />}
 
       <div className="mt-5 grid gap-4 xl:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-4">

@@ -184,7 +184,7 @@ export const webApply = {
       if (guild && !already) {
         const { getGate } = await import('./secureGate.service.js');
         const gate: any = await getGate(communityId).catch(() => ({}));
-        const roles = [gate.memberRoleId].filter(Boolean);
+        const roles = [gate.memberRoleId, ...(gate.approvedExtraRoleIds || [])].filter(Boolean);
         for (const s of logins) {
           const at = await this.freshToken(s).catch(() => null);
           if (!at) continue;

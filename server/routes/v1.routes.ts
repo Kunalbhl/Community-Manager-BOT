@@ -443,6 +443,7 @@ router.post(`${tk}/workspace`, requireTenantAccess(), requirePermission('setting
 router.get(`${tk}/gate`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateStatusHandler);
 router.get(`${tk}/gate/diagnose`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateDiagnoseHandler);
 router.post(`${tk}/gate/repair`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateRepairHandler);
+router.put(`${tk}/gate/roles`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateRolesHandler);
 router.post(`${tk}/gate/lock`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateLockHandler);
 router.post(`${tk}/gate/undo`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateUndoHandler);
 router.post(`${tk}/gate/confirm`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.gateConfirmHandler);

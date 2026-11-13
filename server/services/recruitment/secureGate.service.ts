@@ -23,6 +23,8 @@ export interface GateDoc {
   nativeApplyOffConfirmed: boolean;
   memberRoleId?: string;
   applicantRoleId?: string;
+  /** More roles given on approval, besides the Member role (e.g. a starter role). */
+  approvedExtraRoleIds?: string[];
   publicChannelIds: string[];
   snapshot?: { channelId: string; overwrites: { id: string; type: number; allow: string; deny: string }[] }[];
   snapshotAt?: string;
@@ -265,6 +267,34 @@ export const secureGate = {
     return report;
   },
 
+  /** Change the newcomer / approved roles without re-locking. */
+  async setRoles(communityId: string, p: { applicantRoleId: string; memberRoleId: string; approvedExtraRoleIds: string[] }) {
+    const guild: any = await guildFor(communityId);
+    if (!guild) throw new Error('The bot is not connected to this server right now.');
+    const top = guild.members.me.roles.highest.position;
+    const check = (id: string, what: string) => {
+      const r = guild.roles.cache.get(id);
+      if (!r || r.managed || r.id === guild.id) throw new Error(`Choose a valid ${what}.`);
+      if (r.position >= top) throw new Error(`Move the bot’s role above @${r.name} first (Server Settings → Roles).`);
+      return r;
+    };
+    check(p.applicantRoleId, 'newcomer role'); check(p.memberRoleId, 'approved role');
+    if (p.applicantRoleId === p.memberRoleId) throw new Error('The newcomer role and the approved role must be different.');
+    const extras = p.approvedExtraRoleIds.filter((id) => id !== p.memberRoleId && id !== p.applicantRoleId);
+    extras.forEach((id) => check(id, 'extra role'));
+    const cur = await getGate(communityId);
+    // Newcomer role changed: move the private apply channel's access to it.
+    if (cur.applicantRoleId && cur.applicantRoleId !== p.applicantRoleId && (cur as any).applyChannelId) {
+      const ch: any = guild.channels.cache.get((cur as any).applyChannelId);
+      if (ch) {
+        await ch.permissionOverwrites.edit(p.applicantRoleId, { ViewChannel: true, ReadMessageHistory: true, SendMessages: false }).catch(() => undefined);
+        await ch.permissionOverwrites.delete(cur.applicantRoleId).catch(() => undefined);
+      }
+    }
+    await saveGate(communityId, { applicantRoleId: p.applicantRoleId, memberRoleId: p.memberRoleId, approvedExtraRoleIds: extras });
+    return getGate(communityId);
+  },
+
   /** Restore every channel's permissions from the snapshot. */
   async undo(communityId: string) {
     const guild = await guildFor(communityId);
@@ -310,6 +340,7 @@ export const secureGate = {
     const m = await guild?.members.fetch(discordUserId).catch(() => null);
     if (!m) return;
     await m.roles.add(g.memberRoleId, 'Application approved').catch(() => undefined);
+    for (const id of g.approvedExtraRoleIds || []) await m.roles.add(id, 'Application approved').catch(() => undefined);
     if (g.applicantRoleId) await m.roles.remove(g.applicantRoleId, 'Application approved').catch(() => undefined);
   },
 
