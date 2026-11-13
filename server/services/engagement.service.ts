@@ -144,7 +144,7 @@ export class EngagementDeliveryService {
       targetUserId,
       content,
       featureKey,
-      allowMassMentions = false,
+      allowMassMentions = true, // only staff with Manage permission can create engagement posts
       idempotencyKey,
       correlationId = `del_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       metadata = {},
