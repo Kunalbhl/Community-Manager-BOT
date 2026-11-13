@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Download, Upload, Search, Pencil, Trash2, History, Send, X, CheckCircle2, AlertTriangle, Hash } from 'lucide-react';
-import { MemberSelect, MemberName } from '../../common/DiscordPickers.js';
+import { MemberSelect, MemberName, RoleSelect, useDiscordResources } from '../../common/DiscordPickers.js';
 import { Card, useApi } from './ServerToolsView.js';
 import { buildCode, nameWords } from '../../../../shared/utils/nameWords.js';
 
@@ -56,7 +56,7 @@ export function RecruiterCodesManager({ communityId }: { communityId: string }) 
     <div className="space-y-6">
       {toast && <p role="status" className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${toast.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{toast.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}{toast.text}</p>}
 
-      {data && <SeriesCard api={api} series={data.series} dmOnCreate={data.dmOnCreate} codeForNewMembers={(data as any).codeForNewMembers} onSaved={(t) => { flash(true, t); load(); }} onError={(t) => flash(false, t)} />}
+      {data && <SeriesCard communityId={communityId} api={api} rules={(data as any).rules || []} series={data.series} dmOnCreate={data.dmOnCreate} codeForNewMembers={(data as any).codeForNewMembers} onSaved={(t) => { flash(true, t); load(); }} onError={(t) => flash(false, t)} />}
 
       <ImportCard api={api} onDone={(t) => { flash(true, t); load(); }} onTemplate={() => exportFile(true)} />
 
@@ -149,20 +149,62 @@ const MODES = [
   { v: 'FIRST_LAST', l: 'First + last letters', d: 'Some letters from the start and some from the end.' },
 ];
 
-function SeriesCard({ api, series, dmOnCreate, codeForNewMembers, onSaved, onError }: { api: any; series: any; dmOnCreate: boolean; codeForNewMembers: boolean; onSaved: (t: string) => void; onError: (t: string) => void }) {
+function SeriesCard({ communityId, api, rules: rules0, series, dmOnCreate, codeForNewMembers, onSaved, onError }: { communityId: string; api: any; rules: any[]; series: any; dmOnCreate: boolean; codeForNewMembers: boolean; onSaved: (t: string) => void; onError: (t: string) => void }) {
   const [s, setS] = useState({ mode: 'FIXED', separator: '-', firstN: 3, lastM: 2, ...series });
   const [dm, setDm] = useState(dmOnCreate);
   const [auto, setAuto] = useState(codeForNewMembers);
-  const [sample, setSample] = useState('Kunal Pareek');
-  const field = 'w-24 text-xs font-semibold text-slate-600';
+  const [rules, setRules] = useState<any[]>(rules0);
+  const res: any = useDiscordResources(communityId);
   return (
     <Card title="Code naming and delivery" desc="How codes are named, and whether every approved member automatically gets their own code."
-      right={<button className={primary} onClick={() => api('/codes/settings', 'PUT', { series: s, dmOnCreate: dm, codeForNewMembers: auto }).then(() => onSaved('Code settings saved.')).catch((e: any) => onError(e.message))}>Save</button>}>
+      right={<button className={primary} onClick={() => api('/codes/settings', 'PUT', { series: s, rules, dmOnCreate: dm, codeForNewMembers: auto }).then(() => onSaved('Code settings saved.')).catch((e: any) => onError(e.message))}>Save</button>}>
       <label className="flex items-start gap-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-slate-800"><input type="checkbox" className="mt-0.5" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
         <span><b>Give every approved member their own recruiter code</b><br /><span className="text-xs text-slate-600">When an application is approved and the member is in the server, the bot creates their code with the pattern below and sends it to them by DM. Members can see their own code any time with <code>/mycode</code> (only they see the reply).</span></span>
       </label>
       <label className="mt-4 flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={!!s.enabled} onChange={(e) => setS({ ...s, enabled: e.target.checked })} />Use a naming pattern for new codes</label>
-      <div className={`mt-3 space-y-3 ${s.enabled ? '' : 'pointer-events-none opacity-50'}`}>
+      <div className={`mt-3 ${s.enabled ? '' : 'pointer-events-none opacity-50'}`}><SeriesEditor s={s} setS={setS} /></div>
+
+      <div className="mt-6 border-t border-slate-100 pt-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><div className="text-sm font-black text-slate-900">Different series by role</div><p className="text-xs text-slate-500">e.g. members with @Crew Leader get <b>CL-001</b>, members with @VIP get <b>VIP-001</b>. The bot checks these from top to bottom and uses the first one whose role the member has; everyone else gets the pattern above. Each series counts its own numbers.</p></div>
+          <button type="button" className={`${primary} shrink-0`} onClick={() => setRules([...rules, { id: `r${Date.now().toString(36)}`, name: '', enabled: true, roleIds: [], series: { mode: 'FIXED', prefix: '', separator: '-', firstN: 3, lastM: 2, padding: 3, next: 1, suffix: '' } }])}><Plus className="h-4 w-4" />Add role series</button>
+        </div>
+        <div className="mt-3 space-y-3">
+          {rules.map((r, i) => {
+            const up = (patch: any) => setRules(rules.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+            const move = (d: number) => { const n = [...rules]; const [x] = n.splice(i, 1); n.splice(i + d, 0, x); setRules(n); };
+            return (
+              <div key={r.id} className={`rounded-xl border p-4 ${r.enabled ? 'border-slate-200' : 'border-slate-200 opacity-60'}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">{i + 1}</span>
+                  <input className={`${input} max-w-xs`} value={r.name} onChange={(e) => up({ name: e.target.value })} placeholder="Name, e.g. Crew leaders" />
+                  <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={r.enabled} onChange={(e) => up({ enabled: e.target.checked })} />On</label>
+                  <div className="ml-auto flex gap-1">
+                    <button type="button" className="rounded-lg px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-30" disabled={i === 0} onClick={() => move(-1)} aria-label="Move up">↑</button>
+                    <button type="button" className="rounded-lg px-2 py-1 text-sm hover:bg-slate-100 disabled:opacity-30" disabled={i === rules.length - 1} onClick={() => move(1)} aria-label="Move down">↓</button>
+                    <button type="button" className="rounded-lg px-2 py-1 text-rose-600 hover:bg-rose-50" onClick={() => setRules(rules.filter((_, j) => j !== i))} aria-label="Delete"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                </div>
+                <div className="mt-3 text-xs font-semibold text-slate-600">Members with any of these roles</div>
+                <div className="mt-1 flex flex-wrap gap-1.5">{r.roleIds.map((id: string) => <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">@{res?.roles?.find((x: any) => x.id === id)?.name || 'role'}<button type="button" onClick={() => up({ roleIds: r.roleIds.filter((x: string) => x !== id) })}>×</button></span>)}</div>
+                <div className="mt-1 max-w-sm"><RoleSelect communityId={communityId} value="" exclude={r.roleIds} onChange={(id) => id && up({ roleIds: [...r.roleIds, id] })} placeholder="Add a role" /></div>
+                {!r.roleIds.length && <p className="mt-1 text-xs text-amber-700">Add at least one role, or this series is never used.</p>}
+                <div className="mt-3"><SeriesEditor s={r.series} setS={(v: any) => up({ series: v })} /></div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <label className="mt-4 flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={dm} onChange={(e) => setDm(e.target.checked)} />When staff create a code here, also send it to its owner by DM</label>
+    </Card>
+  );
+}
+
+function SeriesEditor({ s, setS }: { s: any; setS: (v: any) => void }) {
+  const [sample, setSample] = useState('Kunal Pareek');
+  const field = 'w-24 text-xs font-semibold text-slate-600';
+  return (
+      <div className="space-y-3">
         <div className="grid gap-2 sm:grid-cols-4">
           {MODES.map((m) => (
             <button key={m.v} type="button" onClick={() => setS({ ...s, mode: m.v })} className={`rounded-xl border p-3 text-left transition ${s.mode === m.v ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-indigo-300'}`}>
@@ -185,8 +227,6 @@ function SeriesCard({ api, series, dmOnCreate, codeForNewMembers, onSaved, onErr
           <span className="text-slate-500">Next code:</span><b className="font-mono text-lg text-indigo-700">{previewSeries(s, sample)}</b>
         </div>
       </div>
-      <label className="mt-4 flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={dm} onChange={(e) => setDm(e.target.checked)} />When staff create a code here, also send it to its owner by DM</label>
-    </Card>
   );
 }
 

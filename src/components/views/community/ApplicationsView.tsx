@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MemberSelect } from '../../common/DiscordPickers.js';
+import { MemberSelect, MemberName } from '../../common/DiscordPickers.js';
 import { RoleSelect } from '../../common/DiscordPickers.js';
 import {
   FileText,
@@ -465,7 +465,7 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
   // Interview state controller
   const handleUpdateInterviewStatus = async (interviewId: string, status: 'started' | 'complete' | 'cancel') => {
     try {
-      const res = await fetch(`/api/v1/interviews/${interviewId}/${status}`, {
+      const res = await fetch(`/api/v1/interviews/${interviewId}/${status === 'started' ? 'start' : status}`, {
         method: 'PATCH',
         headers: {
           'x-role': currentRole,
@@ -2014,9 +2014,9 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                         <table className="w-full text-left text-sm text-xs">
                           <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
                             <tr>
-                              <th className="px-6 py-3.5">Candidate Docket</th>
+                              <th className="px-6 py-3.5">Candidate</th>
                               <th className="px-6 py-3.5">Scheduled Time</th>
-                              <th className="px-6 py-3.5">Assigned Recruiter</th>
+                              <th className="px-6 py-3.5">Interviewer</th>
                               <th className="px-6 py-3.5">Agenda Notes</th>
                               <th className="px-6 py-3.5">Status</th>
                               <th className="px-6 py-3.5 text-right">Actions</th>
@@ -2025,14 +2025,14 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                           <tbody className="divide-y divide-slate-100 font-medium">
                             {interviews.map((intObj) => (
                               <tr key={intObj.id} className="hover:bg-slate-50/80 transition">
-                                <td className="px-6 py-4 font-mono font-bold text-indigo-700">
-                                  {intObj.applicationId?.slice(-8)}
+                                <td className="px-6 py-4 font-bold text-indigo-700">
+                                  {(() => { const a: any = applications.find((x) => x.id === intObj.applicationId); return a ? <MemberName id={a.applicantDiscordUserId} communityId={communityId} fallback={a.applicantDisplayNameSnapshot || a.applicantUsernameSnapshot || a.applicantUsername} /> : <span className="font-mono">{intObj.applicationId?.slice(-8)}</span>; })()}
                                 </td>
                                 <td className="px-6 py-4 font-mono text-xs text-slate-900">
                                   {new Date(intObj.scheduledTime).toLocaleString()}
                                 </td>
-                                <td className="px-6 py-4 font-mono text-xs text-slate-600">
-                                  {intObj.interviewerUserId || 'Assigned Staff'}
+                                <td className="px-6 py-4 text-sm font-semibold text-slate-700">
+                                  {intObj.interviewerUserId && /^\d{15,22}$/.test(intObj.interviewerUserId) ? <MemberName id={intObj.interviewerUserId} communityId={communityId} /> : (intObj.interviewerUserId || 'Any staff')}
                                 </td>
                                 <td className="px-6 py-4 text-xs text-slate-600 max-w-xs truncate">
                                   {intObj.notes || 'General Evaluation'}
