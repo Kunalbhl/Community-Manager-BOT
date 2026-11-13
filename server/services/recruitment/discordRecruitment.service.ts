@@ -25,6 +25,10 @@ export const fillMsg = (t: string, v: Record<string, string>) => t.replace(/\{(\
 
 interface Session { communityId: string; page: number; answers: Record<string, string>; code?: string; at: number }
 const sessions = new Map<string, Session>(); // key: guildId_userId
+/** The server an interaction is for: its own guild, or (in a DM) the server named in the button. */
+const gidOf = (i: any): string => i.guildId || i.__gid || '';
+/** Suffix that carries the server id on DM buttons and forms. */
+const dmTag = (i: any) => (i.guildId ? '' : `:${gidOf(i)}`);
 
 const qCache = new Map<string, { at: number; qs: any[] }>();
 async function questionsFor(communityId: string) {
@@ -45,8 +49,8 @@ function pagesFor(questions: any[], askCode: boolean) {
   return { pages, codePage: askCode ? pages.length - 1 : -1 };
 }
 
-function modalFor(page: number, total: number, qs: any[], withCode: boolean, prev: Session | undefined, codeRequired = false) {
-  const modal = new ModalBuilder().setCustomId(`cm:apply:page:${page}`).setTitle(clip(total > 1 ? `Application (${page + 1}/${total})` : 'Application', 45));
+function modalFor(page: number, total: number, qs: any[], withCode: boolean, prev: Session | undefined, codeRequired = false, tag = '') {
+  const modal = new ModalBuilder().setCustomId(`cm:apply:page:${page}${tag}`).setTitle(clip(total > 1 ? `Application (${page + 1}/${total})` : 'Application', 45));
   for (const q of qs) {
     const options = Array.isArray(q.options) && q.options.length ? ` Options: ${q.options.join(', ')}` : '';
     const long = q.type === 'LONG_TEXT' || q.type === 'PARAGRAPH' || String(q.questionText).length > 45;
@@ -91,7 +95,7 @@ export const discordRecruitment = {
 
   /** Button "Apply" or /apply. Shows the first page, or an explanation. */
   async start(interaction: any) {
-    const communityId = await communityForGuild(interaction.guildId);
+    const communityId = await communityForGuild(gidOf(interaction));
     const cfg = (await getToolkit(communityId)).recruitment;
     if (!cfg.applyEnabled) return interaction.reply({ content: 'Applications are closed in this server right now.', ephemeral: true });
     const { gateRepository } = await import('./secureGate.service.js');
@@ -112,31 +116,37 @@ export const discordRecruitment = {
         await guardApplicant(communityId, { id: interaction.user.id, username: interaction.user.username, globalName: interaction.user.globalName, displayName: interaction.member?.displayName, avatar: interaction.user.displayAvatarURL?.() });
       } catch (e: any) { if (e?.blacklisted) return interaction.reply({ content: `🚫 ${e.message}`, ephemeral: true }); }
     }
+    {
+      const g: any = await guildFor(communityId);
+      const m: any = g ? await g.members.fetch(interaction.user.id).catch(() => null) : null;
+      if (!m) return interaction.reply({ content: 'Join the server first, then press Apply again.', ephemeral: true });
+      if ((gate as any)?.memberRoleId && m.roles.cache.has((gate as any).memberRoleId)) return interaction.reply({ content: '✅ You are already a member of this server, so there is nothing to apply for.', ephemeral: true });
+    }
     const open = (active as any[]).find((a) => ['SUBMITTED', 'UNDER_REVIEW', 'ESCALATED', 'INTERVIEW_SCHEDULED', 'INTERVIEW_PENDING'].includes(a.status));
     if (open) return interaction.reply({ content: `⏳ You already have an application in review (submitted <t:${Math.floor(Date.parse(open.submittedAt || open.createdAt) / 1000)}:R>). You will get a DM when it is decided.`, ephemeral: true });
 
-    const key = `${interaction.guildId}_${interaction.user.id}`;
+    const key = `${gidOf(interaction)}_${interaction.user.id}`;
     const prev = sessions.get(key);
     const session: Session = prev && Date.now() - prev.at < 30 * 60_000 ? { ...prev, page: 0 } : { communityId, page: 0, answers: {}, at: Date.now() };
     sessions.set(key, session);
     const { pages, codePage } = pagesFor(qs, cfg.askRecruiterCode);
-    return interaction.showModal(modalFor(0, pages.length, pages[0], codePage === 0, session, !!cfg.codeRequired));
+    return interaction.showModal(modalFor(0, pages.length, pages[0], codePage === 0, session, !!cfg.codeRequired, dmTag(interaction)));
   },
 
   /** "Continue" button between pages. */
   async next(interaction: any, page: number) {
-    const key = `${interaction.guildId}_${interaction.user.id}`;
+    const key = `${gidOf(interaction)}_${interaction.user.id}`;
     const session = sessions.get(key);
     if (!session) return interaction.reply({ content: '⌛ Your application timed out. Press **Apply** to start again.', ephemeral: true });
     const cfg = (await getToolkit(session.communityId)).recruitment;
     const { pages, codePage } = pagesFor(await questionsFor(session.communityId), cfg.askRecruiterCode);
     if (page >= pages.length) return interaction.reply({ content: 'Something went wrong. Press **Apply** to start again.', ephemeral: true });
-    return interaction.showModal(modalFor(page, pages.length, pages[page], codePage === page, session, !!cfg.codeRequired));
+    return interaction.showModal(modalFor(page, pages.length, pages[page], codePage === page, session, !!cfg.codeRequired, dmTag(interaction)));
   },
 
   /** A page was submitted: save answers, then show "Continue" or submit. */
   async pageSubmitted(interaction: any, page: number) {
-    const key = `${interaction.guildId}_${interaction.user.id}`;
+    const key = `${gidOf(interaction)}_${interaction.user.id}`;
     const session = sessions.get(key);
     if (!session) return interaction.reply({ content: '⌛ Your application timed out. Press **Apply** to start again.', ephemeral: true });
     for (const row of interaction.fields.fields.values()) {
@@ -153,7 +163,7 @@ export const discordRecruitment = {
       return interaction.reply({
         content: `✅ Page ${page + 1} of ${pages.length} saved.`,
         ephemeral: true,
-        components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`cm:apply:next:${page + 1}`).setLabel(`Continue (${page + 2}/${pages.length})`).setStyle(ButtonStyle.Primary))],
+        components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`cm:apply:next:${page + 1}${dmTag(interaction)}`).setLabel(`Continue (${page + 2}/${pages.length})`).setStyle(ButtonStyle.Primary))],
       });
     }
 
@@ -214,6 +224,31 @@ export const discordRecruitment = {
       fields: answers,
       footer: { text: `Application ${app.id}` },
     };
+  },
+
+  /**
+   * Someone joined: send them the Apply button by DM, so they don't have to find the right channel.
+   * Only while recruitment is set up (Secure Setup done, applications open, questions added).
+   */
+  async welcomeDm(communityId: string, member: any) {
+    if (member.user?.bot) return;
+    const cfg = (await getToolkit(communityId)).recruitment as any;
+    if (!cfg.applyEnabled || cfg.dmApplyOnJoin === false) return;
+    const { gateRepository } = await import('./secureGate.service.js');
+    const gate: any = await gateRepository.getById(communityId).catch(() => null);
+    if (!gate?.verified) return;
+    if (gate.memberRoleId && member.roles?.cache?.has(gate.memberRoleId)) return;
+    if (!(await questionsFor(communityId)).length) return;
+    const guild = member.guild;
+    await member.send({
+      embeds: [{
+        title: `👋 Welcome to ${guild.name}!`,
+        description: `To get access to the server, send a short application. It takes about two minutes:\n\n1. Press **Apply** below\n2. Answer a few questions${cfg.askRecruiterCode ? ' and enter the code of the person who invited you' : ''}\n3. Staff review it and you get a message here with the result\n\nYou can also press **Apply** in the server.`,
+        color: 0x7c8cff,
+        thumbnail: guild.iconURL?.() ? { url: guild.iconURL({ size: 128 }) } : undefined,
+      }],
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`cm:apply:start:${guild.id}`).setLabel('Apply').setEmoji('📋').setStyle(ButtonStyle.Success))],
+    }).catch(() => undefined);
   },
 
   /** Called after a new application is created. */
@@ -332,7 +367,7 @@ export const discordRecruitment = {
   },
 
   async decide(interaction: any, appId: string, approve: boolean, reason?: string) {
-    const communityId = await communityForGuild(interaction.guildId);
+    const communityId = await communityForGuild(gidOf(interaction));
     const app: any = await applicationsRepository.getById(appId).catch(() => null);
     if (!app || app.communityId !== communityId) return interaction.reply({ content: '⚠️ Application not found.', ephemeral: true });
     if (!(await this.canReview(communityId, interaction.member))) return interaction.reply({ content: '⛔ Only reviewers can decide applications.', ephemeral: true });
