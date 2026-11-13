@@ -349,6 +349,9 @@ export async function gateLockHandler(req: Request, res: Response) {
     ok(res, { started: true });
   } catch (err) { fail(res, err); }
 }
+export async function gateDiagnoseHandler(req: Request, res: Response) {
+  try { const { secureGate } = await import('../services/recruitment/secureGate.service.js'); ok(res, await secureGate.diagnose(req.params.communityId)); } catch (err) { fail(res, err); }
+}
 export async function gateUndoHandler(req: Request, res: Response) {
   try {
     const { secureGate } = await import('../services/recruitment/secureGate.service.js');

@@ -165,6 +165,29 @@ export const secureGate = {
     return getGate(communityId);
   },
 
+  /** Read-only check of how the Applicant / Member roles are set up (nothing is changed). */
+  async diagnose(communityId: string) {
+    const guild: any = await guildFor(communityId);
+    if (!guild) throw new Error('The bot is not connected to this server right now.');
+    const g = await getGate(communityId);
+    const members = await guild.members.fetch();
+    const humans = Array.from(members.values()).filter((m: any) => !m.user.bot) as any[];
+    const roleInfo = (id?: string) => {
+      const r = id ? guild.roles.cache.get(id) : null;
+      if (!r) return null;
+      const chans = Array.from(guild.channels.cache.values()).filter((c: any) => c.permissionOverwrites?.cache?.get(r.id)?.allow?.has?.(PermissionFlagsBits.ViewChannel)) as any[];
+      return { id: r.id, name: r.name, holders: humans.filter((m) => m.roles.cache.has(r.id)).length, channelsItOpens: chans.length, sampleChannels: chans.slice(0, 15).map((c) => c.name) };
+    };
+    return {
+      humans: humans.length,
+      sameRole: !!g.memberRoleId && g.memberRoleId === g.applicantRoleId,
+      memberRole: roleInfo(g.memberRoleId),
+      applicantRole: roleInfo(g.applicantRoleId),
+      newcomerVisible: newcomerVisible(guild).map((c: any) => c.name),
+      publicChannels: (g.publicChannelIds || []).map((id: string) => guild.channels.cache.get(id)?.name || id),
+    };
+  },
+
   /** Restore every channel's permissions from the snapshot. */
   async undo(communityId: string) {
     const guild = await guildFor(communityId);
