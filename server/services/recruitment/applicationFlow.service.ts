@@ -130,16 +130,39 @@ export const applicationFlow = {
     if (!r) return;
     const t = await getToolkit(r.communityId);
     const { chat, guild } = await channels(r);
-    const rules = (await communityQuestionsService.listGuidelines(r.communityId).catch(() => [])).filter((g: any) => g.enabled !== false);
+    // Rules come straight from the server's own rules channels (Members & onboarding → Welcome & rules),
+    // copied with their formatting so the applicant reads exactly what members read.
+    const ruleEmbeds: any[] = [];
+    try {
+      const { welcomeOnboardingService } = await import('../welcomeOnboarding.service.js');
+      const w: any = await welcomeOnboardingService.getWelcomeConfig(r.communityId);
+      const ids: string[] = (w?.rulesChannelIds?.length ? w.rulesChannelIds : w?.rulesChannelId ? [w.rulesChannelId] : []).filter(Boolean);
+      for (const id of ids.slice(0, 5)) {
+        const src: any = guild?.channels.cache.get(id) || (await guild?.channels.fetch(id).catch(() => null));
+        const msgs: any = await src?.messages?.fetch({ limit: 50 }).catch(() => null);
+        if (!msgs?.size) continue;
+        for (const m of Array.from(msgs.values()).reverse() as any[]) {
+          const parts = [m.content, ...m.embeds.map((e: any) => [e.title ? `**${e.title}**` : '', e.description, ...(e.fields || []).map((f: any) => `**${f.name}**\n${f.value}`)].filter(Boolean).join('\n'))].filter((x: string) => x && x.trim());
+          const text = parts.join('\n\n');
+          const image = m.attachments?.find?.((a: any) => /^image\//.test(a.contentType || ''))?.url || m.embeds.find((e: any) => e.image?.url)?.image?.url;
+          if (!text && !image) continue;
+          for (let i = 0; i < Math.max(1, text.length); i += 4000) ruleEmbeds.push({ color: 0xffc46b, description: text.slice(i, i + 4000) || undefined, ...(i === 0 && image ? { image: { url: image } } : {}), ...(ruleEmbeds.length === 0 ? { title: '📜 Rules and guide', } : {}), footer: i === 0 ? { text: `From #${src.name}` } : undefined });
+        }
+      }
+    } catch { /* fall back to the rules list */ }
+    if (ruleEmbeds.length) {
+      for (let i = 0; i < ruleEmbeds.length; i += 10) await chat?.send({ embeds: ruleEmbeds.slice(i, i + 10), allowedMentions: { parse: [] } }).catch(() => undefined);
+    }
+    const rules = ruleEmbeds.length ? [] : (await communityQuestionsService.listGuidelines(r.communityId).catch(() => [])).filter((g: any) => g.enabled !== false);
     const fields = rules.slice(0, 20).map((g: any) => ({ name: clip(`${g.category === 'RULE' ? '📜' : g.category === 'DISCIPLINARY' || g.category === 'DISQUALIFYING' ? '⛔' : '📘'} ${g.title}`, 256), value: clip(g.description || '—', 1024) }));
     await chat?.send({
       content: `👋 Welcome <@${r.applicantId}>! I'm **Community Manager**, and I'll guide you through your application to [**${guild?.name || 'the server'}**](https://discord.com/channels/${guild?.id || ''}) until the team takes over.`,
       allowedMentions: { users: [r.applicantId] },
       embeds: [{
-        title: '📜 Rules and guide',
+        title: ruleEmbeds.length ? '✅ Before you continue' : '📜 Rules and guide',
         color: 0xffc46b,
-        description: t.recruitment.screening.consentText.replace(/\\n/g, '\n'),
-        fields: fields.length ? fields : [{ name: 'Rules', value: 'Please read the rules channel of this server.' }],
+        description: t.recruitment.screening.consentText.replace(/\\n/g, '\n') + (ruleEmbeds.length ? '\n\nThe rules are posted above. Read them all, then press the button.' : ''),
+        fields: ruleEmbeds.length ? [] : fields.length ? fields : [{ name: 'Rules', value: 'The staff haven’t added rules yet.' }],
       }],
       components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`cm:flow:consent:${roomId}`).setLabel('I have read and agree').setEmoji('✅').setStyle(ButtonStyle.Success))],
     });
@@ -299,11 +322,15 @@ export const applicationFlow = {
 
   async startInterview(roomId: string, interviewer: any | null) {
     const r = await room(roomId);
-    if (!r || r.status !== 'OPEN') throw new Error('This application is closed.');
+    if (!r || r.status !== 'OPEN') throw new Error('This application is already closed.');
+    const t = await getToolkit(r.communityId);
+    if (!r.flow?.consentAt) throw new Error('The applicant hasn’t agreed to the rules yet. The interview can start once they press **I have read and agree** in their chat.');
+    if (t.recruitment.screening.questions.length && (r.flow?.quiz?.score === undefined || r.flow?.quiz?.score === null)) {
+      throw new Error(r.flow?.quiz ? 'The applicant is still answering the rules quiz. The interview can start once they finish it.' : 'The applicant hasn’t taken the rules quiz yet. Press **Send rules quiz** first; the interview can start once they finish it.');
+    }
     if (interviewer && (r.flow?.stage === 'INTERVIEW_MANUAL' || r.flow?.stage === 'INTERVIEW_AUTO')) {
       throw new Error(`An interview is already running${r.flow?.interview?.interviewerId ? ` (started by <@${r.flow.interview.interviewerId}>)` : ''}. Press **End interview** when it is finished.`);
     }
-    const t = await getToolkit(r.communityId);
     const { chat, staff } = await channels(r);
     if (!interviewer) {
       const qs = (await communityQuestionsService.listInterviewQuestions(r.communityId).catch(() => [])).filter((q: any) => q.enabled !== false).map((q: any) => q.questionText);
