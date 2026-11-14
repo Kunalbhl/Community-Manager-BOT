@@ -234,10 +234,11 @@ export const serverStats = {
       await statCountersRepository.update(c.id, { lastValue: value, lastName: name, lastUpdatedAt: new Date().toISOString(), lastError: '' } as any);
     } catch (e: any) {
       const raw = String(e?.message || e);
-      const msg = /Missing Access|50001/.test(raw)
-        ? `The bot can’t see this channel, so it can’t rename it. In Discord: Edit Channel → Permissions → add the bot’s role (Community Manager) → allow View Channel and Manage Channels. ${accessNote || ''}`.trim()
-        : /Missing Permissions|50013/.test(raw) ? `The bot needs Manage Channels on this channel. ${accessNote || ''}`.trim() : raw.slice(0, 200);
-      await statCountersRepository.update(c.id, { lastError: msg, lastUpdatedAt: new Date().toISOString() } as any).catch(() => undefined);
+      const { explainAccess } = await import('../../integrations/discord/selfAccess.js');
+      const msg = /Missing Access|50001|Missing Permissions|50013/.test(raw)
+        ? (explainAccess(ch, [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels]) || accessNote || 'The bot needs View Channel and Manage Channels on this channel.')
+        : raw.slice(0, 200);
+      await statCountersRepository.update(c.id, { lastError: msg.slice(0, 900), lastUpdatedAt: new Date().toISOString() } as any).catch(() => undefined);
     }
     return c;
   },
