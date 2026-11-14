@@ -234,10 +234,12 @@ function styleFor(b: any, guild?: any): ButtonStyle {
   if (pick === 'GREEN') return ButtonStyle.Success;
   if (pick === 'RED') return ButtonStyle.Danger;
   if (pick === 'GREY') return ButtonStyle.Secondary;
+  // Auto: a colour that makes the emoji stand out (a red emoji on a red button disappears).
   const e = String(b.emoji || '');
-  if (RED.test(e)) return ButtonStyle.Danger;
-  if (GREEN.test(e)) return ButtonStyle.Success;
-  if (BLUE.test(e)) return ButtonStyle.Primary;
+  if (RED.test(e)) return ButtonStyle.Primary;
+  if (BLUE.test(e)) return ButtonStyle.Success;
+  if (GREEN.test(e)) return ButtonStyle.Primary;
+  if (e) return ButtonStyle.Secondary;
   const c = guild?.roles?.cache?.get(b.roleId)?.color || 0;
   if (c) {
     const r = (c >> 16) & 255, g = (c >> 8) & 255, bl = c & 255;
@@ -262,17 +264,19 @@ export const buttonRoles = {
     });
     return rows;
   },
-  /** Card layout (Discord's newer message style): one row per role with its description and its own button. */
+  /** Premium layout: a coloured frame with the server's picture, the text, the buttons, a big image and a footer. */
   cards(panel: ButtonRolePanel, guild?: any) {
-    const accent = (panel as any).color ? parseInt(String((panel as any).color).replace('#', ''), 16) : (guild?.roles.cache.get(panel.buttons[0]?.roleId)?.color || 0x7c8cff);
+    const p: any = panel;
+    const accent = p.color ? parseInt(String(p.color).replace('#', ''), 16) : (guild?.roles.cache.get(panel.buttons[0]?.roleId)?.color || 0x7c8cff);
+    const thumb = p.thumbnailUrl || guild?.iconURL?.({ size: 256 });
+    const head = { type: 10, content: `${guild ? `-# ${guild.name}\n` : ''}## ${panel.title}${panel.description ? `\n${clip(boldBlocks(panel.description), 3000)}` : ''}` };
+    const rows = this.components(panel, guild).map((r) => r.toJSON());
     const container: any = { type: 17, accent_color: accent, components: [
-      (() => { const head = { type: 10, content: `-# ${guild?.name || ''}\n## ${panel.title}${panel.description ? `\n${clip(boldBlocks(panel.description), 3000)}` : ''}` }; const ic = guild?.iconURL?.({ size: 256 }); return ic ? { type: 9, components: [head], accessory: { type: 11, media: { url: ic } } } : head; })(),
-      { type: 14, divider: true, spacing: 1 },
-      ...panel.buttons.slice(0, 20).map((b: any) => ({
-        type: 9,
-        components: [{ type: 10, content: `${b.emoji && !/^<a?:/.test(b.emoji) ? `${b.emoji} ` : ''}**${clip(b.label, 80)}**${b.description ? `\n-# ${clip(b.description, 200)}` : ''}` }],
-        accessory: roleButton(panel, b, guild, true).toJSON(),
-      })),
+      thumb ? { type: 9, components: [head], accessory: { type: 11, media: { url: thumb } } } : head,
+      { type: 14, divider: true, spacing: 2 },
+      ...rows,
+      ...(p.imageUrl ? [{ type: 12, items: [{ media: { url: p.imageUrl } }] }] : []),
+      ...(p.footerText ? [{ type: 14, divider: false, spacing: 1 }, { type: 10, content: `-# ${clip(p.footerText, 200)}` }] : []),
     ] };
     return { flags: 1 << 15, components: [container], allowedMentions: { parse: [] as any[] } };
   },
@@ -280,7 +284,13 @@ export const buttonRoles = {
     const guild = channel.guild;
     const color = (panel as any).color ? parseInt(String((panel as any).color).replace('#', ''), 16) : (guild?.roles.cache.get(panel.buttons[0]?.roleId)?.color || 0x7c8cff);
     const icon = guild?.iconURL?.({ size: 256 }) || undefined;
-    const classic = { embeds: [{ author: guild ? { name: guild.name, icon_url: icon } : undefined, title: panel.title, description: boldBlocks(panel.description || 'Pick your roles below.'), color, thumbnail: icon ? { url: icon } : undefined }], components: this.components(panel, guild) };
+    const p: any = panel;
+    const thumb = p.thumbnailUrl || icon;
+    const classic = { embeds: [{
+      author: guild ? { name: guild.name, icon_url: icon } : undefined, title: panel.title, description: boldBlocks(panel.description || 'Pick your roles below.'), color,
+      thumbnail: thumb ? { url: thumb } : undefined, image: p.imageUrl ? { url: p.imageUrl } : undefined,
+      footer: p.footerText ? { text: String(p.footerText).slice(0, 200), icon_url: p.footerIconUrl || undefined } : undefined,
+    }], components: this.components(panel, guild) };
     const payload: any = (panel as any).layout === 'CARDS' ? this.cards(panel, guild) : classic;
     if (panel.messageId && panel.channelId === channel.id) {
       const existing = await channel.messages.fetch(panel.messageId).catch(() => null);
