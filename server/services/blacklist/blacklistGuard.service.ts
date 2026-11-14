@@ -144,9 +144,9 @@ export async function alertStaff(communityId: string, user: { id: string; tag: s
       .setFooter({ text: m.how === 'DISCORD_ID' ? 'Matched by Discord ID, so it is the same account.' : 'Matched by name only. Check before acting; press “Not them” if it is a different person.' });
     if (user.avatar) embed.setThumbnail(user.avatar);
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(`cm:bl:ban:${m.entry.id}|${user.id}`.slice(0, 100)).setLabel('Ban').setStyle(ButtonStyle.Danger),
-      new ButtonBuilder().setCustomId(`cm:bl:kick:${m.entry.id}|${user.id}`.slice(0, 100)).setLabel('Kick').setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder().setCustomId(`cm:bl:clear:${m.entry.id}|${user.id}`.slice(0, 100)).setLabel('Not them').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`cm:bl:ban:${m.entry.id}|${user.id}`.slice(0, 100)).setLabel('Ban').setEmoji('🔨').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`cm:bl:kick:${m.entry.id}|${user.id}`.slice(0, 100)).setLabel('Kick').setEmoji('👢').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`cm:bl:clear:${m.entry.id}|${user.id}`.slice(0, 100)).setLabel('Not them').setEmoji('👍').setStyle(ButtonStyle.Success),
     );
     await ch.send({ embeds: [embed], components: m.how === 'DISCORD_ID' ? [] : [row], allowedMentions: { parse: [] } });
   } catch (err: any) { logger.warn(`[Blacklist] alert failed: ${err?.message}`); }

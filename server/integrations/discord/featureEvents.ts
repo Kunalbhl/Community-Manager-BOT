@@ -53,7 +53,7 @@ export function attachFeatureHandlers(client: Client) {
       content: `👋 Welcome to [**${member.guild.name || 'the server'}**](https://discord.com/channels/${member.guild.id || ''})! Would you like the server to celebrate your birthday? It’s completely optional; only the day and month are saved.`,
       components: [new ActionRowBuilder<any>().addComponents(
         new ButtonBuilder().setCustomId(`cm:bday:ask:${member.guild.id}`).setLabel('Share my birthday').setEmoji('🎂').setStyle(ButtonStyle.Primary),
-        new ButtonBuilder().setCustomId(`cm:bday:skip:${member.guild.id}`).setLabel('No thanks').setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder().setCustomId(`cm:bday:skip:${member.guild.id}`).setLabel('No thanks').setEmoji('🙅').setStyle(ButtonStyle.Secondary),
       )],
     }).catch(() => undefined); // DMs closed: nothing to do
   }));

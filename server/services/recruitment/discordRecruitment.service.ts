@@ -269,7 +269,7 @@ export const discordRecruitment = {
         new ButtonBuilder().setCustomId(`cm:rv:reject:${appId}`).setLabel('Reject').setEmoji('✖️').setStyle(ButtonStyle.Danger),
       );
     }
-    row.addComponents(new ButtonBuilder().setLabel('Open in dashboard').setStyle(ButtonStyle.Link).setURL(`${appUrl()}/dashboard?application=${encodeURIComponent(appId)}`));
+    row.addComponents(new ButtonBuilder().setLabel('Open in dashboard').setEmoji('🔗').setStyle(ButtonStyle.Link).setURL(`${appUrl()}/dashboard?application=${encodeURIComponent(appId)}`));
     return [row];
   },
 

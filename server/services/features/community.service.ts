@@ -145,7 +145,7 @@ export const verification = {
   panel(message: string) {
     return {
       embeds: [{ title: '✅ Verification', description: message, color: 0x7fe0b0 }],
-      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('cm:verify:start').setLabel('Verify').setStyle(ButtonStyle.Success))],
+      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('cm:verify:start').setLabel('Verify').setEmoji('✅').setStyle(ButtonStyle.Success))],
     };
   },
   async postPanel(communityId: string, channel: any) {
@@ -223,24 +223,73 @@ export interface ButtonRolePanel {
 }
 export const buttonRolePanelsRepository = new FirestoreRepository<ButtonRolePanel>('buttonRolePanels');
 
+const RED = /[🎯🎲❤🔴🍎🔥🚨⛔🍓🌹💥🩸🥊🏎🍒🌶🎈🧨📕]/u;
+const GREEN = /[🟢✅🌿🍀🧪💚🐸🌲🌳🥦🍏💸💵🌱🐍♻🔋📗]/u;
+const BLUE = /[🔵💙🧊💎🌊🧙🐳🚀🌀🛡🎮🔷🦋🌐📘🧩🎧]/u;
+/** Button colour: the one picked for this role, else matched to its emoji, else to the role's colour. */
+function styleFor(b: any, guild?: any): ButtonStyle {
+  const pick = String(b.style || 'AUTO');
+  if (pick === 'BLUE') return ButtonStyle.Primary;
+  if (pick === 'GREEN') return ButtonStyle.Success;
+  if (pick === 'RED') return ButtonStyle.Danger;
+  if (pick === 'GREY') return ButtonStyle.Secondary;
+  const e = String(b.emoji || '');
+  if (RED.test(e)) return ButtonStyle.Danger;
+  if (GREEN.test(e)) return ButtonStyle.Success;
+  if (BLUE.test(e)) return ButtonStyle.Primary;
+  const c = guild?.roles?.cache?.get(b.roleId)?.color || 0;
+  if (c) {
+    const r = (c >> 16) & 255, g = (c >> 8) & 255, bl = c & 255;
+    if (r > g + 40 && r > bl + 20) return ButtonStyle.Danger;
+    if (g > r + 30 && g >= bl) return ButtonStyle.Success;
+    if (bl > r || (bl > 120 && r > 120)) return ButtonStyle.Primary;
+  }
+  return ButtonStyle.Secondary;
+}
+function roleButton(panel: any, b: any, guild?: any, short = false) {
+  const btn = new ButtonBuilder().setCustomId(`cm:br:${panel.id}:${b.roleId}`).setLabel((short ? (b.buttonText || 'Choose') : b.label).slice(0, 80)).setStyle(styleFor(b, guild));
+  if (b.emoji) btn.setEmoji(b.emoji);
+  return btn;
+}
+
 export const buttonRoles = {
-  components(panel: ButtonRolePanel) {
+  components(panel: ButtonRolePanel, guild?: any) {
     const rows: ActionRowBuilder<ButtonBuilder>[] = [];
     panel.buttons.slice(0, 25).forEach((b, i) => {
       if (i % 5 === 0) rows.push(new ActionRowBuilder<ButtonBuilder>());
-      const btn = new ButtonBuilder().setCustomId(`cm:br:${panel.id}:${b.roleId}`).setLabel(b.label.slice(0, 80)).setStyle(ButtonStyle.Secondary);
-      if (b.emoji) btn.setEmoji(b.emoji);
-      rows[rows.length - 1].addComponents(btn);
+      rows[rows.length - 1].addComponents(roleButton(panel, b, guild));
     });
     return rows;
   },
+  /** Card layout (Discord's newer message style): one row per role with its description and its own button. */
+  cards(panel: ButtonRolePanel, guild?: any) {
+    const accent = (panel as any).color ? parseInt(String((panel as any).color).replace('#', ''), 16) : (guild?.roles.cache.get(panel.buttons[0]?.roleId)?.color || 0x7c8cff);
+    const container: any = { type: 17, accent_color: accent, components: [
+      { type: 10, content: `## ${panel.title}${panel.description ? `\n${clip(panel.description, 3000)}` : ''}` },
+      { type: 14, divider: true, spacing: 1 },
+      ...panel.buttons.slice(0, 20).map((b: any) => ({
+        type: 9,
+        components: [{ type: 10, content: `${b.emoji && !/^<a?:/.test(b.emoji) ? `${b.emoji} ` : ''}**${clip(b.label, 80)}**${b.description ? `\n-# ${clip(b.description, 200)}` : ''}` }],
+        accessory: roleButton(panel, b, guild, true).toJSON(),
+      })),
+    ] };
+    return { flags: 1 << 15, components: [container], allowedMentions: { parse: [] as any[] } };
+  },
   async post(panel: ButtonRolePanel, channel: any) {
-    const payload = { embeds: [{ title: panel.title, description: panel.description || 'Pick your roles below.', color: 0x7c8cff }], components: this.components(panel) };
+    const guild = channel.guild;
+    const color = (panel as any).color ? parseInt(String((panel as any).color).replace('#', ''), 16) : (guild?.roles.cache.get(panel.buttons[0]?.roleId)?.color || 0x7c8cff);
+    const classic = { embeds: [{ title: panel.title, description: panel.description || 'Pick your roles below.', color }], components: this.components(panel, guild) };
+    const payload: any = (panel as any).layout === 'CARDS' ? this.cards(panel, guild) : classic;
     if (panel.messageId && panel.channelId === channel.id) {
       const existing = await channel.messages.fetch(panel.messageId).catch(() => null);
-      if (existing) { await existing.edit(payload); return panel; }
+      // A message can't switch between the two layouts, so a layout change posts a new one and removes the old.
+      const sameLayout = existing && Boolean(existing.flags?.has?.(1 << 15)) === ((panel as any).layout === 'CARDS');
+      if (existing && sameLayout && (await existing.edit(payload).then(() => true).catch(() => false))) return panel;
+      if (existing && !sameLayout) await existing.delete().catch(() => undefined);
     }
-    const msg = await channel.send(payload);
+    let msg = await channel.send(payload).catch(() => null);
+    if (!msg && payload !== classic) msg = await channel.send(classic); // older clients / API refusal: fall back to the classic layout
+    if (!msg) throw new Error('Could not post the panel in that channel.');
     return buttonRolePanelsRepository.update(panel.id, { channelId: channel.id, messageId: msg.id } as any);
   },
   async press(panelId: string, roleId: string, member: any): Promise<string> {
