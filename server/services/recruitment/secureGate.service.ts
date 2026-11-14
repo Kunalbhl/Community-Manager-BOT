@@ -263,7 +263,7 @@ export const secureGate = {
     const { discordRecruitment } = await import('./discordRecruitment.service.js');
     const recent = await apply.messages.fetch({ limit: 20 }).catch(() => null);
     const hasPanel = recent && Array.from(recent.values()).some((m: any) => m.author?.id === me.id && m.components?.length);
-    if (!hasPanel) await apply.send(discordRecruitment.panel(rc)).catch(() => undefined);
+    if (!hasPanel) await apply.send(discordRecruitment.panel(rc, apply.guild?.name)).catch(() => undefined);
     return report;
   },
 

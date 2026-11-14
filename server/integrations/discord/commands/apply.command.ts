@@ -15,6 +15,6 @@ export const applyCommand: SlashCommandDefinition = {
       await interaction.reply({ content: 'Applications are closed in this server right now.', ephemeral: true });
       return;
     }
-    await interaction.reply({ ...discordRecruitment.panel(cfg), ephemeral: true });
+    await interaction.reply({ ...discordRecruitment.panel(cfg, interaction.guild?.name), ephemeral: true });
   },
 };

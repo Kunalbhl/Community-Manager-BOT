@@ -51,6 +51,7 @@ export const MODULES: Record<string, ModuleDef> = {
       { id: 'role-rules', label: 'Role rules', icon: UserCheck, hint: 'Which roles an approved applicant gets, and when.', render: (c) => <ServerToolsView communityId={c.communityId} only="roles" /> },
       { id: 'levels', label: 'Levels & XP', icon: TrendingUp, hint: 'Members earn XP by chatting and unlock reward roles.', render: (c) => <CommunityFeaturesView communityId={c.communityId} only="levels" /> },
       { id: 'birthdays', label: 'Birthdays', icon: Cake, hint: 'Members save their birthday with /birthday; the bot celebrates on the day.', render: (c) => <CommunityFeaturesView communityId={c.communityId} only="birthdays" /> },
+      { id: 'server-stats', label: 'Server stats', icon: BarChart3, hint: 'Channels whose names show live numbers: members, a role’s members, online, boosts and more.', render: (c) => <CommunityFeaturesView communityId={c.communityId} only="stats" /> },
       { id: 'directory', label: 'Member list', icon: Users, hint: 'Everyone in the server, live from Discord, with their name in this server and their roles.', render: (c) => <MemberListView communityId={c.communityId} /> },
     ],
   },
