@@ -754,6 +754,7 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms, commun
                 </label>
               ))}
             </div>
+            <InterviewQuestions communityId={communityId} auto={c.interview.mode === 'AUTO'} />
           </div>
           <div className="rounded-xl border border-slate-200 p-4 text-sm">
             <div className="font-bold text-slate-900">Screening threshold</div>
@@ -1108,6 +1109,43 @@ export function RulesCard({ api, res }: { api: any; res: Resources }) {
         </div>
         {msg && <p className="mt-3 text-sm text-slate-600">{msg}</p>}
       </Card>
+    </div>
+  );
+}
+
+/** The questions the bot asks in an automatic interview (also a guide for manual interviewers). */
+function InterviewQuestions({ communityId, auto }: { communityId: string; auto: boolean }) {
+  const [list, setList] = useState<any[] | null>(null);
+  const [text, setText] = useState('');
+  const [msg, setMsg] = useState('');
+  const h = { 'Content-Type': 'application/json', 'x-community-id': communityId };
+  const load = useCallback(() => fetch(`/api/v1/community/questions?communityId=${encodeURIComponent(communityId)}`, { credentials: 'include', headers: h })
+    .then((r) => r.json()).then((j) => setList((j?.data?.interviewQuestions || j?.interviewQuestions || []).filter((q: any) => q.enabled !== false))).catch(() => setList([])), [communityId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [load]);
+  const add = async () => {
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    setMsg('Saving…');
+    for (const l of lines) {
+      const r = await fetch('/api/v1/community/interview-questions', { method: 'POST', credentials: 'include', headers: h, body: JSON.stringify({ communityId, questionText: l.slice(0, 300), category: 'GENERAL' }) });
+      if (!r.ok) { const j = await r.json().catch(() => ({})); setMsg(j?.error?.message || j?.message || 'Could not save the question.'); return; }
+    }
+    setText(''); setMsg('✓ Saved'); load();
+  };
+  const del = async (id: string) => {
+    await fetch(`/api/v1/community/interview-questions/${id}?communityId=${encodeURIComponent(communityId)}`, { method: 'DELETE', credentials: 'include', headers: h });
+    load();
+  };
+  return (
+    <div className={`mt-4 rounded-lg border p-3 ${auto ? 'border-indigo-200 bg-indigo-50/40' : 'border-slate-200'}`}>
+      <div className="text-sm font-bold text-slate-900">Interview questions ({list?.length ?? '…'})</div>
+      <p className="text-xs text-slate-500">{auto ? 'The bot asks these one by one in the applicant’s chat and waits for each answer. Answers and a summary go to the staff thread.' : 'Shown to interviewers as a guide. If you switch to automatic, the bot asks these.'}</p>
+      {auto && list && !list.length && <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800">Add at least one question, or the automatic interview waits for a staff member.</p>}
+      {!!list?.length && <ol className="mt-2 space-y-1.5">{list.map((q, i) => (
+        <li key={q.id} className="flex items-start gap-2 rounded-md bg-white px-2 py-1.5 text-sm ring-1 ring-slate-200"><span className="font-bold text-slate-400">{i + 1}.</span><span className="flex-1">{q.questionText}</span><button type="button" aria-label="Delete" className="text-slate-400 hover:text-rose-600" onClick={() => del(q.id)}><Trash2 className="h-4 w-4" /></button></li>
+      ))}</ol>}
+      <textarea rows={2} className={`${input} mt-2`} value={text} onChange={(e) => setText(e.target.value)} placeholder={'One question per line, e.g.\nWhy do you want to join us?\nHow many hours do you play each week?'} />
+      <div className="mt-2 flex items-center gap-3"><button type="button" className={ghost} disabled={!text.trim()} onClick={add}><Plus className="h-4 w-4" /> Add questions</button>{msg && <span className="text-xs text-indigo-700">{msg}</span>}</div>
     </div>
   );
 }
