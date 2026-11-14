@@ -226,6 +226,7 @@ export const serverStats = {
     }
     const since = c.lastUpdatedAt ? Date.now() - Date.parse(c.lastUpdatedAt) : Infinity;
     if (!force && since < MIN_GAP_MS) return c;
+    { const { ensureSelfPerms } = await import('../../integrations/discord/selfAccess.js'); await ensureSelfPerms(ch, [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels], 'update the stats counter'); }
     try {
       // setName can wait a long time when Discord rate-limits; don't block the loop for it.
       await Promise.race([ch.setName(name, 'Server stats'), new Promise((_, rej) => setTimeout(() => rej(new Error('Discord is limiting renames; it will update shortly.')), 15_000))]);

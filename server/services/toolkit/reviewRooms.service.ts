@@ -139,6 +139,7 @@ export const reviewRooms = {
     await reviewRoomsRepository.update(roomId, { voiceChannelId: vc.id, voiceEmptySince: Date.now(), history: [...room.history, { at: new Date().toISOString(), by: actor.id, event: 'Voice room created' }] } as any);
     // The applicant gets the link in their own application chat so they can join with one click.
     if (text && text.id !== undefined) {
+      { const { ensureSelfPerms } = await import('../../integrations/discord/selfAccess.js'); await ensureSelfPerms(vc, [PermissionFlagsBits.CreateInstantInvite], 'invite the applicant to the voice room'); }
       const invite = await (vc as any).createInvite({ maxAge: 3 * 3600, maxUses: 0, unique: true, reason: 'Interview voice room' }).catch(() => null);
       await text.send({
         content: `🎙️ <@${room.applicantId}>, your interview voice room is ready: <#${vc.id}>. Press **Join Voice** below, or [open it here](https://discord.com/channels/${guild.id}/${vc.id}).${invite ? `\n${invite.url}` : ''}`,
