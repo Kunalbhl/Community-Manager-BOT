@@ -1,3 +1,4 @@
+import { useRemembered } from '../../common/useRemembered.js';
 import React, { useState, useEffect } from 'react';
 import { ChannelSelect } from '../../common/DiscordPickers.js';
 import {
@@ -35,7 +36,7 @@ export const EventsView: React.FC<EventsViewProps> = ({ communityId }) => {
   const [timezone, setTimezone] = useState(
     typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' : 'UTC'
   );
-  const [channelId, setChannelId] = useState('');
+  const [channelId, setChannelId] = useRemembered('event:' + (typeof location !== 'undefined' ? location.pathname : ''));
   const [capacity, setCapacity] = useState('50');
   const [registrationEnabled, setRegistrationEnabled] = useState(true);
   const [visibility, setVisibility] = useState<'PUBLIC' | 'COMMUNITY' | 'PRIVATE'>('COMMUNITY');

@@ -155,6 +155,8 @@ function SeriesCard({ communityId, api, rules: rules0, series, dmOnCreate, codeF
   const [auto, setAuto] = useState(codeForNewMembers);
   const [codeCh, setCodeCh] = useState(codeChannelId);
   const [boardCh, setBoardCh] = useState(rewardBoardChannelId);
+  const [chMsg, setChMsg] = useState('');
+  const saveCh = (patch: any) => { setChMsg('Saving…'); api('/codes/channels', 'PUT', patch).then((r: any) => setChMsg(`✓ Saved${r.posted ? `. ${r.posted} codes posted.` : '.'}`)).catch((e: any) => setChMsg(e.message)); };
   const [rules, setRules] = useState<any[]>(rules0);
   const res: any = useDiscordResources(communityId);
   return (
@@ -201,12 +203,31 @@ function SeriesCard({ communityId, api, rules: rules0, series, dmOnCreate, codeF
       <div className="mt-6 grid gap-4 border-t border-slate-100 pt-5 md:grid-cols-2">
         <div className="text-sm font-semibold text-slate-700">Post codes in a channel
           <p className="text-xs font-normal text-slate-500">Every code gets one message here: owner, status, uses and expiry. When a code is renamed, paused, used or deleted, that same message is updated, not a new one. Picking a channel posts all existing codes once.</p>
-          <div className="mt-1"><ChannelSelect communityId={communityId} value={codeCh} onChange={(v: any) => setCodeCh(v || '')} placeholder="Don't post codes" /></div>
+          <div className="mt-1"><ChannelSelect communityId={communityId} value={codeCh} onChange={(v: any) => { setCodeCh(v || ''); saveCh({ codeChannelId: v || '' }); }} placeholder="Don't post codes" /></div>
         </div>
         <div className="text-sm font-semibold text-slate-700">Recruiter reward board
           <p className="text-xs font-normal text-slate-500">One message per recruiter with their invites, reward roles, latest rewards and wallet balance. The first reward posts it; every later reward, use or correction updates the same message. Empty = the announcement channel of the reward rule.</p>
-          <div className="mt-1"><ChannelSelect communityId={communityId} value={boardCh} onChange={(v: any) => setBoardCh(v || '')} placeholder="Use the reward rule's channel" /></div>
+          <div className="mt-1"><ChannelSelect communityId={communityId} value={boardCh} onChange={(v: any) => { setBoardCh(v || ''); saveCh({ rewardBoardChannelId: v || '' }); }} placeholder="Use the reward rule's channel" /></div>
         </div>
+        <p className="text-xs text-indigo-700 md:col-span-2">{chMsg || 'These two save on their own as soon as you pick a channel. The other settings in this box save with the Save button at the top.'}</p>
+        <div className="md:col-span-2 grid gap-4 md:grid-cols-2">
+          <div><div className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">How a code message looks</div>
+            <div className="rounded-lg border-l-4 border-emerald-400 bg-[#2b2d31] p-3 text-[13px] text-slate-200">
+              <div className="font-bold text-white">🎟️ KUN-007</div>
+              <div>Owner: <span className="rounded bg-indigo-500/30 px-1 text-indigo-200">@Kunal</span> (Kunal)</div>
+              <div className="mt-2 grid grid-cols-3 gap-2 text-xs"><div><b className="text-white">Status</b><br />🟢 Active</div><div><b className="text-white">Used</b><br />4</div><div><b className="text-white">Expires</b><br />Never</div><div><b className="text-white">Created</b><br />2 days ago</div><div><b className="text-white">Updated</b><br />just now</div></div>
+            </div></div>
+          <div><div className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">How a reward board message looks</div>
+            <div className="rounded-lg border-l-4 border-indigo-400 bg-[#2b2d31] p-3 text-[13px] text-slate-200">
+              <div className="mb-1 text-slate-300">Your reward announcement text (if you wrote one)</div>
+              <div className="font-bold text-white">🏆 Kunal</div>
+              <div><span className="rounded bg-indigo-500/30 px-1 text-indigo-200">@Kunal</span> · code <b>KUN-007</b></div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs"><div><b className="text-white">👥 Invites</b><br />5 in the server · 1 left</div><div><b className="text-white">🏷️ Reward roles</b><br /><span className="text-indigo-200">@Silver Recruiter</span></div></div>
+              <div className="mt-2 text-xs"><b className="text-white">💰 Balance</b><br />🎮 Modded Heist: 3 available · earned 5 · used 2</div>
+              <div className="mt-2 text-xs"><b className="text-white">🎁 Latest rewards</b><br />✅ ➕ Reward per recruit · 1 hour ago</div>
+            </div></div>
+        </div>
+</div>
       </div>
     </Card>
   );

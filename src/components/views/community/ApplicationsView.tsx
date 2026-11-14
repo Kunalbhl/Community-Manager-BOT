@@ -1412,74 +1412,16 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                     </div>
                   )}
 
-                  {/* Workload Balance Grid */}
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-5 space-y-3">
-                      <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Team Resource Management</h4>
-                        <h3 className="text-xs font-black text-slate-800">Reviewer Workload Balance</h3>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {workloadStats.length === 0 ? (
-                          <div className="col-span-4 text-center py-4 text-xs text-slate-400 italic">No reviewers assigned. Load candidates to balance resource allocation.</div>
-                        ) : (
-                          workloadStats.map((stat) => (
-                            <div key={stat.reviewerId} className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5">
-                              <div className="font-bold text-slate-800 truncate text-[11px]">{stat.reviewerUsername}</div>
-                              <div className="flex items-baseline justify-between">
-                                <span className="text-lg font-black text-indigo-700">{stat.activeCount}</span>
-                                <span className="text-[9px] text-slate-400 font-medium">Assigned files</span>
-                              </div>
-                              <div className="h-1 w-full bg-slate-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${Math.min(stat.activeCount * 15, 100)}%` }} />
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Active Campaign Foundations */}
-                    <div className="rounded-xl border border-slate-200 bg-white p-5 space-y-3">
-                      <div>
-                        <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Talent Acquisitions</h4>
-                        <h3 className="text-xs font-black text-slate-800">Active Campaign Foundations</h3>
-                      </div>
-
-                      <div className="space-y-2">
-                        {campaigns.length === 0 ? (
-                          <div className="bg-emerald-50/50 border border-emerald-100 rounded-lg p-3 text-xs">
-                            <div className="font-bold text-emerald-800">Standard Intake Active</div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">Accepting all open open-community registry submissions.</div>
-                          </div>
-                        ) : (
-                          campaigns.map((camp) => (
-                            <div key={camp.id} className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-lg p-2.5 text-xs font-semibold">
-                              <div className="space-y-0.5">
-                                <div className="font-bold text-slate-800">{camp.name}</div>
-                                <div className="text-[9px] text-slate-400 font-mono font-normal">CODE: {camp.recruiterCode}</div>
-                              </div>
-                              <span className="rounded bg-indigo-50 border border-indigo-100 text-indigo-700 font-mono font-bold text-[9px] px-1.5 py-0.5">
-                                Active Campaign
-                              </span>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Intelligent Saved Segments Selector */}
                   <div className="space-y-2 bg-slate-50/50 p-4 border border-slate-200 rounded-xl">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Intelligent Saved Segments</span>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Quick filters</span>
                     <div className="flex flex-wrap items-center gap-2">
                       {[
-                        { id: null, label: 'All Candidates', count: applications.length },
-                        { id: 'unassigned', label: 'Unassigned Review', count: applications.filter(a => !a.assignedReviewerId).length },
-                        { id: 'sla_overdue', label: 'Urgent SLAs Breached', count: applications.filter(a => getSlaStatus(a).overdue).length },
-                        { id: 'top_tier', label: 'Top Tier (80+ Score)', count: applications.filter(a => (a.recruitmentScore ?? 0) >= 80).length },
-                        { id: 'caution', label: 'Caution Lists', count: applications.filter(a => (a.recruitmentScore ?? 100) < 50 || (a.tags || []).includes('Caution')).length },
+                        { id: null, label: 'All', count: applications.length },
+                        { id: 'unassigned', label: 'No reviewer yet', count: applications.filter(a => !a.assignedReviewerId).length },
+                        { id: 'sla_overdue', label: 'Waiting too long', count: applications.filter(a => getSlaStatus(a).overdue).length },
+                        { id: 'top_tier', label: 'Score 80+', count: applications.filter(a => (a.recruitmentScore ?? 0) >= 80).length },
+                        { id: 'caution', label: 'Needs care (score under 50)', count: applications.filter(a => (a.recruitmentScore ?? 100) < 50 || (a.tags || []).includes('Caution')).length },
                       ].map((seg) => (
                         <button
                           key={seg.id || 'all'}
@@ -1507,9 +1449,9 @@ export const ApplicationsView: React.FC<ApplicationsViewProps> = ({
                   {/* Saved view filters bar */}
                   <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl border border-slate-200 bg-white">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-black uppercase text-slate-400">Saved Views:</span>
+                      <span className="text-[10px] font-black uppercase text-slate-400">Your saved filters:</span>
                       {savedFilters.length === 0 ? (
-                        <span className="text-[10px] text-slate-400 italic">No custom views recorded.</span>
+                        <span className="text-[10px] text-slate-400 italic">None yet. Set filters below and press Save Current View.</span>
                       ) : (
                         savedFilters.map((f, idx) => (
                           <button

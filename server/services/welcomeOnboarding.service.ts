@@ -167,7 +167,8 @@ export class WelcomeOnboardingService {
     rendered = rendered.replace(/\{\{member\}\}/g, vars.memberId ? `<@${vars.memberId}>` : vars.memberName || 'Member');
     rendered = rendered.replace(/\{\{recruiter\}\}/g, vars.recruiterId ? `<@${vars.recruiterId}>` : vars.recruiterName || '');
     rendered = rendered.replace(/\{\{memberCount\}\}/g, vars.memberCount ? String(vars.memberCount) : '');
-    rendered = rendered.replace(/\{\{memberName\}\}/g, vars.memberName || 'Member');
+    // Shown as a clickable mention when we know who it is.
+    rendered = rendered.replace(/\{\{memberName\}\}/g, vars.memberId ? `<@${vars.memberId}>` : vars.memberName || 'Member');
     rendered = rendered.replace(/\{\{communityName\}\}/g, vars.communityName || 'the community');
     rendered = rendered.replace(/\{\{recruiterName\}\}/g, vars.recruiterName || '');
     rendered = rendered.replace(/\{\{recruiterCode\}\}/g, vars.recruiterCode || '');
@@ -388,7 +389,18 @@ export class WelcomeOnboardingService {
       serverWelcomeStatus = 'NOT_CONFIGURED';
       serverWelcomeError = 'WELCOME_CHANNEL_NOT_CONFIGURED';
     } else {
-      const serverText = this.resolveTemplate(config.serverWelcomeMessage, templateVars);
+      let serverText = this.resolveTemplate(config.serverWelcomeMessage, templateVars);
+      try {
+        // Plain "#channel" and "@Role" names typed in the message become clickable mentions.
+        const comm: any = await communitiesRepository.getById(communityId);
+        const g: any = discordService.getGuild(comm?.discordGuildId || comm?.guildId);
+        if (g) {
+          const chans = Array.from(g.channels.cache.values()).filter((c: any) => c.name).sort((a: any, b: any) => b.name.length - a.name.length) as any[];
+          for (const c of chans) serverText = serverText.split(`#${c.name}`).join(`<#${c.id}>`);
+          const roles = Array.from(g.roles.cache.values()).filter((r: any) => r.name && r.name !== '@everyone').sort((a: any, b: any) => b.name.length - a.name.length) as any[];
+          for (const r of roles) serverText = serverText.split(`@${r.name}`).join(`<@&${r.id}>`);
+        }
+      } catch { /* keep plain text */ }
       const chanRes = await discordService.sendChannelMessage(config.welcomeChannelId, serverText);
       if (chanRes.success) {
         serverWelcomeStatus = 'SENT';

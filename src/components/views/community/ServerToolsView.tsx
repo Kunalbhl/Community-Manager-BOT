@@ -715,7 +715,7 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms, commun
   const sc = c.screening;
   const setSc = (p: any) => setC({ ...c, screening: { ...c.screening, ...p } });
   const setQ = (i: number, p: any) => setSc({ questions: sc.questions.map((q: any, n: number) => (n === i ? { ...q, ...p } : q)) });
-  const [panelCh, setPanelCh] = useState('');
+  const [panelCh, setPanelCh] = useState<string>(cfg?.panelChannelId || '');
   const [msg, setMsg] = useState('');
   const setM = (k: string, v: string) => setC({ ...c, messages: { ...c.messages, [k]: v } });
   const steps = [
@@ -849,7 +849,7 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms, commun
         <Card title="Save and publish">
           <SaveBar onSave={() => onSave(c)} />
           <div className="mt-6 flex flex-wrap gap-3 border-t border-slate-100 pt-5">
-            <div className="min-w-[240px] flex-1"><Pick options={res.textChannels} value={panelCh} onChange={setPanelCh} placeholder="Channel for the Apply panel" /></div>
+            <div className="min-w-[240px] flex-1"><Pick options={res.textChannels} value={panelCh} onChange={setPanelCh} placeholder="Channel for the Apply panel" />{cfg?.panelChannelId && cfg.panelChannelId === panelCh && <p className="mt-1 text-xs text-emerald-700">✓ The panel is already posted here. Pressing the button updates it.</p>}</div>
             <button className={btn} disabled={!panelCh} onClick={async () => {
               setMsg('');
               try { await onSave(c); const r = await api('/recruitment/panel', 'POST', { channelId: panelCh }); setMsg(r?.updated ? 'Saved. The Apply panel already in that channel was updated.' : 'Saved and Apply panel posted.'); } catch (e: any) { setMsg(e.message); }
@@ -1035,13 +1035,39 @@ export function RulesCard({ api, res }: { api: any; res: Resources }) {
   const [msg, setMsg] = useState('');
   const load = useCallback(() => api('/recruitment/rules').then(setRules).catch((e: any) => setMsg(e.message)), [api]);
   useEffect(() => { load(); }, [load]);
+  const [src, setSrc] = useState<any>(null);
+  const [srcMsg, setSrcMsg] = useState('');
+  useEffect(() => { api('/recruitment/rules/source').then(setSrc).catch(() => undefined); }, [api]);
+  const saveSrc = (patch: any) => { const next = { ...src, ...patch }; setSrc(next); setSrcMsg('Saving…'); api('/recruitment/rules/source', 'PUT', { source: next.source, channelIds: next.channelIds }).then((r: any) => { setSrc(r); setSrcMsg('✓ Saved'); }).catch((e: any) => setSrcMsg(e.message)); };
+  const chName = (id: string) => res.textChannels.find((c: any) => c.id === id)?.name || 'channel';
   const add = async () => {
     const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
     try { for (const l of lines) await api('/recruitment/rules', 'POST', { title: l }); setText(''); setMsg(''); load(); } catch (e: any) { setMsg(e.message); }
   };
   return (
     <div id="server-rules">
-      <Card title={`Server rules (${rules.length})`} desc="One list used everywhere: shown to applicants before they apply, and used to write the rules quiz.">
+      <Card title="Server rules" desc="What applicants read before they agree, and what the rules quiz is written from.">
+        {src && (
+          <div className="mb-5 rounded-xl border border-slate-200 p-4">
+            <div className="text-sm font-semibold text-slate-700">What applicants are shown</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button type="button" onClick={() => saveSrc({ source: 'CHANNELS' })} className={`rounded-xl border px-3 py-2 text-left text-sm ${src.source === 'CHANNELS' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200'}`}><b>Automatic: from my rules channels</b><br /><span className="text-xs text-slate-500">The bot copies the messages from the channels with their formatting, so applicants read exactly what members read.</span></button>
+              <button type="button" onClick={() => saveSrc({ source: 'LIST' })} className={`rounded-xl border px-3 py-2 text-left text-sm ${src.source === 'LIST' ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200'}`}><b>Manual: the list below</b><br /><span className="text-xs text-slate-500">You type or import each rule yourself.</span></button>
+            </div>
+            {src.source === 'CHANNELS' && (
+              <div className="mt-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {(src.channelIds.length ? src.channelIds : src.welcomeChannelIds).map((id: string) => <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">#{chName(id)}{src.channelIds.length > 0 && <button type="button" aria-label="Remove" onClick={() => saveSrc({ channelIds: src.channelIds.filter((x: string) => x !== id) })}>×</button>}</span>)}
+                  {!src.channelIds.length && !src.welcomeChannelIds.length && <span className="text-xs text-amber-700">No rules channel picked yet. Add one below.</span>}
+                </div>
+                {!src.channelIds.length && src.welcomeChannelIds.length > 0 && <p className="mt-1 text-xs text-slate-500">Using the rules channels from Members → Welcome &amp; rules. Add channels here to use different ones for applicants.</p>}
+                <div className="mt-2 max-w-sm"><Pick options={res.textChannels.filter((c: any) => !src.channelIds.includes(c.id))} value="" onChange={(id: string) => id && saveSrc({ channelIds: [...src.channelIds, id] })} placeholder="Add a rules channel" /></div>
+              </div>
+            )}
+            {srcMsg && <p className="mt-2 text-xs text-indigo-700">{srcMsg}</p>}
+          </div>
+        )}
+        <div className="mb-2 text-sm font-semibold text-slate-700">Rules list ({rules.length}) <span className="font-normal text-slate-500">· {src?.source === 'CHANNELS' ? 'used for the rules quiz' : 'shown to applicants and used for the rules quiz'}</span></div>
         {!!rules.length && <ol className="mb-4 space-y-2">
           {rules.map((r, i) => (
             <li key={r.id} className="flex items-start gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm">

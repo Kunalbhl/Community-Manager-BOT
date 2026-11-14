@@ -1,3 +1,4 @@
+import { EmojiField } from '../../common/EmojiField.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Award, Wallet, CheckCircle2, Clock, Gift, Pencil, Plus, RefreshCw, Trash2, Trophy, Undo2, X, XCircle } from 'lucide-react';
 import { ChannelSelect, MemberName, MemberSelect, RoleSelect, useDiscordResources } from '../../common/DiscordPickers.js';
@@ -14,6 +15,10 @@ const REWARD_VARS: TemplateVar[] = [
   { token: 'reason', label: 'Why', sample: 'Reached 5 invites' },
   { token: 'server', label: 'Server name', sample: 'Bharat Esports' },
   { token: 'manualReward', label: 'Hand-out reward', sample: 'Discord Nitro (1 month)' },
+  { token: 'recruit', label: '@New member', sample: '@Rahul' },
+  { token: 'recruitName', label: 'New member name', sample: 'Rahul' },
+  { token: 'code', label: 'Code used', sample: 'KUN-007' },
+  { token: 'balance', label: 'Balance', sample: '3' },
 ];
 
 type Trigger = 'EACH_INVITE' | 'MILESTONE' | 'EVERY' | 'IN_PERIOD' | 'TOP_RECRUITER';
@@ -29,7 +34,7 @@ const BLANK = {
   name: '', emoji: '🎁', description: '', enabled: true,
   trigger: { type: 'MILESTONE' as Trigger, count: 5, period: 'MONTH' },
   countWhen: { mode: 'STAYED', stayDays: 7 },
-  actions: { addRoleIds: [] as string[], removeRoleIds: [] as string[], roleDays: 0, xp: 0, dmMessage: '', announceChannelId: '', announceMessage: '', manualReward: '', credit: { itemId: '', amount: 1 } },
+  actions: { addRoleIds: [] as string[], removeRoleIds: [] as string[], roleDays: 0, xp: 0, expireDays: 0, dmMessage: '', announceChannelId: '', announceMessage: '', manualReward: '', credit: { itemId: '', amount: 1 } },
   approval: 'AUTO', onLeave: 'REVOKE', maxPerRecruiter: 0,
 };
 
@@ -286,7 +291,7 @@ function RuleEditor({ communityId, rule, onClose, onSaved, api }: any) {
         <div className="space-y-5 px-6 py-5">
           <Section n={1} title="Name">
             <div className="flex gap-2">
-              <input className={`${input} w-20 text-center text-lg`} value={r.emoji} maxLength={16} onChange={(e) => set('emoji', e.target.value)} aria-label="Emoji" />
+              <EmojiField communityId={communityId} className="w-20 shrink-0" value={r.emoji} onChange={(v) => set('emoji', v)} />
               <input className={input} value={r.name} maxLength={80} onChange={(e) => set('name', e.target.value)} placeholder="e.g. Silver Recruiter" />
             </div>
             <input className={input} value={r.description} maxLength={300} onChange={(e) => set('description', e.target.value)} placeholder="Short note for staff (optional)" />
@@ -326,11 +331,13 @@ function RuleEditor({ communityId, rule, onClose, onSaved, api }: any) {
               <label className="text-sm font-semibold text-slate-700">Remove roles <span className="font-normal text-slate-500">· e.g. the previous rank</span><div className="mt-1"><RoleChips communityId={communityId} ids={r.actions.removeRoleIds} onChange={(l) => set('actions.removeRoleIds', l)} placeholder="Remove a role" /></div></label>
               {r.actions.addRoleIds.length > 0 && <label className="text-sm font-semibold text-slate-700">Keep the role for<div className="mt-1 flex items-center gap-2"><input type="number" min={0} max={365} className={`${input} w-24`} value={r.actions.roleDays} onChange={(e) => set('actions.roleDays', Number(e.target.value))} /><span className="font-normal text-slate-500">days (0 = forever)</span></div></label>}
               <label className="text-sm font-semibold text-slate-700">XP<div className="mt-1 flex items-center gap-2"><input type="number" min={0} className={`${input} w-32`} value={r.actions.xp} onChange={(e) => set('actions.xp', Number(e.target.value))} /><span className="font-normal text-slate-500">added to their level</span></div></label>
+              <label className="text-sm font-semibold text-slate-700">Expires after <span className="font-normal text-slate-500">· optional</span><div className="mt-1 flex items-center gap-2"><input type="number" min={0} max={365} className={`${input} w-24`} value={r.actions.expireDays || 0} onChange={(e) => set('actions.expireDays', Number(e.target.value))} /><span className="font-normal text-slate-500">days (0 = never). The wallet credit and XP from this reward are taken back after this, for a temporary bonus.</span></div></label>
               <label className="text-sm font-semibold text-slate-700 md:col-span-2">Something staff hand out <span className="font-normal text-slate-500">· Nitro, merch, in-game items. These always wait for staff approval.</span><input className={`${input} mt-1`} value={r.actions.manualReward} maxLength={200} onChange={(e) => set('actions.manualReward', e.target.value)} placeholder="e.g. Discord Nitro Basic (1 month)" /></label>
             </div>
             <TemplateField label="Private message to the recruiter (optional)" value={r.actions.dmMessage} onChange={(v) => set('actions.dmMessage', v)} vars={REWARD_VARS} rows={2} />
             <label className="block text-sm font-semibold text-slate-700">Announce in a channel (optional)<div className="mt-1 max-w-md"><ChannelSelect communityId={communityId} value={r.actions.announceChannelId} onChange={(id) => set('actions.announceChannelId', id)} placeholder="No announcement" /></div></label>
-            {r.actions.announceChannelId && <TemplateField label="Announcement" value={r.actions.announceMessage} onChange={(v) => set('actions.announceMessage', v)} vars={REWARD_VARS} rows={2} />}
+            {r.actions.announceChannelId && <TemplateField label="Announcement (optional)" value={r.actions.announceMessage} onChange={(v) => set('actions.announceMessage', v)} vars={REWARD_VARS} rows={2} />}
+            {r.actions.announceChannelId && <p className="text-xs text-slate-500">Posted <b>once per recruiter</b> in this channel, together with their live status card (invites, reward roles, balance). Every later reward edits that same message instead of posting again. If you set a <b>Recruiter reward board</b> channel in Recruiters &amp; codes, that channel is used instead.</p>}
           </Section>
 
           <Section n={5} title="How is it handled?">
