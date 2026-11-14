@@ -518,3 +518,17 @@ export async function cancelSchedule(req: Request, res: Response, next: NextFunc
     next(error);
   }
 }
+
+/** Things done for an event (announcement, reminder, poll, giveaway) are listed on it. */
+export async function linkToEvent(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const e: any = await eventsRepository.getById(req.params.eventId);
+    if (!e || e.communityId !== communityId) throw new NotFoundError('Event not found.');
+    const b = req.body || {};
+    const item = { type: String(b.type || '').slice(0, 20), id: String(b.id || '').slice(0, 80), label: String(b.label || '').slice(0, 200), at: b.at ? String(b.at) : new Date().toISOString(), createdAt: new Date().toISOString() };
+    const links = [...(e.links || []), item].slice(-50);
+    await eventsRepository.update(e.id, { links } as any);
+    res.json({ success: true, links });
+  } catch (error) { next(error); }
+}

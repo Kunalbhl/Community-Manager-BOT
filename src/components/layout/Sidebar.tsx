@@ -125,6 +125,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
       clearInterval(interval);
     };
   }, [selectedCommunity]);
+  const readSetup = () => { try { return localStorage.getItem(`cm_setup_complete_${selectedCommunity}`) === '1'; } catch { return false; } };
+  const [setupComplete, setSetupComplete] = React.useState(readSetup);
+  React.useEffect(() => {
+    setSetupComplete(readSetup());
+    const on = () => setSetupComplete(readSetup());
+    window.addEventListener('cm:setup-progress', on);
+    if (selectedCommunity) fetch(`/api/v1/communities/${encodeURIComponent(selectedCommunity)}/setup-guide`, { credentials: 'include', headers: { 'x-community-id': selectedCommunity } })
+      .then((r) => r.json()).then((j) => { if (j?.success) { try { localStorage.setItem(`cm_setup_complete_${selectedCommunity}`, j.data.done >= j.data.total ? '1' : '0'); } catch { /* ignore */ } on(); } }).catch(() => undefined);
+    return () => window.removeEventListener('cm:setup-progress', on);
+  }, [selectedCommunity]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>
@@ -223,6 +233,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 if (mod.requiredPermission && !hasPermission(authContext, mod.requiredPermission)) {
                   return null;
                 }
+                if (mod.id === 'setup-guide' && setupComplete && activeCommunitySection !== 'setup-guide') return null; // hidden once everything is set up
 
                 const isActive =
                   portalMode === 'COMMUNITY_DASHBOARD' &&

@@ -419,6 +419,37 @@ export async function deleteReminder(req: Request, res: Response, next: NextFunc
   }
 }
 
+/** Failed reminder: send it again now. */
+export async function resendReminder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const r: any = await remindersRepository.getById(req.params.id);
+    if (!r || r.communityId !== communityId) throw new NotFoundError('Reminder not found');
+    const now = new Date().toISOString();
+    await remindersRepository.update(r.id, { status: 'PENDING', triggerAt: now, errorDetails: '', failureReason: '', lastError: '', updatedAt: now } as any);
+    res.json({ success: true, reminder: await remindersRepository.getById(r.id) });
+  } catch (error) { next(error); }
+}
+
+/** Change a reminder that hasn't been sent yet (or failed). */
+export async function updateReminder(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const r: any = await remindersRepository.getById(req.params.id);
+    if (!r || r.communityId !== communityId) throw new NotFoundError('Reminder not found');
+    if (r.status === 'SENT') throw new Error('This reminder was already sent. Make a new one instead.');
+    const b = req.body || {};
+    const patch: any = { updatedAt: new Date().toISOString() };
+    if (typeof b.message === 'string') { if (!b.message.trim()) throw new Error('Write the reminder message.'); patch.message = b.message.slice(0, 2000); }
+    if (b.triggerAt && !Number.isNaN(Date.parse(b.triggerAt))) patch.triggerAt = new Date(b.triggerAt).toISOString();
+    if (['ONCE', 'DAILY', 'WEEKLY'].includes(b.recurrence)) patch.recurrence = b.recurrence;
+    if (b.targetType === 'CHANNEL' && /^\d{15,22}$/.test(String(b.channelId || ''))) { patch.targetType = 'CHANNEL'; patch.channelId = b.channelId; }
+    if (b.targetType === 'MEMBER' && /^\d{15,22}$/.test(String(b.targetUser || ''))) { patch.targetType = 'MEMBER'; patch.targetUser = b.targetUser; patch.targetUserName = String(b.targetUserName || '').slice(0, 80); }
+    if (r.status === 'FAILED') { patch.status = 'PENDING'; patch.errorDetails = ''; patch.failureReason = ''; patch.lastError = ''; }
+    res.json({ success: true, reminder: await remindersRepository.update(r.id, patch) });
+  } catch (error) { next(error); }
+}
+
 export async function closePollHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const communityId = getCommunityId(req);

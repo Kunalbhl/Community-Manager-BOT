@@ -3,13 +3,33 @@ import { CheckCircle2, Circle, ChevronRight, RefreshCw, Server, Lock, ClipboardL
 
 const ICONS: Record<string, any> = { server: Server, secure: Lock, recruitment: ClipboardList, interviews: Mic, moderation: ShieldCheck, tickets: Ticket, community: PartyPopper, integrations: Plug };
 
-interface Step { label: string; done: boolean; section: string; tab?: string; hint?: string }
+interface Step { label: string; done: boolean; section: string; tab?: string; hint?: string; find?: string }
 interface Module { key: string; title: string; description: string; steps: Step[] }
 
 /** Opens a dashboard section (and a tab inside it). */
-export function openSection(onNavigate: (s: string) => void, section: string, tab?: string) {
+export function openSection(onNavigate: (s: string) => void, section: string, tab?: string, find?: string) {
   try { if (tab) sessionStorage.setItem('cm_open_tab', tab); } catch { /* ignore */ }
   onNavigate(section);
+  if (find) scrollToHeading(find);
+}
+
+/** After opening a screen, scroll to the box whose heading starts with this text and highlight it. */
+export function scrollToHeading(text: string) {
+  const want = text.toLowerCase();
+  const started = Date.now();
+  const tick = () => {
+    const els = Array.from(document.querySelectorAll('main h1, main h2, main h3, main h4, main .font-bold, main .font-black, main label, main section')) as HTMLElement[];
+    const hit = els.find((e) => (e.textContent || '').trim().toLowerCase().startsWith(want) && e.offsetParent !== null);
+    if (hit) {
+      const box = (hit.closest('section, .rounded-2xl, .rounded-xl') as HTMLElement) || hit;
+      box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      box.classList.add('ring-4', 'ring-indigo-300', 'transition');
+      setTimeout(() => box.classList.remove('ring-4', 'ring-indigo-300'), 2500);
+      return;
+    }
+    if (Date.now() - started < 6000) setTimeout(tick, 200);
+  };
+  setTimeout(tick, 300);
 }
 
 /** Open a section from screens that don't receive onNavigate. */
@@ -37,6 +57,7 @@ export function SetupGuideView({ communityId, onNavigate }: { communityId: strin
   if (err) return <p className="text-rose-600">{err}</p>;
   if (!d) return <div className="h-96 animate-pulse rounded-3xl bg-slate-100" />;
   const pct = Math.round((d.done / Math.max(1, d.total)) * 100);
+  try { localStorage.setItem(`cm_setup_complete_${communityId}`, pct >= 100 ? '1' : '0'); window.dispatchEvent(new Event('cm:setup-progress')); } catch { /* ignore */ }
   const next = d.modules.flatMap((m) => m.steps.map((s) => ({ ...s, module: m.title }))).find((s) => !s.done);
 
   return (
@@ -50,7 +71,7 @@ export function SetupGuideView({ communityId, onNavigate }: { communityId: strin
             <div className="mt-4 h-2 w-72 max-w-full overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-gradient-to-r from-indigo-400 to-pink-400" style={{ width: `${pct}%` }} /></div>
           </div>
           {next && (
-            <button onClick={() => openSection(onNavigate, next.section, next.tab)} className="rounded-2xl bg-white px-5 py-4 text-left text-slate-900 shadow-lg transition hover:-translate-y-0.5">
+            <button onClick={() => openSection(onNavigate, next.section, next.tab, next.find)} className="rounded-2xl bg-white px-5 py-4 text-left text-slate-900 shadow-lg transition hover:-translate-y-0.5">
               <div className="text-xs font-semibold uppercase tracking-wider text-indigo-600">Next step · {next.module}</div>
               <div className="mt-1 flex items-center gap-2 font-bold">{next.label}<ChevronRight className="h-4 w-4" /></div>
             </button>
@@ -78,7 +99,7 @@ export function SetupGuideView({ communityId, onNavigate }: { communityId: strin
               <ol className="mt-4 space-y-1">
                 {m.steps.map((s) => (
                   <li key={s.label}>
-                    <button onClick={() => openSection(onNavigate, s.section, s.tab)} className="group flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left text-sm hover:bg-slate-50">
+                    <button onClick={() => openSection(onNavigate, s.section, s.tab, s.find)} className="group flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left text-sm hover:bg-slate-50">
                       {s.done ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" /> : <Circle className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" />}
                       <span className="min-w-0 flex-1">
                         <span className={s.done ? 'text-slate-500' : 'font-medium text-slate-900'}>{s.label}</span>

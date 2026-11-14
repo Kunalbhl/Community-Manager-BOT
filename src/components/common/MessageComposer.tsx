@@ -1,3 +1,4 @@
+import { CategoryPicker } from './CategoryPicker.js';
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
@@ -192,8 +193,7 @@ export function MessageComposer({
                 <input value={tName} onChange={(e) => setTName(e.target.value)} placeholder="e.g. Weekly event reminder" className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm" />
               </label>
               <label className="min-w-32 text-xs font-semibold text-slate-600">Category
-                <input list="cm-template-cats" value={tCat} onChange={(e) => setTCat(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm" />
-                <datalist id="cm-template-cats">{['General', 'Announcement', 'Recruitment', 'Promotion', 'Event', 'Reminder', 'Moderation', ...groups].filter((v, i, a) => a.indexOf(v) === i).map((c) => <option key={c} value={c} />)}</datalist>
+                <div className="mt-1"><CategoryPicker value={tCat} onChange={setTCat} existing={groups} /></div>
               </label>
               <button type="button" disabled={!tName.trim() || !value.trim()} onClick={saveTemplate} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">Save</button>
             </div>

@@ -10,7 +10,7 @@ import { getGate } from '../services/recruitment/secureGate.service.js';
 import { communityQuestionsService } from '../services/communityQuestions.service.js';
 import { autoModerationRulesRepository } from '../repositories/index.js';
 
-interface Step { label: string; done: boolean; section: string; tab?: string; hint?: string; required?: boolean }
+interface Step { label: string; done: boolean; section: string; tab?: string; hint?: string; required?: boolean; find?: string }
 interface Module { key: string; title: string; description: string; steps: Step[] }
 
 export async function setupGuideHandler(req: Request, res: Response) {
@@ -34,33 +34,33 @@ export async function setupGuideHandler(req: Request, res: Response) {
           { required: true, label: 'Bot is online in this server', done: Boolean(guild), section: 'home' },
           { required: true, label: 'Manage Roles and Manage Channels', done: perm(PermissionFlagsBits.ManageRoles) && perm(PermissionFlagsBits.ManageChannels), section: 'home', hint: 'Server Settings → Roles → Community Manager' },
           { label: 'Moderation permissions (timeout, kick, ban)', done: perm(PermissionFlagsBits.ModerateMembers) && perm(PermissionFlagsBits.KickMembers) && perm(PermissionFlagsBits.BanMembers), section: 'home' },
-          { required: true, label: 'Workspace channels ready (applications, logs)', done: Boolean(r.reviewChannelId && r.logChannelId), section: 'server-tools', tab: 'recruit', hint: 'Press “Auto-configure workspace”.' },
+          { required: true, label: 'Workspace channels ready (applications, logs)', done: Boolean(r.reviewChannelId && r.logChannelId), section: 'server-tools', tab: 'recruit', find: '⚙️ Auto-configure', hint: 'Press “Auto-configure workspace”.' },
         ],
       },
       {
         key: 'secure', title: 'Secure Setup', description: 'Newcomers only see your public channels until they are approved.',
         steps: [
-          { required: true, label: 'Lock the server for newcomers', done: Boolean(gate.memberRoleId && gate.publicChannelIds?.length && gate.job?.status !== 'FAILED'), section: 'server-tools', tab: 'recruit' },
-          { required: true, label: 'Confirm Discord’s Apply to Join is off', done: gate.verified, section: 'server-tools', tab: 'recruit' },
+          { required: true, label: 'Lock the server for newcomers', done: Boolean(gate.memberRoleId && gate.publicChannelIds?.length && gate.job?.status !== 'FAILED'), section: 'server-tools', tab: 'recruit', find: 'Secure Setup' },
+          { required: true, label: 'Confirm Discord’s Apply to Join is off', done: gate.verified, section: 'server-tools', tab: 'recruit', find: 'Secure Setup' },
         ],
       },
       {
         key: 'recruitment', title: 'Recruitment', description: 'People apply in Discord, get a private application chat, and staff decide.',
         steps: [
-          { label: 'Rules & guidelines written', done: rules.length > 0, section: 'server-tools', tab: 'recruit', hint: 'Shown to applicants before the quiz.' },
+          { label: 'Rules & guidelines written', done: rules.length > 0, section: 'server-tools', tab: 'recruit', find: 'Server rules', hint: 'Shown to applicants before the quiz.' },
           { required: true, label: 'Application questions', done: qs.length > 0, section: 'recruitment' },
-          { label: 'Rules quiz (4-answer questions)', done: r.screening.questions.length > 0, section: 'server-tools', tab: 'recruit' },
-          { label: 'Messages to applicants', done: true, section: 'server-tools', tab: 'recruit' },
+          { label: 'Rules quiz (4-answer questions)', done: r.screening.questions.length > 0, section: 'server-tools', tab: 'recruit', find: 'Rules quiz' },
+          { label: 'Messages to applicants', done: true, section: 'server-tools', tab: 'recruit', find: 'Messages' },
           { label: 'Reviewer ranks for escalation', done: t.reviewRooms.tiers.some((x) => x.roleIds.length), section: 'server-tools', tab: 'rooms' },
           { label: 'Roles given on approval', done: Boolean(gate.memberRoleId) || t.roleRules.rules.length > 0, section: 'server-tools', tab: 'roles' },
-          { label: 'Apply panel posted', done: Boolean((r as any).panelPostedAt), section: 'server-tools', tab: 'recruit' },
+          { label: 'Apply panel posted', done: Boolean((r as any).panelPostedAt), section: 'server-tools', tab: 'recruit', find: 'Apply panel' },
         ],
       },
       {
         key: 'interviews', title: 'Interviews', description: 'Automatic by Community Manager or manual by your interviewers.',
         steps: [
-          { label: `Mode chosen (${r.interview.mode === 'AUTO' ? 'automatic' : 'manual'})`, done: true, section: 'server-tools', tab: 'recruit' },
-          { label: 'Interview questions', done: r.interview.mode === 'MANUAL' || iqs.length > 0, section: 'recruitment', hint: 'Needed for automatic interviews.' },
+          { label: `Mode chosen (${r.interview.mode === 'AUTO' ? 'automatic' : 'manual'})`, done: true, section: 'server-tools', tab: 'recruit', find: 'Interview is run by' },
+          { label: 'Interview questions', done: r.interview.mode === 'MANUAL' || iqs.length > 0, section: 'server-tools', tab: 'recruit', find: 'Interview questions', hint: 'Needed for automatic interviews.' },
         ],
       },
       {
@@ -89,7 +89,7 @@ export async function setupGuideHandler(req: Request, res: Response) {
       {
         key: 'integrations', title: 'Integrations', description: 'Google Sheets record and SocialCord social media alerts.',
         steps: [
-          { label: 'Google Sheets live record', done: Boolean(r.sheetWebhookUrl), section: 'server-tools', tab: 'recruit' },
+          { label: 'Google Sheets live record', done: Boolean(r.sheetWebhookUrl), section: 'server-tools', tab: 'recruit', find: '📊 Google Sheets' },
         ],
       },
     ];

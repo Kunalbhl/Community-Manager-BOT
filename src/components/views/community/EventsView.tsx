@@ -1,733 +1,222 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { Calendar, Users, Plus, Play, CheckCircle, XCircle, Copy, Send, Megaphone, Clock, BarChart3, Gift, ChevronDown, ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
+import { ChannelSelect, MemberName } from '../../common/DiscordPickers.js';
+import { MessageComposer } from '../../common/MessageComposer.js';
 import { useRemembered } from '../../common/useRemembered.js';
-import React, { useState, useEffect } from 'react';
-import { ChannelSelect } from '../../common/DiscordPickers.js';
-import {
-  Calendar,
-  Users,
-  MapPin,
-  Clock,
-  Plus,
-  Play,
-  CheckCircle,
-  Archive,
-  XCircle,
-  RotateCcw,
-  Copy,
-  Send,
-  Pause,
-  Repeat,
-  Sparkles,
-} from 'lucide-react';
 
-interface EventsViewProps {
-  communityId: string;
-}
+/**
+ * Events: create, publish to Discord (post with Register buttons + Discord's own Events list),
+ * a private registrations channel, and everything around the event in one place:
+ * announcements, reminders, polls and giveaways.
+ */
+const input = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100';
+const label = 'block text-xs font-bold uppercase tracking-wide text-slate-500';
+const primary = 'inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-50';
+const ghost = 'inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50';
+const tz = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' : 'UTC';
+const pad = (n: number) => String(n).padStart(2, '0');
+const toLocalInput = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '');
+const STATUS: Record<string, { label: string; cls: string }> = {
+  DRAFT: { label: 'Draft · not posted', cls: 'bg-slate-100 text-slate-600' },
+  SCHEDULED: { label: 'Posted · upcoming', cls: 'bg-indigo-50 text-indigo-700' },
+  LIVE: { label: 'Happening now', cls: 'bg-emerald-50 text-emerald-700' },
+  COMPLETED: { label: 'Finished', cls: 'bg-slate-100 text-slate-500' },
+  CANCELLED: { label: 'Cancelled', cls: 'bg-rose-50 text-rose-700' },
+  ARCHIVED: { label: 'Archived', cls: 'bg-slate-100 text-slate-400' },
+};
 
-export const EventsView: React.FC<EventsViewProps> = ({ communityId }) => {
-  const [activeTab, setActiveTab] = useState<'events' | 'schedules'>('events');
-  const [events, setEvents] = useState<any[]>([]);
-  const [schedules, setSchedules] = useState<any[]>([]);
+export const EventsView: React.FC<{ communityId: string }> = ({ communityId }) => {
+  const headers = { 'Content-Type': 'application/json', 'x-community-id': communityId };
+  const call = useCallback(async (url: string, method = 'GET', body?: any) => {
+    const r = await fetch(url, { method, credentials: 'include', headers, body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.success === false) throw new Error(String(j?.error?.message || j?.message || 'Something went wrong.').replace(/^[A-Z_]+:\s*/, ''));
+    return j;
+  }, [communityId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Event form state
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [startAt, setStartAt] = useState('');
-  const [endAt, setEndAt] = useState('');
-  const [timezone, setTimezone] = useState(
-    typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' : 'UTC'
-  );
-  const [channelId, setChannelId] = useRemembered('event:' + (typeof location !== 'undefined' ? location.pathname : ''));
-  const [capacity, setCapacity] = useState('50');
-  const [registrationEnabled, setRegistrationEnabled] = useState(true);
-  const [visibility, setVisibility] = useState<'PUBLIC' | 'COMMUNITY' | 'PRIVATE'>('COMMUNITY');
+  const [events, setEvents] = useState<any[] | null>(null);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const flash = (ok: boolean, text: string) => { setMsg({ ok, text }); setTimeout(() => setMsg(null), 5000); };
+  const load = useCallback(() => call('/api/v1/events').then((j) => setEvents((j.events || []).sort((a: any, b: any) => String(b.startAt).localeCompare(String(a.startAt))))).catch(() => setEvents([])), [call]);
+  useEffect(() => { load(); }, [load]);
 
-  // Schedule form state
-  const [scheduleName, setScheduleName] = useState('');
-  const [scheduleResourceType, setScheduleResourceType] = useState<'EVENT' | 'CAMPAIGN' | 'ANNOUNCEMENT' | 'WORKFLOW'>('EVENT');
-  const [scheduleResourceId, setScheduleResourceId] = useState('');
-  const [scheduleRecurrence, setScheduleRecurrence] = useState<'ONCE' | 'DAILY' | 'WEEKLY' | 'MONTHLY'>('DAILY');
-  const [scheduleNextExecution, setScheduleNextExecution] = useState('');
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  const fetchEvents = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/v1/events', {
-        headers: { 'x-community-id': communityId },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setEvents(data.events || []);
-      }
-    } catch (err: any) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSchedules = async () => {
-    try {
-      const res = await fetch('/api/v1/schedules', {
-        headers: { 'x-community-id': communityId },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSchedules(data.schedules || []);
-      }
-    } catch (err: any) {
-      console.error(err);
-    }
-  };
-
-  useEffect(() => {
-    fetchEvents();
-    fetchSchedules();
-  }, [communityId]);
-
-  const handleCreateEvent = async (e: React.FormEvent) => {
+  // Form
+  const blank = () => { const s = new Date(Date.now() + 86400000); s.setMinutes(0, 0, 0); const e = new Date(s.getTime() + 2 * 3600000); return { title: '', description: '', startAt: toLocalInput(s), endAt: toLocalInput(e), capacity: '50', registrationEnabled: true, visibility: 'COMMUNITY', publish: true }; };
+  const [f, setF] = useState<any>(blank);
+  const [channelId, setChannelId] = useRemembered(`event:${communityId}`);
+  const [busy, setBusy] = useState(false);
+  const create = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !description || !startAt || !endAt) return;
-    setError(null);
-    setSuccess(null);
-
+    if (!f.title.trim() || !f.startAt || !f.endAt) return;
+    setBusy(true);
     try {
-      const res = await fetch('/api/v1/events', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-community-id': communityId,
-        },
-        body: JSON.stringify({
-          title,
-          description,
-          startAt: new Date(startAt).toISOString(),
-          endAt: new Date(endAt).toISOString(),
-          timezone: timezone || 'UTC',
-          channelId: channelId || undefined,
-          capacity: parseInt(capacity, 10) || 50,
-          registrationEnabled,
-          visibility,
-        }),
+      const j = await call('/api/v1/events', 'POST', {
+        title: f.title, description: f.description || f.title, startAt: new Date(f.startAt).toISOString(), endAt: new Date(f.endAt).toISOString(), timezone: tz,
+        channelId: channelId || undefined, capacity: parseInt(f.capacity, 10) || 0, registrationEnabled: f.registrationEnabled, visibility: f.visibility,
       });
-
-      if (res.ok) {
-        setTitle('');
-        setDescription('');
-        setStartAt('');
-        setEndAt('');
-        setChannelId('');
-        setCapacity('50');
-        setSuccess('Event successfully created as DRAFT!');
-        fetchEvents();
-      } else {
-        const err = await res.json();
-        setError(err.message || 'Failed to create event.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Network error while creating event.');
-    }
-  };
-
-  const handleEventAction = async (eventId: string, action: string, body?: any) => {
-    setError(null);
-    setSuccess(null);
-    try {
-      const res = await fetch(`/api/v1/events/${eventId}/${action}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-community-id': communityId,
-        },
-        body: body ? JSON.stringify(body) : undefined,
-      });
-
-      if (res.ok) {
-        setSuccess(`Event action "${action}" completed successfully.`);
-        fetchEvents();
-      } else {
-        const err = await res.json();
-        setError(err.message || `Failed to execute ${action}.`);
-      }
-    } catch (err: any) {
-      setError(err.message || `Network error during ${action}.`);
-    }
-  };
-
-  const handleCreateSchedule = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!scheduleName || !scheduleResourceId || !scheduleNextExecution) return;
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const res = await fetch('/api/v1/schedules', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-community-id': communityId,
-        },
-        body: JSON.stringify({
-          name: scheduleName,
-          resourceType: scheduleResourceType,
-          resourceId: scheduleResourceId,
-          timezone: timezone || 'UTC',
-          recurrence: scheduleRecurrence,
-          nextExecutionAt: new Date(scheduleNextExecution).toISOString(),
-        }),
-      });
-
-      if (res.ok) {
-        setScheduleName('');
-        setScheduleResourceId('');
-        setScheduleNextExecution('');
-        setSuccess('Recurring schedule created successfully!');
-        fetchSchedules();
-      } else {
-        const err = await res.json();
-        setError(err.message || 'Failed to create schedule.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Network error creating schedule.');
-    }
-  };
-
-  const handleScheduleAction = async (scheduleId: string, action: 'pause' | 'resume' | 'cancel') => {
-    setError(null);
-    setSuccess(null);
-    try {
-      const res = await fetch(`/api/v1/schedules/${scheduleId}/${action}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-community-id': communityId,
-        },
-      });
-
-      if (res.ok) {
-        setSuccess(`Schedule successfully marked as ${action}d.`);
-        fetchSchedules();
-      } else {
-        const err = await res.json();
-        setError(err.message || `Failed to ${action} schedule.`);
-      }
-    } catch (err: any) {
-      setError(err.message || `Network error during schedule ${action}.`);
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'LIVE':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200 animate-pulse';
-      case 'SCHEDULED':
-        return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'DRAFT':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
-      case 'COMPLETED':
-        return 'bg-slate-100 text-slate-700 border-slate-300';
-      case 'ARCHIVED':
-        return 'bg-purple-50 text-purple-700 border-purple-200';
-      case 'CANCELLED':
-        return 'bg-red-50 text-red-700 border-red-200';
-      default:
-        return 'bg-slate-100 text-slate-600 border-slate-200';
-    }
+      if (f.publish) {
+        if (!channelId) throw new Error('Saved as a draft. Pick a channel to post it in Discord.');
+        await call(`/api/v1/events/${j.event.id}/publish`, 'POST', { syncDiscord: true });
+        flash(true, 'Event posted in Discord and added to the server’s Events list.' + (f.registrationEnabled ? ' A private registrations channel was created for staff.' : ''));
+      } else flash(true, 'Saved as a draft. Press Post when you’re ready.');
+      setF(blank()); load();
+    } catch (err: any) { flash(false, err.message); load(); }
+    setBusy(false);
   };
 
   return (
-    <div id="events-automation-module" className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="rounded bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
-              COMMUNITY SCOPE
-            </span>
-            <span className="rounded bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-              TASK 84 ENGINE
-            </span>
+    <div className="space-y-5">
+      {msg && <p role="status" className={`rounded-xl border px-4 py-3 text-sm font-semibold ${msg.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{msg.text}</p>}
+      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
+        <form onSubmit={create} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-3"><span className="rounded-xl bg-indigo-50 p-2 text-indigo-600"><Plus className="h-5 w-5" /></span><div><h3 className="font-bold text-slate-900">New event</h3><p className="text-xs text-slate-500">Members register with buttons in Discord.</p></div></div>
+          <label className={label}>Title<input className={`${input} mt-1`} value={f.title} maxLength={100} onChange={(e) => setF({ ...f, title: e.target.value })} placeholder="e.g. Moto GP race night" required /></label>
+          <div><span className={label}>Description</span><div className="mt-1"><MessageComposer communityId={communityId} value={f.description} onChange={(v: string) => setF({ ...f, description: v })} rows={4} maxLength={1000} placeholder="What happens, rules, prizes…" /></div></div>
+          <div><span className={label}>Post in channel</span><div className="mt-1"><ChannelSelect communityId={communityId} value={channelId} onChange={setChannelId} placeholder="Channel for the event post" /></div></div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={label}>Starts<input type="datetime-local" className={`${input} mt-1`} value={f.startAt} onChange={(e) => setF({ ...f, startAt: e.target.value })} required /></label>
+            <label className={label}>Ends<input type="datetime-local" className={`${input} mt-1`} value={f.endAt} onChange={(e) => setF({ ...f, endAt: e.target.value })} required /></label>
           </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
-            Events & Automation Engine
-          </h1>
-          <p className="text-sm text-slate-500">
-            Authoritative lifecycle state management, recurrence scheduler, Discord event sync, and attendee rosters.
-          </p>
-        </div>
+          <p className="-mt-2 text-xs text-slate-500">You’re entering times in your time zone ({tz}). In Discord every member sees the time in their own time zone.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={label}>Places<input type="number" min={0} className={`${input} mt-1`} value={f.capacity} onChange={(e) => setF({ ...f, capacity: e.target.value })} /><span className="mt-0.5 block text-[11px] font-normal normal-case text-slate-500">0 = no limit</span></label>
+            <label className={label}>Who can register<select className={`${input} mt-1`} value={f.visibility} onChange={(e) => setF({ ...f, visibility: e.target.value })}><option value="COMMUNITY">Members only</option><option value="PUBLIC">Everyone in the server</option></select></label>
+          </div>
+          <label className="flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" className="mt-1" checked={f.registrationEnabled} onChange={(e) => setF({ ...f, registrationEnabled: e.target.checked })} /><span><b>Registration</b><span className="block text-xs text-slate-500">Register / Can’t go buttons, reminders 24h, 1h and 15 min before, and one private channel for staff with the live list of who registered. That channel is removed when the event finishes.</span></span></label>
+          <label className="flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" className="mt-1" checked={f.publish} onChange={(e) => setF({ ...f, publish: e.target.checked })} /><span><b>Post it now</b><span className="block text-xs text-slate-500">Posts in the channel and adds it to the server’s Events list in Discord. Untick to keep it as a draft.</span></span></label>
+          <button className={`${primary} w-full`} disabled={busy || !f.title.trim()}><Send className="h-4 w-4" />{busy ? 'Saving…' : f.publish ? 'Create and post' : 'Save draft'}</button>
+        </form>
 
-        {/* Tab switchers */}
-        <div className="flex rounded-lg bg-slate-100 p-1">
-          <button
-            id="tab-events-view"
-            onClick={() => setActiveTab('events')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              activeTab === 'events'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Calendar className="h-3.5 w-3.5" />
-            Events Lifecycle ({events.length})
-          </button>
-          <button
-            id="tab-schedules-view"
-            onClick={() => setActiveTab('schedules')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${
-              activeTab === 'schedules'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Repeat className="h-3.5 w-3.5" />
-            Recurring Schedules ({schedules.length})
-          </button>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between"><h3 className="font-bold text-slate-900">Your events</h3><button className={ghost} onClick={load}><RefreshCw className="h-3.5 w-3.5" />Refresh</button></div>
+          {!events ? <div className="h-40 animate-pulse rounded-2xl bg-slate-100" /> : !events.length ? <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">No events yet. Create your first one on the left.</p>
+            : events.filter((e) => e.status !== 'ARCHIVED').map((e) => <EventCard key={e.id} e={e} communityId={communityId} call={call} reload={load} flash={flash} />)}
         </div>
       </div>
+    </div>
+  );
+};
 
-      {error && (
-        <div id="events-error-banner" className="rounded-lg border border-red-200 bg-red-50 p-4 text-xs font-semibold text-red-800">
-          ⚠️ {error}
+function EventCard({ e, communityId, call, reload, flash }: any) {
+  const [open, setOpen] = useState(false);
+  const [regs, setRegs] = useState<any[] | null>(null);
+  const [tool, setTool] = useState<'' | 'announce' | 'reminder' | 'poll' | 'giveaway'>('');
+  const st = STATUS[e.status] || { label: e.status, cls: 'bg-slate-100 text-slate-600' };
+  const act = async (action: string, ok: string, body?: any) => {
+    try { await call(`/api/v1/events/${e.id}/${action}`, 'POST', body); flash(true, ok); reload(); } catch (err: any) { flash(false, err.message); }
+  };
+  const loadRegs = () => call(`/api/v1/events/${e.id}/registrations`).then((j: any) => setRegs(j.registrations || [])).catch(() => setRegs([]));
+  useEffect(() => { if (open && !regs) loadRegs(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const going = (regs || []).filter((r) => r.status === 'REGISTERED' || r.status === 'ATTENDED');
+  const upcoming = e.status === 'SCHEDULED' || e.status === 'LIVE';
+  const link = (type: string, id: string, label: string, at?: string) => call(`/api/v1/events/${e.id}/links`, 'POST', { type, id, label, at }).then(reload).catch(() => undefined);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <button className="flex w-full items-start gap-3 p-4 text-left" onClick={() => setOpen(!open)}>
+        <span className="rounded-xl bg-indigo-50 p-2 text-indigo-600"><Calendar className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2"><span className="font-bold text-slate-900">{e.title}</span><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}>{st.label}</span></div>
+          <div className="mt-0.5 text-xs text-slate-500">{fmt(e.startAt)} – {new Date(e.endAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}{e.capacity ? ` · ${e.capacity} places` : ''}{e.registrationEnabled ? ' · registration on' : ''}</div>
         </div>
-      )}
-      {success && (
-        <div id="events-success-banner" className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-800">
-          ✓ {success}
-        </div>
-      )}
+        {open ? <ChevronDown className="h-5 w-5 text-slate-400" /> : <ChevronRight className="h-5 w-5 text-slate-400" />}
+      </button>
+      {open && (
+        <div className="space-y-4 border-t border-slate-100 p-4">
+          <div className="flex flex-wrap gap-2">
+            {e.status === 'DRAFT' && <button className={ghost} disabled={!e.channelId} title={!e.channelId ? 'Pick a channel first' : ''} onClick={() => act('publish', 'Posted in Discord and added to the Events list.', { syncDiscord: true })}><Send className="h-3.5 w-3.5" />Post in Discord</button>}
+            {e.status === 'SCHEDULED' && <button className={ghost} onClick={() => act('start', 'Marked as started.')}><Play className="h-3.5 w-3.5" />Start now</button>}
+            {e.status === 'LIVE' && <button className={ghost} onClick={() => act('complete', 'Event finished. The registrations channel was removed and the list saved.')}><CheckCircle className="h-3.5 w-3.5" />Finish</button>}
+            {(e.status === 'DRAFT' || upcoming) && <button className={ghost} onClick={() => window.confirm('Cancel this event? Registered members are told in the channel.') && act('cancel', 'Event cancelled.')}><XCircle className="h-3.5 w-3.5" />Cancel event</button>}
+            <button className={ghost} onClick={() => act('duplicate', 'Copied as a new draft.')}><Copy className="h-3.5 w-3.5" />Duplicate</button>
+            {e.discordEventUrl && <a className={ghost} href={e.discordEventUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" />Discord Events</a>}
+          </div>
+          <p className="text-xs text-slate-500">It starts and finishes by itself at the set times. When it finishes, the private registrations channel is removed and the final list is kept here.</p>
 
-      {activeTab === 'events' ? (
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Create Event Form */}
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs lg:col-span-1 h-fit">
-            <h3 className="font-bold text-slate-900 flex items-center gap-2">
-              <Plus className="h-4 w-4 text-emerald-600" />
-              Create Event
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">Initializes event in draft state with timezone enforcement.</p>
-
-            <form onSubmit={handleCreateEvent} className="mt-4 space-y-3.5">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase">Title</label>
-                <input
-                  id="event-input-title"
-                  type="text"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  placeholder="E.g., Recruiter AMA & Workshop"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:ring-indigo-500 focus:border-indigo-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase">Discord Channel ID</label>
-                <ChannelSelect className="mt-1" value={channelId} placeholder="Channel for the event notice (optional)" onChange={setChannelId} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase">Start Time</label>
-                  <input
-                    id="event-input-start"
-                    type="datetime-local"
-                    value={startAt}
-                    onChange={e => setStartAt(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:ring-indigo-500 focus:border-indigo-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase">End Time</label>
-                  <input
-                    id="event-input-end"
-                    type="datetime-local"
-                    value={endAt}
-                    onChange={e => setEndAt(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:ring-indigo-500 focus:border-indigo-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase">Timezone (IANA)</label>
-                  <input
-                    id="event-input-timezone"
-                    type="text"
-                    value={timezone}
-                    onChange={e => setTimezone(e.target.value)}
-                    placeholder="UTC, America/New_York"
-                    className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:ring-indigo-500 focus:border-indigo-500"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase">Capacity</label>
-                  <input
-                    id="event-input-capacity"
-                    type="number"
-                    value={capacity}
-                    onChange={e => setCapacity(e.target.value)}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs focus:ring-indigo-500 focus:border-indigo-500"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase">Description</label>
-                <textarea
-                  id="event-input-description"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder="Community event agenda and topics..."
-                  rows={2}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:ring-indigo-500 focus:border-indigo-500"
-                  required
-                />
-              </div>
-
-              <div className="flex items-center gap-4 text-xs text-slate-700">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={registrationEnabled}
-                    onChange={e => setRegistrationEnabled(e.target.checked)}
-                    className="rounded text-emerald-600 focus:ring-emerald-500"
-                  />
-                  <span>Allow Registration</span>
-                </label>
-                <select
-                  value={visibility}
-                  onChange={e => setVisibility(e.target.value as any)}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs"
-                >
-                  <option value="COMMUNITY">Members only</option>
-                  <option value="PUBLIC">Everyone in the server</option>
-                  <option value="PRIVATE">Private (staff add people)</option>
-                </select>
-              </div>
-              <p className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-slate-600">
-                {visibility === 'PRIVATE'
-                  ? 'Not announced in Discord. Add people from the event’s attendee list.'
-                  : 'When you publish, the bot posts this event in the chosen channel with Register and Can’t go buttons. People sign up right in Discord and get reminders 24h, 1h and 15 min before.'}
-              </p>
-
-              <button
-                id="btn-create-event-submit"
-                type="submit"
-                className="w-full rounded-md bg-emerald-600 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-colors"
-              >
-                Create Event Draft
-              </button>
-            </form>
+          <div>
+            <div className="mb-2 text-sm font-bold text-slate-900">Around this event</div>
+            <div className="flex flex-wrap gap-2">
+              <button className={ghost} onClick={() => setTool(tool === 'announce' ? '' : 'announce')}><Megaphone className="h-3.5 w-3.5" />Announcement</button>
+              <button className={ghost} onClick={() => setTool(tool === 'reminder' ? '' : 'reminder')}><Clock className="h-3.5 w-3.5" />Reminder</button>
+              <button className={ghost} onClick={() => setTool(tool === 'poll' ? '' : 'poll')}><BarChart3 className="h-3.5 w-3.5" />Poll</button>
+              <button className={ghost} onClick={() => setTool(tool === 'giveaway' ? '' : 'giveaway')}><Gift className="h-3.5 w-3.5" />Giveaway</button>
+            </div>
+            {tool && <Tool kind={tool} e={e} communityId={communityId} flash={flash} done={(type: string, id: string, labelText: string, at?: string) => { setTool(''); link(type, id, labelText, at); }} />}
+            {!!e.links?.length && (
+              <ul className="mt-3 space-y-1 text-xs text-slate-600">
+                {e.links.slice().reverse().map((l: any, i: number) => <li key={i}>• <b className="capitalize">{l.type}</b> · {l.label}{l.at ? ` · ${fmt(l.at)}` : ''}</li>)}
+              </ul>
+            )}
           </div>
 
-          {/* Events List */}
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs lg:col-span-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-900">Events Directory</h3>
-                <p className="text-xs text-slate-500">Manage state transitions and inspect member attendance.</p>
-              </div>
-              <button
-                onClick={fetchEvents}
-                className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-              >
-                Refresh
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-4">
-              {loading ? (
-                <div className="py-8 text-center text-xs text-slate-400">Loading events directory...</div>
-              ) : events.length === 0 ? (
-                <div className="py-12 text-center text-xs text-slate-400">
-                  No community events created yet. Use the form to draft your first event.
-                </div>
-              ) : (
-                events.map(ev => (
-                  <div
-                    key={ev.id}
-                    id={`event-card-${ev.id}`}
-                    className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 space-y-3"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-slate-900 text-sm">{ev.title}</h4>
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${getStatusBadge(ev.status)}`}>
-                          {ev.status}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {ev.status === 'DRAFT' && (
-                          <button
-                            onClick={() => handleEventAction(ev.id, 'publish', { syncDiscord: true })}
-                            className="rounded bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 flex items-center gap-1"
-                          >
-                            <Send className="h-3 w-3" />
-                            Publish
-                          </button>
-                        )}
-                        {ev.status === 'SCHEDULED' && (
-                          <>
-                            <button
-                              onClick={() => handleEventAction(ev.id, 'start')}
-                              className="rounded bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700 flex items-center gap-1"
-                            >
-                              <Play className="h-3 w-3" />
-                              Go Live
-                            </button>
-                            <button
-                              onClick={() => handleEventAction(ev.id, 'unpublish')}
-                              className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100 flex items-center gap-1"
-                            >
-                              <RotateCcw className="h-3 w-3" />
-                              Unpublish
-                            </button>
-                          </>
-                        )}
-                        {ev.status === 'LIVE' && (
-                          <button
-                            onClick={() => handleEventAction(ev.id, 'complete')}
-                            className="rounded bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-slate-900 flex items-center gap-1"
-                          >
-                            <CheckCircle className="h-3 w-3" />
-                            Complete
-                          </button>
-                        )}
-                        {(ev.status === 'COMPLETED' || ev.status === 'CANCELLED') && (
-                          <button
-                            onClick={() => handleEventAction(ev.id, 'archive')}
-                            className="rounded border border-purple-200 bg-purple-50 px-2.5 py-1 text-[11px] font-semibold text-purple-700 hover:bg-purple-100 flex items-center gap-1"
-                          >
-                            <Archive className="h-3 w-3" />
-                            Archive
-                          </button>
-                        )}
-                        {ev.status !== 'CANCELLED' && ev.status !== 'COMPLETED' && ev.status !== 'ARCHIVED' && (
-                          <button
-                            onClick={() => handleEventAction(ev.id, 'cancel')}
-                            className="rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-100 flex items-center gap-1"
-                          >
-                            <XCircle className="h-3 w-3" />
-                            Cancel
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleEventAction(ev.id, 'duplicate')}
-                          className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-1"
-                          title="Duplicate Event"
-                        >
-                          <Copy className="h-3 w-3" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-slate-600 bg-white p-2.5 rounded border border-slate-200">
-                      {ev.description}
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-500">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5 text-slate-400" />
-                        {new Date(ev.startAt).toLocaleString()} ({ev.timezone || 'UTC'})
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3.5 w-3.5 text-slate-400" />
-                        Capacity: {ev.maxParticipants || ev.capacity || 'Unlimited'}
-                      </span>
-                      {ev.channelId && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                          Channel: {ev.channelId}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      ) : (
-        /* Schedules Tab */
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Create Schedule Form */}
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs lg:col-span-1 h-fit">
-            <h3 className="font-bold text-slate-900 flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-indigo-600" />
-              New Recurring Schedule
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">Automates event reminders, announcements, and maintenance triggers.</p>
-
-            <form onSubmit={handleCreateSchedule} className="mt-4 space-y-3.5">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase">Schedule Name</label>
-                <input
-                  id="sched-input-name"
-                  type="text"
-                  value={scheduleName}
-                  onChange={e => setScheduleName(e.target.value)}
-                  placeholder="E.g., Weekly Member Sync Timer"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:ring-indigo-500 focus:border-indigo-500"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase">Resource Type</label>
-                  <select
-                    value={scheduleResourceType}
-                    onChange={e => setScheduleResourceType(e.target.value as any)}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
-                  >
-                    <option value="EVENT">EVENT</option>
-                    <option value="ANNOUNCEMENT">ANNOUNCEMENT</option>
-                    <option value="CAMPAIGN">CAMPAIGN</option>
-                    <option value="WORKFLOW">WORKFLOW</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase">Recurrence</label>
-                  <select
-                    value={scheduleRecurrence}
-                    onChange={e => setScheduleRecurrence(e.target.value as any)}
-                    className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs"
-                  >
-                    <option value="DAILY">DAILY</option>
-                    <option value="WEEKLY">WEEKLY</option>
-                    <option value="MONTHLY">MONTHLY</option>
-                    <option value="ONCE">ONCE</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase">Target Resource ID</label>
-                <input
-                  id="sched-input-resource-id"
-                  type="text"
-                  value={scheduleResourceId}
-                  onChange={e => setScheduleResourceId(e.target.value)}
-                  placeholder="ID of target event or workflow"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:ring-indigo-500 focus:border-indigo-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 uppercase">Next Execution Time</label>
-                <input
-                  id="sched-input-next-exec"
-                  type="datetime-local"
-                  value={scheduleNextExecution}
-                  onChange={e => setScheduleNextExecution(e.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs focus:ring-indigo-500 focus:border-indigo-500"
-                  required
-                />
-              </div>
-
-              <button
-                id="btn-create-schedule-submit"
-                type="submit"
-                className="w-full rounded-md bg-indigo-600 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition-colors"
-              >
-                Register Schedule
-              </button>
-            </form>
-          </div>
-
-          {/* Schedules List */}
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs lg:col-span-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-900">Active Schedules</h3>
-                <p className="text-xs text-slate-500">Autonomous recurrence schedules registered in the durable engine.</p>
-              </div>
-              <button
-                onClick={fetchSchedules}
-                className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-              >
-                Refresh
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {schedules.length === 0 ? (
-                <div className="py-12 text-center text-xs text-slate-400">
-                  No recurring schedules registered. Create one to automate event reminders or periodic workflows.
-                </div>
-              ) : (
-                schedules.map(sc => (
-                  <div
-                    key={sc.id}
-                    id={`schedule-card-${sc.id}`}
-                    className="rounded-lg border border-slate-200 bg-slate-50/50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-xs">{sc.name}</span>
-                        <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold border ${
-                          sc.status === 'ACTIVE'
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : sc.status === 'PAUSED'
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-slate-100 text-slate-600 border-slate-300'
-                        }`}>
-                          {sc.status}
-                        </span>
-                        <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-mono text-slate-700">
-                          {sc.recurrence}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-500 font-mono">
-                        Target: {sc.resourceType} ({sc.resourceId}) | Next: {new Date(sc.nextExecutionAt).toLocaleString()} ({sc.timezone})
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {sc.status === 'ACTIVE' && (
-                        <button
-                          onClick={() => handleScheduleAction(sc.id, 'pause')}
-                          className="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 flex items-center gap-1"
-                        >
-                          <Pause className="h-3 w-3" />
-                          Pause
-                        </button>
-                      )}
-                      {sc.status === 'PAUSED' && (
-                        <button
-                          onClick={() => handleScheduleAction(sc.id, 'resume')}
-                          className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 flex items-center gap-1"
-                        >
-                          <Play className="h-3 w-3" />
-                          Resume
-                        </button>
-                      )}
-                      {sc.status !== 'CANCELLED' && (
-                        <button
-                          onClick={() => handleScheduleAction(sc.id, 'cancel')}
-                          className="rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-100 flex items-center gap-1"
-                        >
-                          <XCircle className="h-3 w-3" />
-                          Cancel
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+          <div>
+            <div className="mb-2 flex items-center justify-between"><span className="text-sm font-bold text-slate-900"><Users className="mr-1 inline h-4 w-4" />Registered ({regs ? going.length : '…'}{e.capacity ? ` / ${e.capacity}` : ''})</span>{e.rosterChannelId && <span className="text-xs text-slate-500">Also live in the private registrations channel</span>}</div>
+            {(e.finalRoster || regs) && (
+              <ol className="max-h-56 space-y-1 overflow-auto text-sm">
+                {(regs && regs.length ? going : (e.finalRoster || []).filter((r: any) => r.status !== 'CANCELLED')).map((r: any, i: number) => (
+                  <li key={r.discordUserId || i} className="flex items-center gap-2"><span className="w-6 text-right text-xs text-slate-400">{i + 1}.</span><MemberName id={r.discordUserId} communityId={communityId} fallback={r.username} />{r.status === 'ATTENDED' && <span className="text-xs text-emerald-600">attended</span>}</li>
+                ))}
+                {regs && !going.length && !(e.finalRoster || []).length && <li className="text-xs text-slate-500">Nobody yet.</li>}
+              </ol>
+            )}
           </div>
         </div>
       )}
     </div>
   );
-};
+}
+
+function Tool({ kind, e, communityId, flash, done }: any) {
+  const engagement = async (path: string, body: any) => {
+    const r = await fetch(`/api/v1/engagement/${path}?communityId=${encodeURIComponent(communityId)}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'x-community-id': communityId }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.success === false) throw new Error(j?.error?.message || j?.message || 'Could not save.');
+    return j;
+  };
+  const start = new Date(e.startAt);
+  const [channelId, setChannelId] = useState(e.channelId || '');
+  const [text, setText] = useState(kind === 'announce' ? `📢 **${e.title}** starts <t:${Math.floor(start.getTime() / 1000)}:R>!` : kind === 'reminder' ? `⏰ **${e.title}** starts <t:${Math.floor(start.getTime() / 1000)}:R>. See you there!` : '');
+  const [at, setAt] = useState(toLocalInput(new Date(Math.max(Date.now() + 5 * 60000, start.getTime() - 3600000))));
+  const [options, setOptions] = useState(['', '']);
+  const [hours, setHours] = useState(24);
+  const [winners, setWinners] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    setBusy(true);
+    try {
+      if (kind === 'announce') { const j = await engagement('announcements', { title: e.title, content: text, channelId }); done('announcement', j.announcement?.id || j.id || '', text.slice(0, 80)); }
+      if (kind === 'reminder') { const j = await engagement('reminders', { targetType: 'CHANNEL', channelId, triggerAt: new Date(at).toISOString(), recurrence: 'ONCE', message: text }); done('reminder', j.reminder?.id || j.id || '', text.slice(0, 80), new Date(at).toISOString()); }
+      if (kind === 'poll') { const filled = options.map((o) => o.trim()).filter(Boolean); const j = await engagement('polls', { question: text, channelId, options: filled, durationHours: hours, allowMultiselect: false, afterAction: 'ANNOUNCE' }); done('poll', j.poll?.id || j.id || '', text); }
+      if (kind === 'giveaway') {
+        const r = await fetch(`/api/v1/communities/${encodeURIComponent(communityId)}/features/giveaways`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'x-community-id': communityId }, body: JSON.stringify({ channelId, prize: text, winners, durationMinutes: Math.max(1, Math.round(hours * 60)), description: `For ${e.title}` }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.success) throw new Error(j?.error?.message || 'Could not start the giveaway.');
+        done('giveaway', j.data?.id || '', text);
+      }
+      flash(true, kind === 'reminder' ? 'Reminder scheduled.' : 'Posted in Discord.');
+    } catch (err: any) { flash(false, err.message); }
+    setBusy(false);
+  };
+  return (
+    <div className="mt-3 space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3">
+      <div><span className={label}>Channel</span><div className="mt-1"><ChannelSelect communityId={communityId} value={channelId} onChange={setChannelId} /></div></div>
+      {(kind === 'announce' || kind === 'reminder') && <div><span className={label}>Message</span><div className="mt-1"><MessageComposer communityId={communityId} value={text} onChange={setText} rows={3} maxLength={2000} /></div><p className="mt-1 text-[11px] text-slate-500">The &lt;t:…:R&gt; part shows as “in 2 hours” in each member’s own time.</p></div>}
+      {kind === 'reminder' && <label className={label}>Send at<input type="datetime-local" className={`${input} mt-1`} value={at} onChange={(ev) => setAt(ev.target.value)} /></label>}
+      {kind === 'poll' && <>
+        <label className={label}>Question<input className={`${input} mt-1`} value={text} maxLength={300} onChange={(ev) => setText(ev.target.value)} placeholder="e.g. Which track should we race?" /></label>
+        {options.map((o, i) => <input key={i} className={input} value={o} maxLength={55} placeholder={`Answer ${i + 1}`} onChange={(ev) => setOptions(options.map((x, j) => (j === i ? ev.target.value : x)))} />)}
+        {options.length < 10 && <button type="button" className={ghost} onClick={() => setOptions([...options, ''])}><Plus className="h-3.5 w-3.5" />Answer</button>}
+        <label className={label}>Open for (hours)<input type="number" min={1} max={768} className={`${input} mt-1 w-28`} value={hours} onChange={(ev) => setHours(Number(ev.target.value))} /></label>
+      </>}
+      {kind === 'giveaway' && <>
+        <label className={label}>Prize<input className={`${input} mt-1`} value={text} maxLength={200} onChange={(ev) => setText(ev.target.value)} placeholder="e.g. Discord Nitro" /></label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className={label}>Winners<input type="number" min={1} max={20} className={`${input} mt-1`} value={winners} onChange={(ev) => setWinners(Number(ev.target.value))} /></label>
+          <label className={label}>Runs for (hours)<input type="number" min={0.1} step={0.5} className={`${input} mt-1`} value={hours} onChange={(ev) => setHours(Number(ev.target.value))} /></label>
+        </div>
+      </>}
+      <button className={primary} disabled={busy || !text.trim() || !channelId || (kind === 'poll' && options.filter((o) => o.trim()).length < 2)} onClick={go}><Send className="h-4 w-4" />{kind === 'reminder' ? 'Schedule' : kind === 'giveaway' ? 'Start giveaway' : 'Post'}</button>
+    </div>
+  );
+}

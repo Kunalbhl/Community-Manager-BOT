@@ -247,7 +247,7 @@ import {
   testAutomationWorkflow,
   getAutomationExecutions,
   getInsightsSummary,
-  consultAi, updateCampaignState, deleteReminder, closePollHandler, updateMessageTemplate, deleteMessageTemplate } from '../controllers/communityManager.controller.js';
+  consultAi, updateCampaignState, deleteReminder, resendReminder, updateReminder, closePollHandler, updateMessageTemplate, deleteMessageTemplate } from '../controllers/communityManager.controller.js';
 import {
   createEvent,
   editEvent,
@@ -273,6 +273,7 @@ import {
   pauseSchedule,
   resumeSchedule,
   cancelSchedule,
+  linkToEvent,
 } from '../controllers/events.controller.js';
 import {
   getWarningsHandler,
@@ -832,6 +833,8 @@ router.post('/engagement/campaigns/:id/state', requirePermission('community.mana
 router.get('/engagement/reminders', requirePermission('community.view'), getReminders);
 router.post('/engagement/reminders', requirePermission('community.manage'), createReminder);
 router.delete('/engagement/reminders/:id', requirePermission('community.manage'), deleteReminder);
+router.post('/engagement/reminders/:id/resend', requirePermission('community.manage'), resendReminder);
+router.put('/engagement/reminders/:id', requirePermission('community.manage'), updateReminder);
 
 router.get('/engagement/polls', requirePermission('community.view'), getPolls);
 router.post('/engagement/polls', requirePermission('community.manage'), createPoll);
@@ -887,6 +890,7 @@ router.post('/events/:eventId/register', registerMember);
 router.post('/events/:eventId/register/cancel', cancelRegistration);
 router.post('/events/:eventId/attendance/mark', requirePermission('community.manage'), markAttendance);
 router.post('/events/:eventId/check-in', checkIn);
+router.post('/events/:eventId/links', requirePermission('community.manage'), linkToEvent);
 
 // Schedules module
 router.get('/schedules', requirePermission('community.view'), listSchedules);
