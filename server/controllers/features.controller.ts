@@ -18,6 +18,7 @@ const str = (v: unknown, max: number) => String(v ?? '').trim().slice(0, max);
 const int = (v: unknown, min: number, max: number, def: number) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def; };
 const snow = (v: unknown) => (isSnowflake(v) ? v : undefined);
 const bool = (v: unknown) => Boolean(v);
+const url = (v: unknown) => (/^https:\/\/\S{4,500}$/i.test(String(v || '').trim()) ? String(v).trim() : '');
 
 async function channel(communityId: string, channelId: unknown) {
   const guild = await guildFor(communityId);
@@ -109,7 +110,7 @@ export async function savePanelHandler(req: Request, res: Response) {
     const b = req.body || {};
     const buttons = (Array.isArray(b.buttons) ? b.buttons : []).filter((x: any) => isSnowflake(x?.roleId)).slice(0, 25).map((x: any) => ({ roleId: x.roleId, label: str(x.label, 80) || 'Role', emoji: str(x.emoji, 64) || undefined, style: ['AUTO', 'BLUE', 'GREEN', 'RED', 'GREY'].includes(x.style) ? x.style : 'AUTO', description: str(x.description, 200) || undefined, buttonText: str(x.buttonText, 40) || undefined, requiredRoleIds: (Array.isArray(x.requiredRoleIds) ? x.requiredRoleIds : []).filter(isSnowflake).slice(0, 10), blockedRoleIds: (Array.isArray(x.blockedRoleIds) ? x.blockedRoleIds : []).filter(isSnowflake).slice(0, 10) }));
     if (!buttons.length) throw new Error('Add at least one role button.');
-    const data = { communityId, title: str(b.title, 200) || 'Pick your roles', description: str(b.description, 4000), mode: b.mode === 'ONE_ONLY' ? 'ONE_ONLY' : 'TOGGLE', layout: b.layout === 'CARDS' ? 'CARDS' : 'BUTTONS', color: /^#?[0-9a-f]{6}$/i.test(String(b.color || '')) ? String(b.color).replace(/^#?/, '#') : '', buttons, requiredRoleIds: (Array.isArray(b.requiredRoleIds) ? b.requiredRoleIds : []).filter(isSnowflake).slice(0, 10), blockedRoleIds: (Array.isArray(b.blockedRoleIds) ? b.blockedRoleIds : []).filter(isSnowflake).slice(0, 10) };
+    const data = { communityId, title: str(b.title, 200) || 'Pick your roles', description: str(b.description, 4000), mode: b.mode === 'ONE_ONLY' ? 'ONE_ONLY' : 'TOGGLE', layout: b.layout === 'CARDS' ? 'CARDS' : 'BUTTONS', thumbnailUrl: url(b.thumbnailUrl), imageUrl: url(b.imageUrl), footerText: str(b.footerText, 200), footerIconUrl: url(b.footerIconUrl), color: /^#?[0-9a-f]{6}$/i.test(String(b.color || '')) ? String(b.color).replace(/^#?/, '#') : '', buttons, requiredRoleIds: (Array.isArray(b.requiredRoleIds) ? b.requiredRoleIds : []).filter(isSnowflake).slice(0, 10), blockedRoleIds: (Array.isArray(b.blockedRoleIds) ? b.blockedRoleIds : []).filter(isSnowflake).slice(0, 10) };
     let panel: any;
     if (b.id) {
       const existing = await buttonRolePanelsRepository.getById(String(b.id)).catch(() => null);

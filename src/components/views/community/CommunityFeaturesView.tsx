@@ -238,7 +238,7 @@ function ButtonRolesTab({ api, res, communityId }: any) {
           <div className="grid gap-4 md:grid-cols-[1fr_auto]">
             <div className="text-sm font-medium text-slate-700">Look
               <div className="mt-1 grid grid-cols-2 gap-2">
-                {[['BUTTONS', 'Classic', 'Message with a row of coloured buttons'], ['CARDS', 'Cards (premium)', 'Each role on its own line with an icon, a short description and its button, inside a coloured frame']].map(([v, l, d]) => (
+                {[['BUTTONS', 'Classic', 'Message with a row of coloured buttons'], ['CARDS', 'Premium frame', 'Coloured frame with the server picture, your text, the buttons, a big image and a footer']].map(([v, l, d]) => (
                   <button key={v} type="button" onClick={() => setF({ ...f, layout: v })} className={`rounded-xl border p-3 text-left ${((f.layout || 'BUTTONS') === v) ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200'}`}><b className="text-sm">{l}</b><span className="block text-xs text-slate-500">{d}</span></button>
                 ))}
               </div>
@@ -261,7 +261,7 @@ function ButtonRolesTab({ api, res, communityId }: any) {
                 </div>
                 {b._open && (
                   <div className="mt-2 grid gap-3 rounded-lg bg-slate-50 p-3 md:grid-cols-2">
-                    {(f.layout === 'CARDS') && <><Label t="Short description (cards look)"><input className={input} maxLength={200} value={b.description || ''} onChange={(e) => setB(i, { description: e.target.value })} placeholder="e.g. Unlocks the GTA V channels" /></Label>
+                    {false && <><Label t="Short description (cards look)"><input className={input} maxLength={200} value={b.description || ''} onChange={(e) => setB(i, { description: e.target.value })} placeholder="e.g. Unlocks the GTA V channels" /></Label>
                     <Label t="Button text (cards look)"><input className={input} maxLength={40} value={b.buttonText || ''} onChange={(e) => setB(i, { buttonText: e.target.value })} placeholder="Choose" /></Label></>}
                     <RoleChipsField communityId={communityId} label="Who can take this role" hint="Only members with any of these roles. Empty = anyone who can use the panel." ids={b.requiredRoleIds || []} onChange={(l: string[]) => setB(i, { requiredRoleIds: l })} />
                     <RoleChipsField communityId={communityId} label="Who can’t take it" hint="Members with any of these roles are refused." ids={b.blockedRoleIds || []} onChange={(l: string[]) => setB(i, { blockedRoleIds: l })} />
@@ -274,7 +274,14 @@ function ButtonRolesTab({ api, res, communityId }: any) {
           <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 md:grid-cols-2">
             <RoleChipsField communityId={communityId} label="Who can use the whole panel" hint="Only members with any of these roles. Empty = everyone who can see the channel. Each button can add its own rule with Who." ids={f.requiredRoleIds || []} onChange={(l: string[]) => setF({ ...f, requiredRoleIds: l })} />
             <RoleChipsField communityId={communityId} label="Who can’t use it" hint="Members with any of these roles are refused." ids={f.blockedRoleIds || []} onChange={(l: string[]) => setF({ ...f, blockedRoleIds: l })} />
-            <p className="text-xs text-slate-500 md:col-span-2">Button colours: Discord only offers blue, green, red and grey. <b>Auto</b> matches each button to its emoji or the role’s colour (🎯 → red, 🧙 → blue, 🍀 → green). <b>More</b> on a button sets who can take it and, in the cards look, its description. Who can <b>see</b> the panel is set by the channel’s own permissions in Discord. Picking a role in “Pick one only” mode removes the other roles of this panel, and the member is told exactly what was added and removed.</p>
+            <p className="text-xs text-slate-500 md:col-span-2">Button colours: Discord only offers blue, green, red and grey. <b>Auto</b> picks a colour that makes the emoji stand out (🎯 red emoji → blue button, 🧙 blue emoji → green button). If you pick the same colour as the emoji, the emoji is hard to see. <b>More</b> on a button sets who can take it and, in the cards look, its description. Who can <b>see</b> the panel is set by the channel’s own permissions in Discord. Picking a role in “Pick one only” mode removes the other roles of this panel, and the member is told exactly what was added and removed.</p>
+          </div>
+          <div className="grid gap-3 rounded-xl border border-slate-200 p-3 md:grid-cols-2">
+            <Label t="Thumbnail image link (top right)"><input className={input} value={f.thumbnailUrl || ''} onChange={(e) => setF({ ...f, thumbnailUrl: e.target.value })} placeholder="https://… (empty = server icon)" /></Label>
+            <Label t="Big image link (above the footer)"><input className={input} value={f.imageUrl || ''} onChange={(e) => setF({ ...f, imageUrl: e.target.value })} placeholder="https://…png / .gif" /></Label>
+            <Label t="Footer text"><input className={input} maxLength={200} value={f.footerText || ''} onChange={(e) => setF({ ...f, footerText: e.target.value })} placeholder="e.g. DONS OF SYNDICATE · Pick one game" /></Label>
+            <Label t="Footer icon link (classic look)"><input className={input} value={f.footerIconUrl || ''} onChange={(e) => setF({ ...f, footerIconUrl: e.target.value })} placeholder="https://…" /></Label>
+            <p className="text-xs text-slate-500 md:col-span-2">Links must start with https://. Tip: right-click an image in Discord → Copy Link.</p>
           </div>
           <Label t="Post or update in channel"><Pick options={res.textChannels} value={f.channelId} onChange={(v) => setF({ ...f, channelId: v })} placeholder="Save without posting" /></Label>
           <button className={btn} onClick={async () => { setMsg(''); try { const p = await api('/features/button-roles', 'POST', f); setF({ ...p, channelId: p.channelId || '' }); setMsg(f.channelId ? 'Saved and posted.' : 'Saved.'); load(); } catch (e: any) { setMsg(e.message); } }}><Send className="h-4 w-4" /> Save panel</button>
