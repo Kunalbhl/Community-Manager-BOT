@@ -227,7 +227,6 @@ function SeriesCard({ communityId, api, rules: rules0, series, dmOnCreate, codeF
               <div className="mt-2 text-xs"><b className="text-white">🎁 Latest rewards</b><br />✅ ➕ Reward per recruit · 1 hour ago</div>
             </div></div>
         </div>
-</div>
       </div>
     </Card>
   );
