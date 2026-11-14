@@ -532,3 +532,55 @@ export async function linkToEvent(req: Request, res: Response, next: NextFunctio
     res.json({ success: true, links });
   } catch (error) { next(error); }
 }
+
+const LINK_TYPES = ['announcement', 'campaign', 'reminder', 'poll', 'giveaway'] as const;
+async function linkRepo(type: string): Promise<any> {
+  const r: any = await import('../repositories/index.js');
+  if (type === 'announcement') return r.announcementsRepository;
+  if (type === 'campaign') return r.campaignsRepository;
+  if (type === 'reminder') return r.remindersRepository;
+  if (type === 'poll') return r.pollsRepository;
+  if (type === 'giveaway') return (await import('../services/features/community.service.js')).giveawaysRepository;
+  return null;
+}
+
+/** Attach an announcement / campaign / reminder / poll / giveaway to an event (or detach with eventId empty). */
+export async function attachToEvent(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const e: any = await eventsRepository.getById(req.params.eventId);
+    if (!e || e.communityId !== communityId) throw new NotFoundError('Event not found.');
+    const type = String(req.body?.type || '');
+    if (!(LINK_TYPES as readonly string[]).includes(type)) throw new BadRequestError('Unknown item type.');
+    const repo = await linkRepo(type);
+    const item: any = await repo.getById(String(req.body?.id || '')).catch(() => null);
+    if (!item || item.communityId !== communityId) throw new NotFoundError('Item not found.');
+    await repo.update(item.id, { eventId: e.id, eventTitle: e.title } as any);
+    const links = [...(e.links || []).filter((l: any) => !(l.type === type && l.id === item.id)), { type, id: item.id, createdAt: new Date().toISOString() }].slice(-100);
+    await eventsRepository.update(e.id, { links } as any);
+    res.json({ success: true });
+  } catch (error) { next(error); }
+}
+
+/** Everything linked to an event, with its live status. */
+export async function linkedForEvent(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const e: any = await eventsRepository.getById(req.params.eventId);
+    if (!e || e.communityId !== communityId) throw new NotFoundError('Event not found.');
+    const out: any[] = [];
+    for (const l of (e.links || []) as any[]) {
+      const repo = await linkRepo(l.type);
+      const it: any = repo && l.id ? await repo.getById(l.id).catch(() => null) : null;
+      if (!it) continue;
+      out.push({
+        type: l.type, id: it.id,
+        title: it.title || it.name || it.question || it.prize || String(it.message || it.content || '').slice(0, 80),
+        status: it.status || (it.ended ? 'ENDED' : it.endsAt ? 'ACTIVE' : ''),
+        when: it.scheduledAt || it.triggerAt || it.endsAt || it.sentAt || it.createdAt,
+        channelId: it.channelId || it.targetChannelId,
+      });
+    }
+    res.json({ success: true, items: out.sort((a, b) => String(a.when).localeCompare(String(b.when))) });
+  } catch (error) { next(error); }
+}
