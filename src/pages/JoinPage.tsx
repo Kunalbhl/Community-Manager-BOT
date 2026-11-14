@@ -12,6 +12,7 @@ type Info = {
   quiz: { id: string; question: string; options: string[] }[];
   questions: { id: string; text: string; type: string; options: string[]; required: boolean; guidance: string }[];
   askCode: boolean; codeRequired: boolean;
+  sources?: { id: string; name: string; emoji: string; description: string; codeMode: string; detailLabel: string; detailRequired: boolean }[];
   session: null | {
     me: { id: string; username: string; name: string; avatarUrl: string };
     recruiterCode: string; quizPassed: boolean; inServer: boolean; inviteUrl: string;
@@ -177,11 +178,15 @@ function Quiz({ info, communityId, onPassed }: any) {
 function Form({ info, s, code: code0, communityId, onDone }: any) {
   const [a, setA] = useState<Record<string, string>>({});
   const [code, setCode] = useState(code0 || '');
+  const [srcId, setSrcId] = useState('');
+  const [detail, setDetail] = useState('');
+  const src = (info.sources || []).find((x: any) => x.id === srcId);
+  const mode = src && src.codeMode !== 'INHERIT' ? src.codeMode : info.askCode ? (info.codeRequired ? 'REQUIRED' : 'OPTIONAL') : 'NONE';
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const submit = async () => {
     setBusy(true); setMsg('');
-    try { await api(`${encodeURIComponent(communityId)}/submit`, { answers: a, recruiterCode: code, agree: true }); onDone(); }
+    try { await api(`${encodeURIComponent(communityId)}/submit`, { answers: a, recruiterCode: code, agree: true, sourceId: srcId, sourceDetail: detail }); onDone(); }
     catch (e: any) { setMsg(e.message); } finally { setBusy(false); }
   };
   return (
@@ -190,6 +195,19 @@ function Form({ info, s, code: code0, communityId, onDone }: any) {
       <Me s={s} communityId={communityId} reload={onDone} />
       <h2 className="text-xl font-bold">A few questions</h2>
       <div className="mt-5 space-y-4">
+        {(info.sources || []).length > 0 && (
+          <div>
+            <div className="text-sm font-semibold">How did you find us?<span className="text-rose-300"> *</span></div>
+            <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+              {info.sources.map((x: any) => (
+                <button type="button" key={x.id} onClick={() => setSrcId(x.id)} className={`rounded-xl border px-3 py-2 text-left text-sm ${srcId === x.id ? 'border-indigo-400 bg-indigo-500/20' : 'border-white/15 hover:bg-white/5'}`}>
+                  <b>{x.emoji} {x.name}</b>{x.description && <div className="text-xs text-white/60">{x.description}</div>}
+                </button>
+              ))}
+            </div>
+            {src?.detailLabel && <input className={`${field} mt-2`} maxLength={200} placeholder={`${src.detailLabel}${src.detailRequired ? ' *' : ''}`} value={detail} onChange={(e) => setDetail(e.target.value)} />}
+          </div>
+        )}
         {info.questions.map((q: any) => (
           <label key={q.id} className="block">
             <div className="text-sm font-semibold">{q.text}{q.required && <span className="text-rose-300"> *</span>}</div>
@@ -205,9 +223,9 @@ function Form({ info, s, code: code0, communityId, onDone }: any) {
             </div>
           </label>
         ))}
-        {info.askCode && (
+        {mode !== 'NONE' && (
           <label className="block">
-            <div className="text-sm font-semibold">Recruiter code{info.codeRequired ? <span className="text-rose-300"> *</span> : <span className="font-normal text-white/50"> (optional)</span>}</div>
+            <div className="text-sm font-semibold">Recruiter code{mode === 'REQUIRED' ? <span className="text-rose-300"> *</span> : <span className="font-normal text-white/50"> (optional)</span>}</div>
             <div className="text-xs text-white/50">The code of the person who invited you, so they get credit.</div>
             <input className={`${field} mt-1.5 font-mono uppercase`} maxLength={32} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="e.g. KP-007" />
           </label>

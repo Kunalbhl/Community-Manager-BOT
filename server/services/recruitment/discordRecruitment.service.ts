@@ -23,7 +23,7 @@ const appUrl = () => (process.env.APP_URL || 'https://community-manager-bot-7209
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 export const fillMsg = (t: string, v: Record<string, string>) => t.replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m)).replace(/\\n/g, '\n');
 
-interface Session { communityId: string; page: number; answers: Record<string, string>; code?: string; at: number }
+interface Session { communityId: string; page: number; answers: Record<string, string>; code?: string; at: number; sourceId?: string; sourceDetail?: string }
 const sessions = new Map<string, Session>(); // key: guildId_userId
 /** The server an interaction is for: its own guild, or (in a DM) the server named in the button. */
 const gidOf = (i: any): string => i.guildId || i.__gid || '';
@@ -39,17 +39,31 @@ async function questionsFor(communityId: string) {
   return qs;
 }
 
-/** Pages of questions; the recruiter-code field rides on the last page when there is room, else gets its own page. */
-function pagesFor(questions: any[], askCode: boolean) {
+/** Pages of questions; the extra fields (recruiter code, source detail) ride on the last page when there is room, else get their own page. */
+function pagesFor(questions: any[], askCode: boolean, extra = 0) {
   const pages: any[][] = [];
   for (let i = 0; i < questions.length; i += PAGE) pages.push(questions.slice(i, i + PAGE));
   if (!pages.length) pages.push([]);
-  const codeOnOwnPage = askCode && pages[pages.length - 1].length >= PAGE;
-  if (codeOnOwnPage) pages.push([]);
-  return { pages, codePage: askCode ? pages.length - 1 : -1 };
+  const n = (askCode ? 1 : 0) + extra;
+  if (n && pages[pages.length - 1].length + n > PAGE) pages.push([]);
+  return { pages, codePage: askCode || extra ? pages.length - 1 : -1 };
 }
 
-function modalFor(page: number, total: number, qs: any[], withCode: boolean, prev: Session | undefined, codeRequired = false, tag = '') {
+export interface ApplySource { id: string; name: string; emoji?: string; description?: string; enabled?: boolean; codeMode?: 'INHERIT' | 'NONE' | 'OPTIONAL' | 'REQUIRED'; detailLabel?: string; detailRequired?: boolean; pingRoleIds?: string[]; tag?: string }
+/** Enabled sources, when the server asks "How did you find us?". */
+export function sourcesOf(cfg: any): ApplySource[] {
+  return cfg?.askSource ? (cfg.sources || []).filter((x: any) => x && x.enabled !== false && x.name) : [];
+}
+/** Recruiter-code rules for this applicant: the picked source can override the server setting. */
+function codeRule(cfg: any, src?: ApplySource | null) {
+  const mode = src?.codeMode && src.codeMode !== 'INHERIT' ? src.codeMode : cfg.askRecruiterCode ? (cfg.codeRequired ? 'REQUIRED' : 'OPTIONAL') : 'NONE';
+  return { ask: mode !== 'NONE', required: mode === 'REQUIRED' };
+}
+function sourceFor(cfg: any, session?: Session) {
+  return session?.sourceId ? sourcesOf(cfg).find((x) => x.id === session.sourceId) || null : null;
+}
+
+function modalFor(page: number, total: number, qs: any[], withCode: boolean, prev: Session | undefined, codeRequired = false, tag = '', detail?: { label: string; required: boolean } | null) {
   const modal = new ModalBuilder().setCustomId(`cm:apply:page:${page}${tag}`).setTitle(clip(total > 1 ? `Application (${page + 1}/${total})` : 'Application', 45));
   for (const q of qs) {
     const options = Array.isArray(q.options) && q.options.length ? ` Options: ${q.options.join(', ')}` : '';
@@ -66,7 +80,12 @@ function modalFor(page: number, total: number, qs: any[], withCode: boolean, pre
     if (old) input.setValue(old);
     modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
   }
-  if (withCode) {
+  if (detail) {
+    const d = new TextInputBuilder().setCustomId('srcdetail').setLabel(clip(detail.label, 45)).setStyle(TextInputStyle.Short).setRequired(!!detail.required).setMaxLength(200);
+    if (prev?.sourceDetail) d.setValue(prev.sourceDetail);
+    modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(d));
+  }
+  if (withCode && (!detail || true)) {
     modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder().setCustomId('code').setLabel(codeRequired ? 'Recruiter code' : 'Recruiter code (optional)').setStyle(TextInputStyle.Short).setRequired(!!codeRequired).setMaxLength(40).setPlaceholder(codeRequired ? 'The code from the person who invited you' : 'Leave empty if nobody referred you'),
     ));
@@ -151,8 +170,35 @@ export const discordRecruitment = {
     const prev = sessions.get(key);
     const session: Session = prev && Date.now() - prev.at < 30 * 60_000 ? { ...prev, page: 0 } : { communityId, page: 0, answers: {}, at: Date.now() };
     sessions.set(key, session);
-    const { pages, codePage } = pagesFor(qs, cfg.askRecruiterCode);
-    return interaction.showModal(modalFor(0, pages.length, pages[0], codePage === 0, session, !!cfg.codeRequired, dmTag(interaction)));
+    const srcs = sourcesOf(cfg);
+    if (srcs.length && !interaction.isStringSelectMenu?.()) {
+      const { StringSelectMenuBuilder } = await import('discord.js');
+      const menu = new StringSelectMenuBuilder().setCustomId(`cm:apply:src:0${dmTag(interaction)}`).setPlaceholder('How did you find us?')
+        .addOptions(srcs.slice(0, 25).map((x) => ({ label: clip(x.name, 100), value: x.id, description: x.description ? clip(x.description, 100) : undefined, emoji: x.emoji && !/^</.test(x.emoji) ? x.emoji : undefined, default: x.id === session.sourceId })));
+      return interaction.reply({ content: '📋 **Before the form:** how did you find us? Pick one to continue.', components: [new ActionRowBuilder<any>().addComponents(menu)], ephemeral: true });
+    }
+    return this.openPage(interaction, session, 0);
+  },
+
+  /** Picked a source from the menu: remember it and open the form. */
+  async sourcePicked(interaction: any) {
+    const key = `${gidOf(interaction)}_${interaction.user.id}`;
+    const session = sessions.get(key);
+    if (!session) return interaction.reply({ content: '⌛ Your application timed out. Press **Apply** to start again.', ephemeral: true });
+    session.sourceId = interaction.values?.[0];
+    session.at = Date.now();
+    return this.openPage(interaction, session, 0);
+  },
+
+  async openPage(interaction: any, session: Session, page: number) {
+    const cfg = (await getToolkit(session.communityId)).recruitment;
+    const src = sourceFor(cfg, session);
+    const rule = codeRule(cfg, src);
+    const detail = src?.detailLabel ? { label: src.detailLabel, required: !!src.detailRequired } : null;
+    const { pages, codePage } = pagesFor(await questionsFor(session.communityId), rule.ask, detail ? 1 : 0);
+    if (page >= pages.length) return interaction.reply({ content: 'Something went wrong. Press **Apply** to start again.', ephemeral: true });
+    const last = codePage === page;
+    return interaction.showModal(modalFor(page, pages.length, pages[page], last && rule.ask, session, rule.required, dmTag(interaction), last ? detail : null));
   },
 
   /** "Continue" button between pages. */
@@ -160,10 +206,7 @@ export const discordRecruitment = {
     const key = `${gidOf(interaction)}_${interaction.user.id}`;
     const session = sessions.get(key);
     if (!session) return interaction.reply({ content: '⌛ Your application timed out. Press **Apply** to start again.', ephemeral: true });
-    const cfg = (await getToolkit(session.communityId)).recruitment;
-    const { pages, codePage } = pagesFor(await questionsFor(session.communityId), cfg.askRecruiterCode);
-    if (page >= pages.length) return interaction.reply({ content: 'Something went wrong. Press **Apply** to start again.', ephemeral: true });
-    return interaction.showModal(modalFor(page, pages.length, pages[page], codePage === page, session, !!cfg.codeRequired, dmTag(interaction)));
+    return this.openPage(interaction, session, page);
   },
 
   /** A page was submitted: save answers, then show "Continue" or submit. */
@@ -174,12 +217,15 @@ export const discordRecruitment = {
     for (const row of interaction.fields.fields.values()) {
       const id = String(row.customId);
       if (id === 'code') session.code = String(row.value || '').trim() || undefined;
+      else if (id === 'srcdetail') session.sourceDetail = String(row.value || '').trim() || undefined;
       else if (id.startsWith('q:')) session.answers[id.slice(2)] = String(row.value || '').trim();
     }
     session.at = Date.now();
     const cfg = (await getToolkit(session.communityId)).recruitment;
     const qs = await questionsFor(session.communityId);
-    const { pages } = pagesFor(qs, cfg.askRecruiterCode);
+    const src = sourceFor(cfg, session);
+    const rule = codeRule(cfg, src);
+    const { pages } = pagesFor(qs, rule.ask, src?.detailLabel ? 1 : 0);
 
     if (page + 1 < pages.length) {
       return interaction.reply({
@@ -192,7 +238,8 @@ export const discordRecruitment = {
     await interaction.deferReply({ ephemeral: true });
     try {
       const rc = (await getToolkit(session.communityId)).recruitment;
-      if (rc.askRecruiterCode && rc.codeRequired && !session.code) throw new Error('A recruiter code is required in this server. Ask the person who invited you for their code.');
+      if (rule.required && !session.code) throw new Error(`A recruiter code is required${src ? ` when you found us through ${src.name}` : ' in this server'}. Ask the person who invited you for their code.`);
+      if (!rule.ask) session.code = undefined;
       const { applicationWorkflowService } = await import('../applicationWorkflow.service.js');
       const member: any = interaction.member;
       await applicationWorkflowService.submitApplication({
@@ -202,6 +249,7 @@ export const discordRecruitment = {
         applicantDisplayName: member?.displayName || interaction.user.globalName || interaction.user.username,
         recruiterCode: session.code,
         source: 'DISCORD',
+        applicationSource: src ? { id: src.id, name: src.name, emoji: src.emoji, detail: session.sourceDetail, tag: src.tag } : undefined,
         answers: qs.map((q: any) => ({ questionId: q.id, answerText: session.answers[q.id] || '' })),
       });
       sessions.delete(key);
@@ -238,6 +286,7 @@ export const discordRecruitment = {
       description: [
         isSnowflake(id) ? `Applicant: <@${id}> (\`${app.applicantUsernameSnapshot || app.applicantUsername || id}\`)` : '',
         app.recruiterCodeUsed || app.recruiterCode ? `Recruiter code: **${app.recruiterCodeUsed || app.recruiterCode}**` : '',
+        app.applicationSource ? `Found us through: **${app.applicationSource.emoji || ''} ${app.applicationSource.name}**${app.applicationSource.detail ? ` · ${clip(app.applicationSource.detail, 200)}` : ''}` : '',
         `Submitted <t:${Math.floor(Date.parse(app.submittedAt || app.createdAt || new Date().toISOString()) / 1000)}:R> · via ${app.source === 'DISCORD' ? 'Discord' : 'website'}`,
         extra?.roomUrl ? `Review room: ${extra.roomUrl}` : '',
         status === 'APPROVED' || status === 'JOIN_PENDING' || status === 'JOINED' ? `\n✅ **Approved**${extra?.by ? ` by <@${extra.by}>` : ''}` : '',
@@ -283,7 +332,8 @@ export const discordRecruitment = {
     if (guild && cfg.reviewChannelId) {
       const channel: any = guild.channels.cache.get(cfg.reviewChannelId);
       if (channel) {
-        const pings = cfg.pingRoleIds.filter((r) => guild.roles.cache.has(r));
+        const srcPing: string[] = ((cfg as any).sources || []).find((x: any) => x.id === app.applicationSourceId)?.pingRoleIds || [];
+        const pings = [...new Set([...cfg.pingRoleIds, ...srcPing])].filter((r) => guild.roles.cache.has(r));
         const msg = await channel.send({
           content: pings.length ? `${pings.map((r) => `<@&${r}>`).join(' ')} New application` : undefined,
           allowedMentions: { roles: pings },

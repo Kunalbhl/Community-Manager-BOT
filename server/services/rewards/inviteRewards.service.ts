@@ -40,6 +40,10 @@ export interface RewardRule {
     credit?: { itemId: string; amount: number };
   };
   approval: 'AUTO' | 'STAFF';
+  /** Who can approve when approval is STAFF (empty = the server's staff roles). Pinged when one is waiting. */
+  approverRoleIds?: string[];
+  /** Where the approval request is posted (empty = announcement channel, else the recruitment log). */
+  approvalChannelId?: string;
   onLeave: 'KEEP' | 'REVOKE';
   /** For repeating rewards: most times one recruiter can get it (0 = no limit). */
   maxPerRecruiter: number;
@@ -96,6 +100,23 @@ export function periodKey(d: Date, p: Period): string {
   const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
   return `${t.getUTCFullYear()}-W${String(Math.ceil(((t.getTime() - y0.getTime()) / DAY + 1) / 7)).padStart(2, '0')}`;
 }
+/** The server's staff roles: review-room ranks and the roles pinged for new applications. */
+export async function staffRoleIds(communityId: string): Promise<string[]> {
+  const { getToolkit } = await import('../toolkit/toolkitConfig.js');
+  const t: any = await getToolkit(communityId).catch(() => null);
+  const list = [...(t?.reviewRooms?.tiers || []).flatMap((x: any) => x.roleIds || []), ...(t?.recruitment?.pingRoleIds || [])];
+  return [...new Set(list.filter((x: any) => snow(x)))] as string[];
+}
+
+/** Staff check for reward buttons: the chosen roles, else the staff roles, else Discord staff permissions. */
+export async function canApprove(communityId: string, member: any, roleIds?: string[]) {
+  const p = member?.permissions;
+  if (p?.has?.('ManageGuild') || p?.has?.('Administrator')) return true;
+  const roles = roleIds?.length ? roleIds : await staffRoleIds(communityId);
+  if (roles.length) return roles.some((id) => member?.roles?.cache?.has(id));
+  return !!(p?.has?.('ManageRoles') || p?.has?.('ModerateMembers'));
+}
+
 const periodLabel = (p: Period) => (p === 'WEEK' ? 'week' : 'month');
 
 /** Cleans a rule coming from the dashboard. */
@@ -118,6 +139,8 @@ export function sanitizeRule(b: any, cur?: Partial<RewardRule>): Omit<RewardRule
     countWhen: { mode: b?.countWhen?.mode === 'STAYED' ? 'STAYED' : 'JOINED', stayDays: clampInt(b?.countWhen?.stayDays, 1, 90, 7) },
     actions,
     approval: b?.approval === 'STAFF' || actions.manualReward ? 'STAFF' : 'AUTO',
+    approverRoleIds: ids(b?.approverRoleIds),
+    approvalChannelId: snow(b?.approvalChannelId) ? b.approvalChannelId : '',
     onLeave: b?.onLeave === 'REVOKE' ? 'REVOKE' : 'KEEP',
     maxPerRecruiter: clampInt(b?.maxPerRecruiter, 0, 1000, 0),
     includePast: !!b?.includePast,
@@ -345,12 +368,53 @@ export const inviteRewards = {
   },
 
   async notifyStaffPending(g: RewardGrant) {
+    const rule = await rewardRulesRepository.getById(g.ruleId).catch(() => null);
     const { getToolkit } = await import('../toolkit/toolkitConfig.js');
     const cfg: any = await getToolkit(g.communityId).catch(() => null);
-    const chId = cfg?.recruitment?.logChannelId || cfg?.recruitment?.reviewChannelId;
+    const chId = rule?.approvalChannelId || rule?.actions.announceChannelId || cfg?.recruitment?.logChannelId || cfg?.recruitment?.reviewChannelId;
     const guild: any = chId ? await guildFor(g.communityId) : null;
     const ch: any = guild?.channels.cache.get(chId);
-    if (ch?.send) await ch.send({ content: `🎁 <@${g.recruiterId}> earned **${g.emoji} ${g.ruleName}** (${g.reason}). It is waiting for staff approval in the dashboard → Recruitment → Rewards.${g.manualReward ? `\nTo hand out: **${g.manualReward}**` : ''}`, allowedMentions: { parse: [] } }).catch(() => undefined);
+    if (!ch?.send) return;
+    const roles = (rule?.approverRoleIds?.length ? rule.approverRoleIds : await staffRoleIds(g.communityId)).filter((id) => guild.roles.cache.has(id));
+    const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
+    const msg = await ch.send({
+      content: roles.length ? `${roles.map((r) => `<@&${r}>`).join(' ')} a reward is waiting for approval` : undefined,
+      embeds: [{ title: `⏳ ${g.emoji} ${g.ruleName}`, color: 0xf59e0b, description: `<@${g.recruiterId}> earned this: ${g.reason}.${g.manualReward ? `\nTo hand out: **${g.manualReward}**` : ''}\nApprove to give it, or reject it.`, timestamp: new Date().toISOString() }],
+      components: [new ActionRowBuilder<any>().addComponents(
+        new ButtonBuilder().setCustomId(`cm:rg:ok:${g.id}`).setLabel('Approve').setEmoji('✅').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`cm:rg:no:${g.id}`).setLabel('Reject').setEmoji('✖️').setStyle(ButtonStyle.Secondary),
+      )],
+      allowedMentions: { roles },
+    }).catch(() => null);
+    if (msg) await rewardGrantsRepository.update(g.id, { approvalChannelId: ch.id, approvalMessageId: msg.id } as any).catch(() => undefined);
+  },
+
+  /** After a decision (dashboard or button): turn the approval request into the result, no new message. */
+  async closeApproval(g: any, text: string) {
+    if (!g?.approvalChannelId || !g?.approvalMessageId) return;
+    const guild: any = await guildFor(g.communityId);
+    const msg = await guild?.channels.cache.get(g.approvalChannelId)?.messages.fetch(g.approvalMessageId).catch(() => null);
+    if (!msg) return;
+    const e = msg.embeds?.[0]?.toJSON?.() || {};
+    await msg.edit({ content: null, embeds: [{ ...e, title: String(e.title || '').replace(/^⏳/, text.startsWith('✅') ? '✅' : '✖️'), color: text.startsWith('✅') ? 0x7fe0b0 : 0x94a3b8, description: `${String(e.description || '').split('\nApprove to give it')[0]}\n\n${text}` }], components: [], allowedMentions: { parse: [] } }).catch(() => undefined);
+  },
+
+  /** Approve / Reject from Discord. */
+  async decideFromDiscord(grantId: string, approve: boolean, member: any) {
+    const g: any = await rewardGrantsRepository.getById(grantId).catch(() => null);
+    if (!g) throw new Error('This reward no longer exists.');
+    const rule = await rewardRulesRepository.getById(g.ruleId).catch(() => null);
+    if (!(await canApprove(g.communityId, member, rule?.approverRoleIds))) throw new Error('Only the approvers of this reward can decide.');
+    if (!['PENDING_APPROVAL', 'FAILED'].includes(g.status)) throw new Error(`Already handled${g.decidedBy ? ` by ${g.decidedBy}` : ''}.`);
+    await rewardGrantsRepository.update(g.id, { decidedBy: member.displayName || member.user?.username, decidedAt: nowIso() } as any);
+    if (approve) {
+      const out: any = await this.deliver(g, rule);
+      await this.closeApproval(g, out?.status === 'FAILED' ? `⚠️ Approved by <@${member.id}>, but: ${out.error}` : `✅ Approved by <@${member.id}>.`);
+      return out?.status === 'FAILED' ? `Approved, but: ${out.error}` : 'Approved and given.';
+    }
+    await rewardGrantsRepository.update(g.id, { status: 'REJECTED', error: 'Rejected by staff.', updatedAt: nowIso() } as any);
+    await this.closeApproval(g, `✖️ Rejected by <@${member.id}>.`);
+    return 'Rejected.';
   },
 
   /** Removes temporary roles that have run out. */
@@ -409,7 +473,7 @@ export const inviteRewards = {
       if (rule.trigger.type === 'EVERY') { const done = Math.floor(have / target); target = (done + 1) * target; }
       if (rule.trigger.type === 'IN_PERIOD') have = valid.filter((r) => periodKey(new Date(joinedMs(r)), rule.trigger.period) === periodKey(new Date(now), rule.trigger.period)).length;
       const got = grants.some((g) => g.ruleId === rule.id && g.recruiterId === recruiterId && ['GRANTED', 'PENDING_APPROVAL'].includes(g.status) && (rule.trigger.type === 'MILESTONE' || (rule.trigger.type === 'IN_PERIOD' && g.occurrence === `period:${periodKey(new Date(now), rule.trigger.period)}`)));
-      return { ruleId: rule.id, name: rule.name, emoji: rule.emoji, have, target, waiting, done: got };
+      return { ruleId: rule.id, name: rule.name, emoji: rule.emoji, have, target, waiting, stayDays: rule.countWhen.mode === 'STAYED' ? rule.countWhen.stayDays : 0, done: got };
     });
   },
 };

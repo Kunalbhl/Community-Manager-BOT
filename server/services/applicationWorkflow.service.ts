@@ -37,6 +37,8 @@ export interface SubmitApplicationInput {
   formId?: string;
   formVersion?: string;
   source?: string;
+  /** "How did you find us?" picked by the applicant (admin-managed list). */
+  applicationSource?: { id: string; name: string; emoji?: string; detail?: string; tag?: string };
   answers: Array<{
     questionId: string;
     answerText: string;
@@ -306,6 +308,9 @@ export class ApplicationWorkflowService {
       formId,
       formVersion,
       source,
+      applicationSource: input.applicationSource,
+      applicationSourceId: input.applicationSource?.id,
+      tags: input.applicationSource?.tag ? [input.applicationSource.tag] : undefined,
       status: 'SUBMITTED',
       questions: configuredQuestions.map((q) => ({
         questionId: q.id,

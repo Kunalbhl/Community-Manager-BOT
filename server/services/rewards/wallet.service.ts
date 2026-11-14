@@ -22,6 +22,10 @@ export interface RewardItem {
   claimApproval: 'AUTO' | 'STAFF';
   /** Where use requests and the use log are posted. */
   logChannelId?: string;
+  /** Pinged whenever someone uses it (and for approval requests). */
+  pingRoleIds?: string[];
+  /** Who may approve use requests (empty = the server's staff roles). */
+  approverRoleIds?: string[];
   /** Most that can be used at once (0 = no limit). */
   maxPerClaim: number;
   active: boolean;
@@ -105,11 +109,16 @@ export const wallet = {
       name, emoji: String(b?.emoji || '🎟️').trim().slice(0, 16), description: String(b?.description || '').trim().slice(0, 300),
       claimApproval: b?.claimApproval === 'STAFF' ? 'STAFF' : 'AUTO', logChannelId: snow(b?.logChannelId) ? b.logChannelId : '',
       maxPerClaim: Math.max(0, Math.min(1000, Math.round(Number(b?.maxPerClaim) || 0))), active: b?.active !== false, updatedAt: nowIso(),
+      pingRoleIds: (Array.isArray(b?.pingRoleIds) ? b.pingRoleIds : []).filter(snow).slice(0, 10),
+      approverRoleIds: (Array.isArray(b?.approverRoleIds) ? b.approverRoleIds : []).filter(snow).slice(0, 10),
     } as const;
     if (id) { await this.item(communityId, id); return rewardItemsRepository.update(id, data as any); }
     return rewardItemsRepository.create({ ...data, communityId, createdAt: nowIso() } as any);
   },
 
+  async tx(id: string) {
+    return walletTxRepository.getById(id);
+  },
   async txs(communityId: string, filter?: { memberId?: string; itemId?: string }) {
     const where: any[] = [{ field: 'communityId', operator: '==', value: communityId }];
     if (filter?.memberId) where.push({ field: 'memberId', operator: '==', value: filter.memberId });
@@ -166,7 +175,7 @@ export const wallet = {
     const tx = await walletTxRepository.create({ communityId, itemId: item.id, memberId: p.memberId, memberName: p.memberName, kind: 'CLAIM', amount: -amount, status: pending ? 'PENDING' : 'APPROVED', forEvent: (p.forEvent || '').slice(0, 120), by: p.by, decidedBy: pending ? undefined : p.by, decidedAt: pending ? undefined : nowIso(), createdAt: nowIso() } as any);
     const left = bal.available - amount;
     if (pending) await this.postApproval(communityId, item, tx, left);
-    else await this.log(communityId, tx, `🎯 <@${p.memberId}> used **${amount}× ${item.emoji} ${item.name}**${tx.forEvent ? ` for *${tx.forEvent}*` : ''}${p.byStaff ? ` (recorded by ${p.by})` : ''}. **${left}** left.`);
+    else await this.log(communityId, tx, `🎯 <@${p.memberId}> used **${amount}× ${item.emoji} ${item.name}**${tx.forEvent ? ` for *${tx.forEvent}*` : ''}${p.byStaff ? ` (recorded by ${p.by})` : ''}. **${left}** left.`, item.pingRoleIds);
     return { tx, item, left, pending };
   },
   async decide(communityId: string, txId: string, approve: boolean, by: string, byId?: string) {
@@ -180,6 +189,11 @@ export const wallet = {
     const guild: any = await guildFor(communityId);
     const member: any = guild ? await guild.members.fetch(tx.memberId).catch(() => null) : null;
     await member?.send({ content: approve ? `✅ Your use of **${-tx.amount}× ${item?.emoji} ${item?.name}** in [**${guild.name || 'the server'}**](https://discord.com/channels/${guild.id || ''}) was approved by ${byId ? `<@${byId}>` : by}. You have **${bal.available}** left.` : `❌ Your request to use **${-tx.amount}× ${item?.emoji} ${item?.name}** in [**${guild.name || 'the server'}**](https://discord.com/channels/${guild.id || ''}) was declined by ${byId ? `<@${byId}>` : by}. Nothing was taken; you still have **${bal.available}**.` }).catch(() => undefined);
+    // The approval request turns into the result (same message), wherever it was decided.
+    if ((tx as any).approvalMessageId) {
+      const m = await guild?.channels.cache.get((tx as any).approvalChannelId)?.messages.fetch((tx as any).approvalMessageId).catch(() => null);
+      await m?.edit({ content: `${approve ? '✅ Approved' : '❌ Declined'} by ${byId ? `<@${byId}>` : by}. <@${tx.memberId}> has **${bal.available}** left.`, components: [], allowedMentions: { parse: [] } }).catch(() => undefined);
+    }
     return { tx: out, available: bal.available };
   },
   async cancel(communityId: string, txId: string, memberId: string) {
@@ -194,12 +208,13 @@ export const wallet = {
     if (!chId) { const { getToolkit } = await import('../toolkit/toolkitConfig.js'); const t: any = await getToolkit(communityId).catch(() => null); chId = t?.recruitment?.logChannelId; }
     return chId ? guild?.channels.cache.get(chId) : null;
   },
-  async log(communityId: string, tx: WalletTx, text: string) {
+  async log(communityId: string, tx: WalletTx, text: string, pingRoleIds: string[] = []) {
     void import('../recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.refreshRecruiter(communityId, tx.memberId)).catch(() => undefined);
     const item = await this.item(communityId, tx.itemId).catch(() => null);
     if (!item) return;
     const ch: any = await this.channel(communityId, item);
-    await ch?.send?.({ content: `${item.emoji} **${item.name}** · ${text}`.slice(0, 1900), allowedMentions: { parse: [] } }).catch(() => undefined);
+    const pings = (pingRoleIds || []).filter((id) => ch?.guild?.roles.cache.has(id));
+    await ch?.send?.({ content: `${pings.length ? `${pings.map((r) => `<@&${r}>`).join(' ')} ` : ''}${item.emoji} **${item.name}** · ${text}`.slice(0, 1900), allowedMentions: { roles: pings, users: [] } }).catch(() => undefined);
   },
   async postApproval(communityId: string, item: RewardItem, tx: WalletTx, leftAfter: number) {
     const ch: any = await this.channel(communityId, item);
@@ -210,7 +225,11 @@ export const wallet = {
       new ButtonBuilder().setCustomId(`cm:rw:ok:${tx.id}`).setLabel('Approve').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`cm:rw:no:${tx.id}`).setLabel('Decline').setStyle(ButtonStyle.Secondary),
     );
-    await ch.send({ embeds: [embed], components: [row], allowedMentions: { parse: [] } }).catch(() => undefined);
+    const { staffRoleIds } = await import('./inviteRewards.service.js');
+    const approvers = item.approverRoleIds?.length ? item.approverRoleIds : await staffRoleIds(communityId).catch(() => [] as string[]);
+    const pings = [...new Set([...(item.pingRoleIds || []), ...approvers])].filter((id) => ch.guild?.roles.cache.has(id));
+    const msg = await ch.send({ content: pings.length ? `${pings.map((r) => `<@&${r}>`).join(' ')} a reward use is waiting for approval` : undefined, embeds: [embed], components: [row], allowedMentions: { roles: pings } }).catch(() => null);
+    if (msg) await walletTxRepository.update(tx.id, { approvalChannelId: ch.id, approvalMessageId: msg.id } as any).catch(() => undefined);
   },
 
   /** The message with "Use" buttons that staff post before an event. */

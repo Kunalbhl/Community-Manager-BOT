@@ -112,6 +112,7 @@ export const webApply = {
       quiz: (rc.screening?.questions || []).map((q: any) => ({ id: q.id, question: q.question, options: q.options })),
       questions: questions.map((q: any) => ({ id: q.id, text: q.questionText, type: q.type, options: q.options || [], required: !!q.required, guidance: q.guidance || '' })),
       askCode: !!rc.askRecruiterCode, codeRequired: !!rc.codeRequired,
+      sources: (rc.askSource ? (rc.sources || []).filter((x: any) => x?.name && x.enabled !== false) : []).map((x: any) => ({ id: x.id, name: x.name, emoji: x.emoji || '', description: x.description || '', codeMode: x.codeMode || 'INHERIT', detailLabel: x.detailLabel || '', detailRequired: !!x.detailRequired })),
     };
   },
 
@@ -145,14 +146,22 @@ export const webApply = {
     if (!body?.agree) throw new Error('Please confirm you have read and agree to the rules.');
     const answers: Record<string, string> = body?.answers || {};
     for (const q of info.questions) if (q.required && !String(answers[q.id] || '').trim()) throw new Error(`Please answer: ${q.text}`);
-    const code = String(body?.recruiterCode ?? s.recruiterCode ?? '').trim().toUpperCase();
-    if (info.askCode && info.codeRequired && !code) throw new Error('A recruiter code is required. Ask the person who invited you.');
+    let code = String(body?.recruiterCode ?? s.recruiterCode ?? '').trim().toUpperCase();
+    const src: any = info.sources.length ? info.sources.find((x: any) => x.id === body?.sourceId) : null;
+    if (info.sources.length && !src) throw new Error('Please tell us how you found us.');
+    const mode = src && src.codeMode !== 'INHERIT' ? src.codeMode : info.askCode ? (info.codeRequired ? 'REQUIRED' : 'OPTIONAL') : 'NONE';
+    if (mode === 'NONE') code = '';
+    if (mode === 'REQUIRED' && !code) throw new Error('A recruiter code is required. Ask the person who invited you.');
+    const detail = String(body?.sourceDetail || '').trim().slice(0, 200);
+    if (src?.detailLabel && src.detailRequired && !detail) throw new Error(`Please answer: ${src.detailLabel}`);
+    const full: any = src ? ((await getToolkit(s.communityId)) as any).recruitment.sources.find((x: any) => x.id === src.id) : null;
     const { guardApplicant } = await import('../blacklist/blacklistGuard.service.js');
     await guardApplicant(s.communityId, { id: s.discordUserId, username: s.username, globalName: s.globalName, avatar: s.avatarUrl }, Object.values(answers).map(String));
     const { applicationWorkflowService } = await import('../applicationWorkflow.service.js');
     const r = await applicationWorkflowService.submitApplication({
       communityId: s.communityId, applicantDiscordUserId: s.discordUserId, applicantUsername: s.username,
-      applicantDisplayName: s.globalName || s.username, recruiterCode: info.askCode ? code || undefined : undefined, source: 'WEB' as any,
+      applicantDisplayName: s.globalName || s.username, recruiterCode: code || undefined, source: 'WEB' as any,
+      applicationSource: src ? { id: src.id, name: src.name, emoji: src.emoji, detail: detail || undefined, tag: full?.tag || undefined } : undefined,
       answers: info.questions.map((q: any) => ({ questionId: q.id, answerText: String(answers[q.id] || '').slice(0, 2000) })),
     } as any);
     await webApplyRepository.update(s.id, { applicationId: r.application.id, recruiterCode: code, updatedAt: nowIso() } as any);
