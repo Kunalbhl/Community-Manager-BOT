@@ -626,9 +626,17 @@ async function nextSeriesCode(communityId: string, name = '', discordId?: string
 export async function issueMemberCode(communityId: string, discordId: string, name: string): Promise<string | null> {
   const t: any = await getToolkit(communityId);
   if (!t.recruitment.codeForNewMembers) return null;
-  const { codes } = await codeRepos();
+  const { codes, apps } = await codeRepos();
   const mine = (await codes.listForTenant(communityId)).find((c: any) => (c.recruiterDiscordId || c.recruiterUserId) === discordId);
   if (mine) return mine.code;
+  // The name for the code can come from an application answer (e.g. their in-game name).
+  const qid = t.recruitment.codeNameQuestionId;
+  if (qid) {
+    const list: any[] = await apps.list({ where: [{ field: 'communityId', operator: '==', value: communityId }, { field: 'applicantDiscordUserId', operator: '==', value: discordId }] } as any).catch(() => []);
+    const app = list.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+    const ans = String((app?.answers || []).find((a: any) => a.questionId === qid)?.answerText || '').trim();
+    if (ans) name = ans.slice(0, 64);
+  }
   let code = await nextSeriesCode(communityId, name, discordId);
   if (!code) code = seriesCode({ mode: 'FIRST', firstN: 4, padding: 3, prefix: '' }, Math.floor(100 + Math.random() * 900), name);
   const doc = await codes.create({
@@ -950,5 +958,52 @@ export async function sourcesHandler(req: Request, res: Response) {
     if (b.askSource && !sources.some((x: any) => x.enabled)) throw new Error('Add at least one source (and keep it on) before asking applicants.');
     await saveToolkit(communityId, { recruitment: { ...t.recruitment, askSource: !!b.askSource, sources } as any });
     ok(res, { askSource: !!b.askSource, sources });
+  } catch (err) { fail(res, err); }
+}
+
+/* ---------- Application questions (the Apply form) ---------- */
+const QTYPES = ['SHORT_TEXT', 'LONG_TEXT', 'YES_NO', 'SINGLE_SELECT', 'NUMBER'];
+export async function appQuestionsHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const { applicationQuestionsRepository } = await import('../repositories/index.js');
+    const repo: any = applicationQuestionsRepository;
+    const t: any = await getToolkit(communityId);
+    const list = async () => (await repo.listForTenant(communityId)).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+    const b = req.body || {};
+    const clean = (x: any) => ({
+      questionText: str(x.questionText, 300), guidance: str(x.guidance, 300),
+      type: QTYPES.includes(x.type) ? x.type : 'SHORT_TEXT',
+      options: (Array.isArray(x.options) ? x.options : String(x.options || '').split(',')).map((o: any) => str(o, 80)).filter(Boolean).slice(0, 25),
+      required: x.required !== false, enabled: x.enabled !== false,
+    });
+    if (req.method === 'POST') {
+      const q = clean(b);
+      if (!q.questionText) throw new Error('Write the question.');
+      const all = await list();
+      await repo.create({ ...q, communityId, order: ((all[all.length - 1] as any)?.order || 0) + 1, createdAt: nowIso(), updatedAt: nowIso() });
+    } else if (req.method === 'PUT' && req.params.questionId) {
+      const cur: any = await repo.getById(req.params.questionId);
+      if (!cur || cur.communityId !== communityId) throw new Error('Question not found.');
+      const q = clean({ ...cur, ...b });
+      if (!q.questionText) throw new Error('Write the question.');
+      await repo.update(cur.id, { ...q, updatedAt: nowIso() });
+    } else if (req.method === 'DELETE') {
+      const cur: any = await repo.getById(req.params.questionId);
+      if (!cur || cur.communityId !== communityId) throw new Error('Question not found.');
+      await repo.delete(cur.id);
+    } else if (req.method === 'PUT') {
+      // order + special uses
+      const ids: string[] = Array.isArray(b.order) ? b.order : [];
+      for (let i = 0; i < ids.length; i++) await repo.update(ids[i], { order: i + 1 } as any).catch(() => undefined);
+      const patch: any = {};
+      if ('codeNameQuestionId' in b) patch.codeNameQuestionId = String(b.codeNameQuestionId || '');
+      if ('sourceQuestionId' in b) patch.sourceQuestionId = String(b.sourceQuestionId || '');
+      if (Object.keys(patch).length) await saveToolkit(communityId, { recruitment: { ...t.recruitment, ...patch } as any });
+    }
+    const t2: any = await getToolkit(communityId);
+    const qs = await list();
+    const { sourceQuestionId } = await import('../services/recruitment/discordRecruitment.service.js');
+    ok(res, { questions: qs, codeNameQuestionId: t2.recruitment.codeNameQuestionId || '', sourceQuestionId: t2.recruitment.sourceQuestionId || '', autoSourceQuestionId: sourceQuestionId(t2.recruitment, qs.filter((q: any) => q.enabled !== false)), sourcesOn: !!t2.recruitment.askSource });
   } catch (err) { fail(res, err); }
 }
