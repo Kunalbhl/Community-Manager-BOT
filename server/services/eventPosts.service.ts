@@ -31,7 +31,7 @@ function view(e: any, going: number) {
     components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
       ...(e.discordEventUrl ? [new ButtonBuilder().setLabel('Open in Events').setEmoji('📅').setStyle(ButtonStyle.Link).setURL(e.discordEventUrl)] : []),
       new ButtonBuilder().setCustomId(`cm:evt:join:${e.id}`).setLabel(full ? 'Full' : 'Register').setEmoji('✅').setStyle(ButtonStyle.Success).setDisabled(Boolean(full) || e.status === 'CANCELLED' || e.status === 'COMPLETED'),
-      new ButtonBuilder().setCustomId(`cm:evt:leave:${e.id}`).setLabel('Can’t go').setStyle(ButtonStyle.Secondary).setDisabled(e.status === 'CANCELLED' || e.status === 'COMPLETED'),
+      new ButtonBuilder().setCustomId(`cm:evt:leave:${e.id}`).setLabel('Can’t go').setEmoji('👋').setStyle(ButtonStyle.Secondary).setDisabled(e.status === 'CANCELLED' || e.status === 'COMPLETED'),
     )],
     allowedMentions: { parse: [] as any[] },
   };

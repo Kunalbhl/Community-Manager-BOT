@@ -222,8 +222,8 @@ export const wallet = {
     const embed = new EmbedBuilder().setColor(0xf59e0b).setTitle(`${item.emoji} Use request: ${-tx.amount}× ${item.name}`)
       .setDescription(`<@${tx.memberId}> wants to use **${-tx.amount}**${tx.forEvent ? ` for *${tx.forEvent}*` : ''}.\nThey will have **${leftAfter}** left if approved.`);
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder().setCustomId(`cm:rw:ok:${tx.id}`).setLabel('Approve').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`cm:rw:no:${tx.id}`).setLabel('Decline').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`cm:rw:ok:${tx.id}`).setLabel('Approve').setEmoji('✅').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`cm:rw:no:${tx.id}`).setLabel('Decline').setEmoji('✖️').setStyle(ButtonStyle.Danger),
     );
     const { staffRoleIds } = await import('./inviteRewards.service.js');
     const approvers = item.approverRoleIds?.length ? item.approverRoleIds : await staffRoleIds(communityId).catch(() => [] as string[]);
@@ -239,7 +239,7 @@ export const wallet = {
     const ev = encodeURIComponent(forEvent).slice(0, 60);
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder().setCustomId(`cm:rw:use1:${item.id}|${ev}`.slice(0, 100)).setLabel('Use 1').setEmoji('🎯').setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(`cm:rw:usen:${item.id}|${ev}`.slice(0, 100)).setLabel('Use more').setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(`cm:rw:usen:${item.id}|${ev}`.slice(0, 100)).setLabel('Use more').setEmoji('➕').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId(`cm:rw:bal:${item.id}`).setLabel('My balance').setEmoji('💰').setStyle(ButtonStyle.Secondary),
     );
     return { embeds: [embed], components: [row] };

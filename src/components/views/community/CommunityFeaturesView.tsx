@@ -1,3 +1,4 @@
+import { EmojiField } from '../../common/EmojiField.js';
 import { useRemembered } from '../../common/useRemembered.js';
 import { takeOpenTab } from './SetupGuideView.js';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -234,19 +235,34 @@ function ButtonRolesTab({ api, res, communityId }: any) {
             <Label t="Title"><input className={input} value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} /></Label>
             <Label t="Mode"><select className={input} value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="TOGGLE">Pick any (press again to remove)</option><option value="ONE_ONLY">Pick one only</option></select></Label>
           </div>
+          <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+            <div className="text-sm font-medium text-slate-700">Look
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                {[['BUTTONS', 'Classic', 'Message with a row of coloured buttons'], ['CARDS', 'Cards (premium)', 'Each role on its own line with an icon, a short description and its button, inside a coloured frame']].map(([v, l, d]) => (
+                  <button key={v} type="button" onClick={() => setF({ ...f, layout: v })} className={`rounded-xl border p-3 text-left ${((f.layout || 'BUTTONS') === v) ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200' : 'border-slate-200'}`}><b className="text-sm">{l}</b><span className="block text-xs text-slate-500">{d}</span></button>
+                ))}
+              </div>
+            </div>
+            <Label t="Frame colour"><div className="flex items-center gap-2"><input type="color" className="h-10 w-14 cursor-pointer rounded-lg border border-slate-200" value={f.color || '#7c8cff'} onChange={(e) => setF({ ...f, color: e.target.value })} />{f.color && <button type="button" className="text-xs text-slate-500 underline" onClick={() => setF({ ...f, color: '' })}>Auto</button>}</div><span className="text-xs text-slate-500">Auto = colour of the first role</span></Label>
+          </div>
           <Label t="Description"><MessageComposer communityId={communityId} value={f.description} onChange={(v) => setF({ ...f, description: v })} rows={8} maxLength={4000} /></Label>
           <div className="space-y-2">
             {f.buttons.map((b: any, i: number) => (
               <div key={i} className="rounded-xl border border-slate-200 p-2">
-                <div className="grid grid-cols-[70px_1fr_1fr_auto_auto] gap-2">
-                  <input className={input} placeholder="🎮" value={b.emoji} onChange={(e) => setB(i, { emoji: e.target.value })} />
+                <div className="grid grid-cols-[70px_1fr_1fr_110px_auto_auto] gap-2">
+                  <EmojiField communityId={communityId} value={b.emoji || ''} onChange={(v) => setB(i, { emoji: v })} />
                   <input className={input} placeholder="Button label" value={b.label} onChange={(e) => setB(i, { label: e.target.value })} />
                   <Pick options={res.roles} value={b.roleId} onChange={(v) => setB(i, { roleId: v, label: b.label || res.roles.find((r: any) => r.id === v)?.name || '' })} placeholder="Role" />
-                  <button type="button" className={`rounded-lg px-2 text-xs font-semibold ${(b.requiredRoleIds?.length || b.blockedRoleIds?.length) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`} onClick={() => setB(i, { _open: !b._open })}>{(b.requiredRoleIds?.length || b.blockedRoleIds?.length) ? `🔒 ${(b.requiredRoleIds?.length || 0) + (b.blockedRoleIds?.length || 0)}` : 'Who'}</button>
+                  <select className={`${input} ${({ BLUE: 'text-indigo-600', GREEN: 'text-emerald-600', RED: 'text-rose-600', GREY: 'text-slate-600' } as any)[b.style] || ''}`} value={b.style || 'AUTO'} onChange={(e) => setB(i, { style: e.target.value })} title="Button colour">
+                    <option value="AUTO">🎨 Auto</option><option value="BLUE">🔵 Blue</option><option value="GREEN">🟢 Green</option><option value="RED">🔴 Red</option><option value="GREY">⚪ Grey</option>
+                  </select>
+                  <button type="button" className={`rounded-lg px-2 text-xs font-semibold ${(b.requiredRoleIds?.length || b.blockedRoleIds?.length) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50'}`} onClick={() => setB(i, { _open: !b._open })}>{(b.requiredRoleIds?.length || b.blockedRoleIds?.length) ? `🔒 ${(b.requiredRoleIds?.length || 0) + (b.blockedRoleIds?.length || 0)}` : 'More'}</button>
                   <button className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600" onClick={() => setF({ ...f, buttons: f.buttons.filter((_: any, n: number) => n !== i) })} aria-label="Delete"><Trash2 className="h-4 w-4" /></button>
                 </div>
                 {b._open && (
                   <div className="mt-2 grid gap-3 rounded-lg bg-slate-50 p-3 md:grid-cols-2">
+                    {(f.layout === 'CARDS') && <><Label t="Short description (cards look)"><input className={input} maxLength={200} value={b.description || ''} onChange={(e) => setB(i, { description: e.target.value })} placeholder="e.g. Unlocks the GTA V channels" /></Label>
+                    <Label t="Button text (cards look)"><input className={input} maxLength={40} value={b.buttonText || ''} onChange={(e) => setB(i, { buttonText: e.target.value })} placeholder="Choose" /></Label></>}
                     <RoleChipsField communityId={communityId} label="Who can take this role" hint="Only members with any of these roles. Empty = anyone who can use the panel." ids={b.requiredRoleIds || []} onChange={(l: string[]) => setB(i, { requiredRoleIds: l })} />
                     <RoleChipsField communityId={communityId} label="Who can’t take it" hint="Members with any of these roles are refused." ids={b.blockedRoleIds || []} onChange={(l: string[]) => setB(i, { blockedRoleIds: l })} />
                   </div>
@@ -258,7 +274,7 @@ function ButtonRolesTab({ api, res, communityId }: any) {
           <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-3 md:grid-cols-2">
             <RoleChipsField communityId={communityId} label="Who can use the whole panel" hint="Only members with any of these roles. Empty = everyone who can see the channel. Each button can add its own rule with Who." ids={f.requiredRoleIds || []} onChange={(l: string[]) => setF({ ...f, requiredRoleIds: l })} />
             <RoleChipsField communityId={communityId} label="Who can’t use it" hint="Members with any of these roles are refused." ids={f.blockedRoleIds || []} onChange={(l: string[]) => setF({ ...f, blockedRoleIds: l })} />
-            <p className="text-xs text-slate-500 md:col-span-2">Who can <b>see</b> the panel is set by the channel’s own permissions in Discord. Picking a role in “Pick one only” mode removes the other roles of this panel, and the member is told exactly what was added and removed.</p>
+            <p className="text-xs text-slate-500 md:col-span-2">Button colours: Discord only offers blue, green, red and grey. <b>Auto</b> matches each button to its emoji or the role’s colour (🎯 → red, 🧙 → blue, 🍀 → green). <b>More</b> on a button sets who can take it and, in the cards look, its description. Who can <b>see</b> the panel is set by the channel’s own permissions in Discord. Picking a role in “Pick one only” mode removes the other roles of this panel, and the member is told exactly what was added and removed.</p>
           </div>
           <Label t="Post or update in channel"><Pick options={res.textChannels} value={f.channelId} onChange={(v) => setF({ ...f, channelId: v })} placeholder="Save without posting" /></Label>
           <button className={btn} onClick={async () => { setMsg(''); try { const p = await api('/features/button-roles', 'POST', f); setF({ ...p, channelId: p.channelId || '' }); setMsg(f.channelId ? 'Saved and posted.' : 'Saved.'); load(); } catch (e: any) { setMsg(e.message); } }}><Send className="h-4 w-4" /> Save panel</button>
