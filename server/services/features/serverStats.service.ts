@@ -226,13 +226,17 @@ export const serverStats = {
     }
     const since = c.lastUpdatedAt ? Date.now() - Date.parse(c.lastUpdatedAt) : Infinity;
     if (!force && since < MIN_GAP_MS) return c;
-    { const { ensureSelfPerms } = await import('../../integrations/discord/selfAccess.js'); await ensureSelfPerms(ch, [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels], 'update the stats counter'); }
+    let accessNote = '';
+    { const { ensureSelfPerms } = await import('../../integrations/discord/selfAccess.js'); accessNote = await ensureSelfPerms(ch, [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels], 'update the stats counter'); }
     try {
       // setName can wait a long time when Discord rate-limits; don't block the loop for it.
       await Promise.race([ch.setName(name, 'Server stats'), new Promise((_, rej) => setTimeout(() => rej(new Error('Discord is limiting renames; it will update shortly.')), 15_000))]);
       await statCountersRepository.update(c.id, { lastValue: value, lastName: name, lastUpdatedAt: new Date().toISOString(), lastError: '' } as any);
     } catch (e: any) {
-      const msg = /Missing Permissions|50013/.test(String(e?.message)) ? 'The bot needs Manage Channels on this channel.' : String(e?.message || e).slice(0, 200);
+      const raw = String(e?.message || e);
+      const msg = /Missing Access|50001/.test(raw)
+        ? `The bot can’t see this channel, so it can’t rename it. In Discord: Edit Channel → Permissions → add the bot’s role (Community Manager) → allow View Channel and Manage Channels. ${accessNote || ''}`.trim()
+        : /Missing Permissions|50013/.test(raw) ? `The bot needs Manage Channels on this channel. ${accessNote || ''}`.trim() : raw.slice(0, 200);
       await statCountersRepository.update(c.id, { lastError: msg, lastUpdatedAt: new Date().toISOString() } as any).catch(() => undefined);
     }
     return c;
