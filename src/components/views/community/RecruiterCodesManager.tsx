@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Download, Upload, Search, Pencil, Trash2, History, Send, X, CheckCircle2, AlertTriangle, Hash } from 'lucide-react';
-import { MemberSelect, MemberName, RoleSelect, useDiscordResources } from '../../common/DiscordPickers.js';
+import { MemberSelect, MemberName, RoleSelect, ChannelSelect, useDiscordResources } from '../../common/DiscordPickers.js';
 import { Card, useApi } from './ServerToolsView.js';
 import { buildCode, nameWords } from '../../../../shared/utils/nameWords.js';
 
@@ -56,7 +56,7 @@ export function RecruiterCodesManager({ communityId }: { communityId: string }) 
     <div className="space-y-6">
       {toast && <p role="status" className={`flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold ${toast.ok ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-rose-200 bg-rose-50 text-rose-800'}`}>{toast.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}{toast.text}</p>}
 
-      {data && <SeriesCard communityId={communityId} api={api} rules={(data as any).rules || []} series={data.series} dmOnCreate={data.dmOnCreate} codeForNewMembers={(data as any).codeForNewMembers} onSaved={(t) => { flash(true, t); load(); }} onError={(t) => flash(false, t)} />}
+      {data && <SeriesCard communityId={communityId} api={api} rules={(data as any).rules || []} series={data.series} dmOnCreate={data.dmOnCreate} codeForNewMembers={(data as any).codeForNewMembers} codeChannelId={(data as any).codeChannelId || ''} rewardBoardChannelId={(data as any).rewardBoardChannelId || ''} onSaved={(t) => { flash(true, t); load(); }} onError={(t) => flash(false, t)} />}
 
       <ImportCard api={api} onDone={(t) => { flash(true, t); load(); }} onTemplate={() => exportFile(true)} />
 
@@ -149,15 +149,17 @@ const MODES = [
   { v: 'FIRST_LAST', l: 'First + last letters', d: 'Some letters from the start and some from the end.' },
 ];
 
-function SeriesCard({ communityId, api, rules: rules0, series, dmOnCreate, codeForNewMembers, onSaved, onError }: { communityId: string; api: any; rules: any[]; series: any; dmOnCreate: boolean; codeForNewMembers: boolean; onSaved: (t: string) => void; onError: (t: string) => void }) {
+function SeriesCard({ communityId, api, rules: rules0, series, dmOnCreate, codeForNewMembers, codeChannelId, rewardBoardChannelId, onSaved, onError }: { codeChannelId: string; rewardBoardChannelId: string; communityId: string; api: any; rules: any[]; series: any; dmOnCreate: boolean; codeForNewMembers: boolean; onSaved: (t: string) => void; onError: (t: string) => void }) {
   const [s, setS] = useState({ mode: 'FIXED', separator: '-', firstN: 3, lastM: 2, ...series });
   const [dm, setDm] = useState(dmOnCreate);
   const [auto, setAuto] = useState(codeForNewMembers);
+  const [codeCh, setCodeCh] = useState(codeChannelId);
+  const [boardCh, setBoardCh] = useState(rewardBoardChannelId);
   const [rules, setRules] = useState<any[]>(rules0);
   const res: any = useDiscordResources(communityId);
   return (
     <Card title="Code naming and delivery" desc="How codes are named, and whether every approved member automatically gets their own code."
-      right={<button className={primary} onClick={() => api('/codes/settings', 'PUT', { series: s, rules, dmOnCreate: dm, codeForNewMembers: auto }).then(() => onSaved('Code settings saved.')).catch((e: any) => onError(e.message))}>Save</button>}>
+      right={<button className={primary} onClick={() => api('/codes/settings', 'PUT', { series: s, rules, dmOnCreate: dm, codeForNewMembers: auto, codeChannelId: codeCh, rewardBoardChannelId: boardCh }).then(() => onSaved('Code settings saved.')).catch((e: any) => onError(e.message))}>Save</button>}>
       <label className="flex items-start gap-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-slate-800"><input type="checkbox" className="mt-0.5" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
         <span><b>Give every approved member their own recruiter code</b><br /><span className="text-xs text-slate-600">When an application is approved and the member is in the server, the bot creates their code with the pattern below and sends it to them by DM. Members can see their own code any time with <code>/mycode</code> (only they see the reply).</span></span>
       </label>
@@ -196,6 +198,16 @@ function SeriesCard({ communityId, api, rules: rules0, series, dmOnCreate, codeF
         </div>
       </div>
       <label className="mt-4 flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={dm} onChange={(e) => setDm(e.target.checked)} />When staff create a code here, also send it to its owner by DM</label>
+      <div className="mt-6 grid gap-4 border-t border-slate-100 pt-5 md:grid-cols-2">
+        <div className="text-sm font-semibold text-slate-700">Post codes in a channel
+          <p className="text-xs font-normal text-slate-500">Every code gets one message here: owner, status, uses and expiry. When a code is renamed, paused, used or deleted, that same message is updated, not a new one. Picking a channel posts all existing codes once.</p>
+          <div className="mt-1"><ChannelSelect communityId={communityId} value={codeCh} onChange={(v: any) => setCodeCh(v || '')} placeholder="Don't post codes" /></div>
+        </div>
+        <div className="text-sm font-semibold text-slate-700">Recruiter reward board
+          <p className="text-xs font-normal text-slate-500">One message per recruiter with their invites, reward roles, latest rewards and wallet balance. The first reward posts it; every later reward, use or correction updates the same message. Empty = the announcement channel of the reward rule.</p>
+          <div className="mt-1"><ChannelSelect communityId={communityId} value={boardCh} onChange={(v: any) => setBoardCh(v || '')} placeholder="Use the reward rule's channel" /></div>
+        </div>
+      </div>
     </Card>
   );
 }

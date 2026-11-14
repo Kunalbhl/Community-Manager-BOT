@@ -82,6 +82,7 @@ export async function createRecruiterCode(req: Request, res: Response, next: Nex
       createdAt: now,
       updatedAt: now,
     });
+    void import('../services/recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.syncCode(targetCommunityId, newCode.id)).catch(() => undefined);
 
     await auditService.record({
       communityId: targetCommunityId,
@@ -157,6 +158,7 @@ export async function updateRecruiterCodeStatus(req: Request, res: Response, nex
       isActive,
       updatedAt: now,
     });
+    void import('../services/recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.syncCode(codeDoc.communityId, id)).catch(() => undefined);
 
     await auditService.record({
       communityId: codeDoc.communityId,

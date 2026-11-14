@@ -95,7 +95,7 @@ export async function registerSlashCommands(guildId?: string): Promise<CommandRe
   const ADMIN = PermissionFlagsBits.ManageGuild.toString();
   const STAFF_ONLY: Record<string, string> = {
     applications: MOD, interview: MOD, approve: MOD, reject: MOD, escalate: MOD,
-    blacklist: MOD, sheet: MOD,
+    blacklist: MOD, sheet: MOD, 'recruiter-code-search': MOD,
     'create-recruiter-code': ADMIN,
   };
   for (const c of discordCommands) {

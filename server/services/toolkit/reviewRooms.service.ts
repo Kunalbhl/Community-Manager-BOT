@@ -127,6 +127,8 @@ export const reviewRooms = {
     if (room.voiceChannelId && guild.channels.cache.get(room.voiceChannelId)) {
       await guild.channels.cache.get(room.voiceChannelId)?.delete('Voice room ended').catch(() => undefined);
       await reviewRoomsRepository.update(roomId, { voiceChannelId: null, voiceEmptySince: null, history: [...room.history, { at: new Date().toISOString(), by: actor.id, event: 'Voice room ended' }] } as any);
+      const t: any = guild.channels.cache.get(room.channelId);
+      await t?.send({ content: `🎙️ The voice room was ended by <@${actor.id}>.`, allowedMentions: { parse: [] } }).catch(() => undefined);
       return '🎙️ Voice room ended.';
     }
     const text: any = guild.channels.cache.get(room.channelId);
@@ -135,7 +137,15 @@ export const reviewRooms = {
       : [{ id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] }];
     const vc = await guild.channels.create({ name: `🎙️ interview-${room.applicantName}`.slice(0, 90), type: ChannelType.GuildVoice, parent: text?.parentId, permissionOverwrites: overwrites });
     await reviewRoomsRepository.update(roomId, { voiceChannelId: vc.id, voiceEmptySince: Date.now(), history: [...room.history, { at: new Date().toISOString(), by: actor.id, event: 'Voice room created' }] } as any);
-    return `🎙️ Voice room ready: <#${vc.id}> · [open it](https://discord.com/channels/${guild.id}/${vc.id}). Only people in this room can join. It is deleted automatically 10 minutes after everyone leaves.`;
+    // The applicant gets the link in their own application chat so they can join with one click.
+    if (text && text.id !== undefined) {
+      const invite = await (vc as any).createInvite({ maxAge: 3 * 3600, maxUses: 0, unique: true, reason: 'Interview voice room' }).catch(() => null);
+      await text.send({
+        content: `🎙️ <@${room.applicantId}>, your interview voice room is ready: <#${vc.id}>. Press **Join Voice** below, or [open it here](https://discord.com/channels/${guild.id}/${vc.id}).${invite ? `\n${invite.url}` : ''}`,
+        allowedMentions: { users: [room.applicantId] },
+      }).catch(() => undefined);
+    }
+    return `🎙️ Voice room ready: <#${vc.id}> · [open it](https://discord.com/channels/${guild.id}/${vc.id}). Only people in this room can join. The applicant got the link in their chat. Press **End voice room** when you are done; it is also deleted 10 minutes after everyone leaves.`;
   },
 
   async escalate(roomId: string, actor: any): Promise<string> {
@@ -285,8 +295,19 @@ export const reviewRooms = {
     const cfg: any = (await getToolkit(room.communityId)).recruitment;
     const log: any = guild?.channels.cache.get(cfg.reviewChannelId) || guild?.channels.cache.get(cfg.logChannelId);
     if (!log?.send) return true; // stored even without a log channel
-    await log.send({
+    const { recruiterCodesRepository } = await import('../../repositories/index.js');
+    const allCodes: any[] = await (recruiterCodesRepository as any).listForTenant(room.communityId).catch(() => []);
+    const own = allCodes.find((c) => (c.recruiterDiscordId || c.recruiterUserId) === room.applicantId);
+    const app: any = await applicationsRepository.getById(room.applicationId).catch(() => null);
+    const used = app?.recruiterCode || app?.referralCode || app?.recruiterCodeUsed;
+    const usedOwner = used ? allCodes.find((c) => c.code === used) : null;
+    const codeFields = [
+      ...(used ? [{ name: '🤝 Applied with code', value: `**${used}**${usedOwner ? ` · <@${usedOwner.recruiterDiscordId || usedOwner.recruiterUserId}>` : ''}`, inline: true }] : []),
+      ...(own ? [{ name: '🎟️ Their recruiter code', value: `**${own.code}**`, inline: true }] : []),
+    ];
+    const sent = await log.send({
       embeds: [{
+        fields: codeFields,
         title: `${decision === 'APPROVED' ? '✅' : '✖️'} Closed application · ${room.applicantName}`,
         color: decision === 'APPROVED' ? 0x7fe0b0 : 0xff5c8a,
         description: `<@${room.applicantId}> · ${decision === 'APPROVED' ? 'approved' : 'rejected'} by <@${byId}>\n${chat.filter((m: any) => !m.bot).length} chat messages · ${staff.filter((m: any) => !m.bot).length} staff messages. Full transcript attached; it is also saved with the application.`,
@@ -294,6 +315,8 @@ export const reviewRooms = {
       files: [{ attachment: Buffer.from(text, 'utf8'), name: `application-${String(room.applicantName).replace(/[^\w-]/g, '').slice(0, 40) || room.applicantId}.txt` }],
       allowedMentions: { parse: [] },
     });
+    // Kept so the message can be updated later (e.g. when their recruiter code is created).
+    if (sent) await reviewRoomsRepository.update(room.id, { archiveChannelId: log.id, archiveMessageId: sent.id } as any).catch(() => undefined);
     return true;
   },
 

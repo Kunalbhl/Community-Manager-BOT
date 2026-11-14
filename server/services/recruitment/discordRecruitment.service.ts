@@ -88,9 +88,31 @@ export const discordRecruitment = {
     if (!(await secureGate.isVerified(communityId))) throw new Error('Finish Secure Setup first (Server tools → Recruitment in Discord). Recruitment stays off until your server is locked for newcomers.');
     const cfg = (await getToolkit(communityId)).recruitment;
     if (!(await questionsFor(communityId)).length) throw new Error('Add your application questions first (Recruitment → Questions).');
-    await channel.send(this.panel(cfg, channel.guild?.name));
+    const payload = this.panel(cfg, channel.guild?.name);
+    // Update the panel already posted in this channel instead of sending a second one.
+    const c: any = cfg;
+    let msg: any = null;
+    if (c.panelChannelId === channel.id && c.panelMessageId) msg = await channel.messages.fetch(c.panelMessageId).catch(() => null);
+    if (!msg) {
+      const recent = await channel.messages.fetch({ limit: 30 }).catch(() => null);
+      msg = recent ? Array.from(recent.values()).find((m: any) => m.author?.id === channel.client.user.id && m.components?.[0]?.components?.some((x: any) => String(x.customId || '').startsWith('cm:apply:start'))) : null;
+    }
+    let updated = false;
+    if (msg) updated = await msg.edit(payload).then(() => true).catch(() => false);
+    if (!updated) msg = await channel.send(payload);
     const { saveToolkit } = await import('../toolkit/toolkitConfig.js');
-    await saveToolkit(communityId, { recruitment: { ...cfg, panelPostedAt: new Date().toISOString() } as any });
+    await saveToolkit(communityId, { recruitment: { ...cfg, panelPostedAt: new Date().toISOString(), panelChannelId: channel.id, panelMessageId: msg.id } as any });
+    return { updated };
+  },
+
+  /** After the panel text is saved: refresh the posted panel, if any. */
+  async refreshPanel(communityId: string) {
+    const c: any = (await getToolkit(communityId)).recruitment;
+    if (!c.panelChannelId || !c.panelMessageId) return;
+    const guild = await guildFor(communityId);
+    const ch: any = guild?.channels.cache.get(c.panelChannelId);
+    const msg = await ch?.messages.fetch(c.panelMessageId).catch(() => null);
+    if (msg) await msg.edit(this.panel(c, guild.name)).catch(() => undefined);
   },
 
   /** Button "Apply" or /apply. Shows the first page, or an explanation. */
@@ -240,15 +262,14 @@ export const discordRecruitment = {
     if (gate.memberRoleId && member.roles?.cache?.has(gate.memberRoleId)) return;
     if (!(await questionsFor(communityId)).length) return;
     const guild = member.guild;
-    await member.send({
-      embeds: [{
-        title: `👋 Welcome to ${guild.name}!`,
-        description: `To get access to the server, send a short application. It takes about two minutes:\n\n1. Press **Apply** below\n2. Answer a few questions${cfg.askRecruiterCode ? ' and enter the code of the person who invited you' : ''}\n3. Staff review it and you get a message here with the result\n\nYou can also press **Apply** in the server.`,
-        color: 0x7c8cff,
-        thumbnail: guild.iconURL?.() ? { url: guild.iconURL({ size: 128 }) } : undefined,
-      }],
-      components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`cm:apply:start:${guild.id}`).setLabel('Apply').setEmoji('📋').setStyle(ButtonStyle.Success))],
-    }).catch(() => undefined);
+    const panel = this.panel(cfg, guild.name);
+    const embed = { ...panel.embeds[0], title: `👋 Welcome to ${guild.name}!`, thumbnail: guild.iconURL?.() ? { url: guild.iconURL({ size: 128 }) } : undefined };
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`cm:apply:start:${guild.id}`).setLabel('Apply').setEmoji('📋').setStyle(ButtonStyle.Success));
+    const sent = await member.send({ embeds: [embed], components: [row] }).then(() => true).catch((err: any) => { logger.info(`[Recruitment] welcome DM to ${member.id} failed: ${err?.message}`); return false; });
+    if (sent) return;
+    // DMs closed: show the same message in the apply channel and ping them so they see it.
+    const ch: any = gate.applyChannelId ? guild.channels.cache.get(gate.applyChannelId) : null;
+    await ch?.send({ content: `👋 <@${member.id}>, welcome! Your DMs are closed, so here is how to join. Press **Apply** below.`, embeds: [panel.embeds[0]], components: panel.components, allowedMentions: { users: [member.id] } }).catch(() => undefined);
   },
 
   /** Called after a new application is created. */

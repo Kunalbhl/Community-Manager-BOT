@@ -151,6 +151,7 @@ export async function saveToolkitSectionHandler(req: Request, res: Response) {
     }
 
     const saved = await saveToolkit(communityId, patch);
+    if (section === 'recruitment') await import('../services/recruitment/discordRecruitment.service.js').then(({ discordRecruitment }) => discordRecruitment.refreshPanel(communityId)).catch(() => undefined);
     await auditService.log({ communityId, actorUserId: actor(req), actorRole: 'CONTROLLER', action: 'TOOLKIT_SETTINGS_UPDATED' as any, targetType: 'toolkit', targetId: section }).catch(() => undefined);
     ok(res, saved);
   } catch (err) { fail(res, err); }
@@ -270,8 +271,8 @@ export async function postApplyPanelHandler(req: Request, res: Response) {
     const channel = isSnowflake(req.body?.channelId) ? guild.channels.cache.get(req.body.channelId) : null;
     if (!channel) throw new Error('Pick a channel for the Apply panel.');
     const { discordRecruitment } = await import('../services/recruitment/discordRecruitment.service.js');
-    await discordRecruitment.postPanel(communityId, channel);
-    ok(res, { posted: true });
+    const r = await discordRecruitment.postPanel(communityId, channel);
+    ok(res, { posted: true, updated: r.updated });
   } catch (err) { fail(res, err); }
 }
 
@@ -539,6 +540,7 @@ const nowIso = () => new Date().toISOString();
 async function codeLog(communityId: string, codeId: string, code: string, action: string, by: string, detail?: string) {
   const { flags } = await codeRepos();
   await flags.create({ communityId, codeId, code, action, by, detail, at: nowIso() }).catch(() => undefined);
+  if (action === 'CREATED' || action === 'UPDATED') void import('../services/recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.syncCode(communityId, codeId)).catch(() => undefined);
 }
 
 /**
@@ -615,7 +617,7 @@ export async function listCodesHandler(req: Request, res: Response) {
     const { codes } = await codeRepos();
     const t = await getToolkit(communityId);
     const list = (await codes.listForTenant(communityId)).sort((a: any, b: any) => String(b.createdAt).localeCompare(String(a.createdAt)));
-    ok(res, { codes: list, rules: (t.recruitment as any).codeRules || [], series: (t.recruitment as any).codeSeries || { enabled: false, mode: 'FIXED', prefix: 'REC-', padding: 3, next: 1, suffix: '', separator: '-', firstN: 3, lastM: 2 }, dmOnCreate: !!(t.recruitment as any).codeDmOnCreate, codeForNewMembers: !!(t.recruitment as any).codeForNewMembers });
+    ok(res, { codes: list, rules: (t.recruitment as any).codeRules || [], series: (t.recruitment as any).codeSeries || { enabled: false, mode: 'FIXED', prefix: 'REC-', padding: 3, next: 1, suffix: '', separator: '-', firstN: 3, lastM: 2 }, dmOnCreate: !!(t.recruitment as any).codeDmOnCreate, codeForNewMembers: !!(t.recruitment as any).codeForNewMembers, codeChannelId: (t.recruitment as any).codeChannelId || '', rewardBoardChannelId: (t.recruitment as any).rewardBoardChannelId || '' });
   } catch (err) { fail(res, err, 500); }
 }
 
@@ -643,8 +645,13 @@ export async function codeSettingsHandler(req: Request, res: Response) {
       series: cleanSeries(r.series),
     }));
     const t = await getToolkit(communityId);
-    await saveToolkit(communityId, { recruitment: { ...t.recruitment, codeSeries: series, codeRules: rules, codeDmOnCreate: !!b.dmOnCreate, codeForNewMembers: !!b.codeForNewMembers } as any });
-    ok(res, { series, rules, dmOnCreate: !!b.dmOnCreate, codeForNewMembers: !!b.codeForNewMembers, example: seriesCode(series, series.next, 'Kunal Pareek') });
+    const codeChannelId = isSnowflake(b.codeChannelId) ? b.codeChannelId : '';
+    const rewardBoardChannelId = isSnowflake(b.rewardBoardChannelId) ? b.rewardBoardChannelId : '';
+    const prev: any = t.recruitment;
+    await saveToolkit(communityId, { recruitment: { ...t.recruitment, codeSeries: series, codeRules: rules, codeDmOnCreate: !!b.dmOnCreate, codeForNewMembers: !!b.codeForNewMembers, codeChannelId, rewardBoardChannelId } as any });
+    const { recruiterBoards } = await import('../services/recruitment/recruiterBoards.service.js');
+    if (codeChannelId && codeChannelId !== prev.codeChannelId) void recruiterBoards.syncAllCodes(communityId).catch(() => undefined);
+    ok(res, { series, rules, dmOnCreate: !!b.dmOnCreate, codeForNewMembers: !!b.codeForNewMembers, codeChannelId, rewardBoardChannelId, example: seriesCode(series, series.next, 'Kunal Pareek') });
   } catch (err) { fail(res, err); }
 }
 
@@ -724,6 +731,7 @@ export async function deleteCodeHandler(req: Request, res: Response) {
     if (!c || c.communityId !== communityId) throw new Error('Code not found.');
     await codes.delete(codeId);
     await codeLog(communityId, codeId, c.code, 'DELETED', (req as any).user?.username || 'staff');
+    void import('../services/recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.syncCode(communityId, codeId, { code: c.code, owner: c.recruiterDiscordId || c.recruiterUserId })).catch(() => undefined);
     ok(res, { deleted: true });
   } catch (err) { fail(res, err); }
 }
