@@ -79,8 +79,14 @@ export class EventDiscordService {
       return { status: 'DISCORD_LIMITATION' };
     }
 
-    const discordEventId = `disc_evt_${event.id}`;
-    return { status: 'CONNECTED', discordEventId };
+    try {
+      const { eventExtras } = await import('./eventExtras.service.js');
+      const discordEventId = await eventExtras.syncDiscordEvent(communityId, event);
+      return discordEventId ? { status: 'CONNECTED', discordEventId } : { status: 'BOT_NOT_CONNECTED' };
+    } catch (err: any) {
+      logger.warn(`[EventService] Discord event not created: ${err?.message}`);
+      return { status: 'DISCORD_LIMITATION' };
+    }
   }
 
   async updateScheduledEvent(communityId: string, event: Event): Promise<boolean> {
@@ -94,6 +100,9 @@ export class EventDiscordService {
     if (!discordService.isConnected()) {
       return false;
     }
+    const { eventExtras } = await import('./eventExtras.service.js');
+    await eventExtras.endDiscordEvent(communityId, event, true).catch(() => undefined);
+    await eventExtras.closeRoster(communityId, event.id).catch(() => undefined);
     return true;
   }
 }
@@ -305,8 +314,8 @@ export class EventService {
     };
 
     // Discord sync check
-    if (options?.syncDiscord) {
-      const isEntitled = await EntitlementService.hasFeature(communityId, 'DISCORD_SCHEDULED_EVENTS');
+    if (options?.syncDiscord !== false) {
+      const isEntitled = true; // free: Discord's own Events list is part of every plan
       if (isEntitled) {
         const syncRes = await eventDiscordService.createScheduledEvent(communityId, event);
         if (syncRes.status === 'CONNECTED' && syncRes.discordEventId) {
@@ -376,6 +385,8 @@ export class EventService {
       try {
         const { eventPosts } = await import('./eventPosts.service.js');
         await eventPosts.post(communityId, published as any);
+        const { eventExtras } = await import('./eventExtras.service.js');
+        await eventExtras.openRoster(communityId, (await eventsRepository.getById(eventId)) as any).catch(() => undefined);
       } catch (delivErr: any) {
         logger.warn(`[EventService] Discord event post skipped: ${delivErr.message}`);
       }
@@ -569,6 +580,13 @@ export class EventService {
       status: 'COMPLETED',
       updatedAt: new Date().toISOString(),
     });
+    try {
+      const { eventExtras } = await import('./eventExtras.service.js');
+      await eventExtras.endDiscordEvent(communityId, event, false);
+      await eventExtras.closeRoster(communityId, eventId);
+      const { eventPosts } = await import('./eventPosts.service.js');
+      await eventPosts.refresh(communityId, eventId);
+    } catch { /* best effort */ }
 
     try {
       await AutomationEventBusService.publish({

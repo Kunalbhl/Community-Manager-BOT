@@ -1,3 +1,4 @@
+import { CategoryPicker } from '../../common/CategoryPicker.js';
 import { useRemembered } from '../../common/useRemembered.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Megaphone, Repeat, Clock, BarChart3, FileText, Trash2, Pause, Play, Pencil, Copy, Info, Send, CheckCircle2 } from 'lucide-react';
@@ -272,11 +273,21 @@ function Reminders({ communityId, data, run, api, busy, chanName }: P) {
   const [at, setAt] = useState('');
   const [repeat, setRepeat] = useState('ONCE');
   const [message, setMessage] = useState('');
+  const [editId, setEditId] = useState('');
   const ready = at && message.trim() && (to === 'MEMBER' ? userId : channelId);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    run(() => api('reminders', 'POST', { targetType: to, targetUser: userId, targetUserName: userName, channelId, triggerAt: new Date(at).toISOString(), recurrence: repeat, message }),
-      'Reminder scheduled.', () => { setMessage(''); setAt(''); });
+    const body = { targetType: to, targetUser: userId, targetUserName: userName, channelId, triggerAt: new Date(at).toISOString(), recurrence: repeat, message };
+    run(() => (editId ? api(`reminders/${editId}`, 'PUT', body) : api('reminders', 'POST', body)),
+      editId ? 'Reminder updated.' : 'Reminder scheduled.', () => { setMessage(''); setAt(''); setEditId(''); });
+  };
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const local = (iso: string) => { const d = new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const edit = (r: any) => {
+    setEditId(r.id); setTo(r.targetType === 'CHANNEL' ? 'CHANNEL' : 'MEMBER'); setUserId(r.targetUser || ''); setUserName(r.targetUserName || '');
+    if (r.channelId) setChannelId(r.channelId);
+    setAt(local(Date.parse(r.triggerAt) > Date.now() ? r.triggerAt : new Date(Date.now() + 5 * 60000).toISOString())); setRepeat(r.recurrence || 'ONCE'); setMessage(r.message || '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   return (
     <Layout listTitle="Scheduled reminders" listDesc="Upcoming and sent reminders."
@@ -297,7 +308,7 @@ function Reminders({ communityId, data, run, api, busy, chanName }: P) {
           <label className={label}>Repeat<select className={input} value={repeat} onChange={(e) => setRepeat(e.target.value)}><option value="ONCE">Don’t repeat</option><option value="DAILY">Every day</option><option value="WEEKLY">Every week</option></select></label>
         </div>
         <div><span className={label}>Message</span><div className="mt-1"><MessageComposer communityId={communityId} value={message} onChange={setMessage} rows={4} placeholder="What should the reminder say?" defaultCategory="Reminder" /></div></div>
-        <button className={primary} disabled={busy || !ready}><Clock className="h-4 w-4" />Schedule reminder</button>
+        <div className="flex gap-2"><button className={primary} disabled={busy || !ready}><Clock className="h-4 w-4" />{editId ? 'Save changes' : 'Schedule reminder'}</button>{editId && <button type="button" className="rounded-xl border border-slate-200 px-4 text-sm font-semibold" onClick={() => { setEditId(''); setMessage(''); setAt(''); }}>Cancel edit</button>}</div>
       </form>}
       list={!data.length ? <Empty text="No reminders yet." /> : data.map((r) => (
         <div key={r.id} className="rounded-xl border border-slate-200 p-4">
@@ -307,7 +318,11 @@ function Reminders({ communityId, data, run, api, busy, chanName }: P) {
           </div>
           <div className="mt-1 text-xs text-slate-500">{r.status === 'PENDING' ? `Sends ${when(r.triggerAt)}` : `Sent ${when(r.updatedAt)}`}{r.recurrence && r.recurrence !== 'ONCE' ? ` · repeats ${r.recurrence === 'DAILY' ? 'daily' : 'weekly'}` : ''}</div>
           <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm text-slate-600">{r.message}</p>
-          <button className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:underline" onClick={() => window.confirm('Delete this reminder?') && run(() => api(`reminders/${r.id}`, 'DELETE'), 'Reminder deleted.')}><Trash2 className="h-3.5 w-3.5" />Delete</button>
+          <div className="mt-2 flex flex-wrap gap-4">
+            {r.status === 'FAILED' && <button className="text-xs font-semibold text-indigo-600 hover:underline" onClick={() => run(() => api(`reminders/${r.id}/resend`, 'POST'), 'Sending again within a minute.')}>↻ Send again</button>}
+            {r.status !== 'SENT' && <button className="text-xs font-semibold text-indigo-600 hover:underline" onClick={() => edit(r)}>✎ Edit</button>}
+            <button className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:underline" onClick={() => window.confirm('Delete this reminder?') && run(() => api(`reminders/${r.id}`, 'DELETE'), 'Reminder deleted.')}><Trash2 className="h-3.5 w-3.5" />Delete</button>
+          </div>
         </div>
       ))} />
   );
@@ -400,9 +415,7 @@ function Templates({ communityId, data, run, api, busy }: P) {
         <Head icon={FileText} tone="bg-sky-50 text-sky-600" title={editing ? `Edit “${editing.name}”` : 'Create a template'} desc="Reusable messages. Variables like {{username}} are filled in when the bot sends them." />
         <div className="grid gap-4 sm:grid-cols-2">
           <label className={label}>Name<input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Welcome message" required /></label>
-          <label className={label}>Category<input list="cm-tpl-cats" className={input} value={category} onChange={(e) => setCategory(e.target.value)} />
-            <datalist id="cm-tpl-cats">{['General', 'Announcement', 'Recruitment', 'Promotion', 'Event', 'Reminder', 'Moderation', ...cats].filter((v, i, a) => a.indexOf(v) === i).map((c) => <option key={c} value={c} />)}</datalist>
-          </label>
+          <div className={label}>Category<div className="mt-1"><CategoryPicker value={category} onChange={setCategory} existing={cats} /></div></div>
         </div>
         <div><span className={label}>Message</span><div className="mt-1"><MessageComposer communityId={communityId} value={content} onChange={setContent} allowTemplates={false} placeholder="Hello {{username}}! Welcome to {{communityName}}…" vars={[{ token: 'username', label: 'Member name' }, { token: 'member', label: '@Member' }, { token: 'communityName', label: 'Server name' }, { token: 'memberCount', label: 'Member count' }, { token: 'recruiter', label: '@Recruiter' }, { token: 'recruiterCode', label: 'Recruiter code' }]} /></div></div>
         <div className="flex gap-2">

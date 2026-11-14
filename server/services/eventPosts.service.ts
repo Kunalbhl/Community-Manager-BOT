@@ -26,9 +26,10 @@ function view(e: any, going: number) {
         { name: 'Going', value: `${going}${e.capacity ? ` / ${e.capacity}` : ''}${full ? ' · full' : ''}`, inline: true },
         { name: 'Who can join', value: e.visibility === 'PUBLIC' ? 'Everyone in the server' : 'Members', inline: true },
       ],
-      footer: { text: 'You will get a reminder before it starts.' },
+      footer: { text: 'Times are shown in your own time zone. You will get a reminder before it starts.' },
     }],
     components: [new ActionRowBuilder<ButtonBuilder>().addComponents(
+      ...(e.discordEventUrl ? [new ButtonBuilder().setLabel('Open in Events').setEmoji('📅').setStyle(ButtonStyle.Link).setURL(e.discordEventUrl)] : []),
       new ButtonBuilder().setCustomId(`cm:evt:join:${e.id}`).setLabel(full ? 'Full' : 'Register').setEmoji('✅').setStyle(ButtonStyle.Success).setDisabled(Boolean(full) || e.status === 'CANCELLED' || e.status === 'COMPLETED'),
       new ButtonBuilder().setCustomId(`cm:evt:leave:${e.id}`).setLabel('Can’t go').setStyle(ButtonStyle.Secondary).setDisabled(e.status === 'CANCELLED' || e.status === 'COMPLETED'),
     )],
@@ -46,6 +47,7 @@ export const eventPosts = {
   },
 
   async refresh(communityId: string, eventId: string) {
+    await import('./eventExtras.service.js').then(({ eventExtras }) => eventExtras.refreshRoster(communityId, eventId)).catch(() => undefined);
     const e: any = await eventsRepository.getById(eventId).catch(() => null);
     if (!e?.discordPostMessageId) return;
     const guild = await guildFor(communityId);

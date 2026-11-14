@@ -34,7 +34,7 @@ const BLANK = {
   name: '', emoji: '🎁', description: '', enabled: true,
   trigger: { type: 'MILESTONE' as Trigger, count: 5, period: 'MONTH' },
   countWhen: { mode: 'STAYED', stayDays: 7 },
-  actions: { addRoleIds: [] as string[], removeRoleIds: [] as string[], roleDays: 0, xp: 0, expireDays: 0, dmMessage: '', announceChannelId: '', announceMessage: '', manualReward: '', credit: { itemId: '', amount: 1 } },
+  actions: { addRoleIds: [] as string[], removeRoleIds: [] as string[], roleDays: 0, xp: 0, dmMessage: '', announceChannelId: '', announceMessage: '', manualReward: '', credit: { itemId: '', amount: 1 } },
   approval: 'AUTO', onLeave: 'REVOKE', maxPerRecruiter: 0,
 };
 
@@ -120,7 +120,7 @@ export function RewardsView({ communityId }: { communityId: string }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-base font-bold text-slate-900">{r.emoji} {r.name}</div>
-                    <p className="mt-0.5 text-sm text-slate-600">{r.summary}</p>
+                    <p className="mt-0.5 text-sm text-slate-600">{r.summary}{r.activeUntil ? <span className={`ml-2 rounded-full px-2 py-0.5 text-xs font-semibold ${Date.parse(r.activeUntil) > Date.now() ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>{Date.parse(r.activeUntil) > Date.now() ? `until ${new Date(r.activeUntil).toLocaleDateString()}` : "ended"}</span> : null}</p>
                   </div>
                   <button role="switch" aria-checked={r.enabled} aria-label="On or off" onClick={async () => { await api(`/rewards/rules/${r.id}`, 'PUT', { enabled: !r.enabled }).catch((e) => flash(false, e.message)); load(); }}
                     className={`relative h-6 w-11 shrink-0 rounded-full transition ${r.enabled ? 'bg-indigo-600' : 'bg-slate-300'}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition ${r.enabled ? 'left-[22px]' : 'left-0.5'}`} /></button>
@@ -331,7 +331,10 @@ function RuleEditor({ communityId, rule, onClose, onSaved, api, staffRoleIds = [
               <label className="text-sm font-semibold text-slate-700">Remove roles <span className="font-normal text-slate-500">· e.g. the previous rank</span><div className="mt-1"><RoleChips communityId={communityId} ids={r.actions.removeRoleIds} onChange={(l) => set('actions.removeRoleIds', l)} placeholder="Remove a role" /></div></label>
               {r.actions.addRoleIds.length > 0 && <label className="text-sm font-semibold text-slate-700">Keep the role for<div className="mt-1 flex items-center gap-2"><input type="number" min={0} max={365} className={`${input} w-24`} value={r.actions.roleDays} onChange={(e) => set('actions.roleDays', Number(e.target.value))} /><span className="font-normal text-slate-500">days (0 = forever)</span></div></label>}
               <label className="text-sm font-semibold text-slate-700">XP<div className="mt-1 flex items-center gap-2"><input type="number" min={0} className={`${input} w-32`} value={r.actions.xp} onChange={(e) => set('actions.xp', Number(e.target.value))} /><span className="font-normal text-slate-500">added to their level</span></div></label>
-              <label className="text-sm font-semibold text-slate-700">Expires after <span className="font-normal text-slate-500">· optional</span><div className="mt-1 flex items-center gap-2"><input type="number" min={0} max={365} className={`${input} w-24`} value={r.actions.expireDays || 0} onChange={(e) => set('actions.expireDays', Number(e.target.value))} /><span className="font-normal text-slate-500">days (0 = never). The wallet credit and XP from this reward are taken back after this, for a temporary bonus.</span></div></label>
+              <label className="text-sm font-semibold text-slate-700">Reward available until <span className="font-normal text-slate-500">· optional</span><div className="mt-1 flex flex-wrap items-center gap-2"><input type="date" className={`${input} w-44`} value={(r.activeUntil || '').slice(0, 10)} onChange={(e) => set('activeUntil', e.target.value ? new Date(`${e.target.value}T23:59:59`).toISOString() : '')} />
+                <span className="font-normal text-slate-500">or for</span><input type="number" min={0} max={365} className={`${input} w-20`} placeholder="days" onChange={(e) => { const n = Number(e.target.value); set('activeUntil', n > 0 ? new Date(Date.now() + n * 86400000).toISOString() : ''); }} /><span className="font-normal text-slate-500">days</span>
+                {r.activeUntil && <button type="button" className="text-xs font-semibold text-rose-600" onClick={() => set('activeUntil', '')}>Clear</button>}</div>
+                <span className="mt-1 block text-xs font-normal text-slate-500">After this the reward switches itself off and nobody new earns it (e.g. a limited-time bonus). What was already given is kept; use the take-back option below for that.</span></label>
               <label className="text-sm font-semibold text-slate-700 md:col-span-2">Something staff hand out <span className="font-normal text-slate-500">· Nitro, merch, in-game items. These always wait for staff approval.</span><input className={`${input} mt-1`} value={r.actions.manualReward} maxLength={200} onChange={(e) => set('actions.manualReward', e.target.value)} placeholder="e.g. Discord Nitro Basic (1 month)" /></label>
             </div>
             <TemplateField label="Private message to the recruiter (optional)" value={r.actions.dmMessage} onChange={(v) => set('actions.dmMessage', v)} vars={REWARD_VARS} rows={2} />

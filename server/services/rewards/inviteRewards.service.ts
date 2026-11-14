@@ -44,6 +44,8 @@ export interface RewardRule {
   approverRoleIds?: string[];
   /** Where the approval request is posted (empty = announcement channel, else the recruitment log). */
   approvalChannelId?: string;
+  /** The reward switches itself off after this moment (limited-time rewards). */
+  activeUntil?: string;
   onLeave: 'KEEP' | 'REVOKE';
   /** For repeating rewards: most times one recruiter can get it (0 = no limit). */
   maxPerRecruiter: number;
@@ -141,6 +143,7 @@ export function sanitizeRule(b: any, cur?: Partial<RewardRule>): Omit<RewardRule
     approval: b?.approval === 'STAFF' || actions.manualReward ? 'STAFF' : 'AUTO',
     approverRoleIds: ids(b?.approverRoleIds),
     approvalChannelId: snow(b?.approvalChannelId) ? b.approvalChannelId : '',
+    activeUntil: b?.activeUntil && !Number.isNaN(Date.parse(b.activeUntil)) ? new Date(b.activeUntil).toISOString() : '',
     onLeave: b?.onLeave === 'REVOKE' ? 'REVOKE' : 'KEEP',
     maxPerRecruiter: clampInt(b?.maxPerRecruiter, 0, 1000, 0),
     includePast: !!b?.includePast,
@@ -215,7 +218,10 @@ export const inviteRewards = {
 
   /** Checks every rule for one server and gives what is due. Safe to run any time; it never gives twice. */
   async evaluate(communityId: string, onlyRecruiter?: string) {
-    const rules = (await this.listRules(communityId)).filter((r) => r.enabled);
+    const all = await this.listRules(communityId);
+    // Limited-time rewards switch themselves off when their date has passed.
+    for (const r of all) if (r.enabled && r.activeUntil && Date.parse(r.activeUntil) <= Date.now()) { r.enabled = false; await rewardRulesRepository.update(r.id, { enabled: false, endedAt: nowIso(), updatedAt: nowIso() } as any).catch(() => undefined); }
+    const rules = all.filter((r) => r.enabled);
     if (!rules.length) return { granted: 0 };
     const [records, credits, grants] = await Promise.all([this.records(communityId), this.credits(communityId), this.grants(communityId)]);
     const tally = this.tally(records, credits);
