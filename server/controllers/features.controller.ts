@@ -7,6 +7,7 @@ import { getFeatures, saveFeatures, FeaturesConfig } from '../services/features/
 import { levels } from '../services/features/levels.service.js';
 import { birthdays, giveaways, buttonRoles, buttonRolePanelsRepository, verification } from '../services/features/community.service.js';
 import { guildFor, isSnowflake } from '../services/toolkit/toolkitConfig.js';
+import { serverStats } from '../services/features/serverStats.service.js';
 import { auditService } from '../services/audit.service.js';
 
 const actor = (req: Request) => String((req as any).user?.userId || 'unknown');
@@ -200,4 +201,27 @@ export async function homeSummaryHandler(req: Request, res: Response) {
       },
     });
   } catch (err) { fail(res, err, 500); }
+}
+
+// ---------- server stats counters ----------
+export async function listStatsHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    ok(res, { counters: await serverStats.list(communityId), kinds: serverStats.kinds, existing: await serverStats.suggestExisting(communityId) });
+  } catch (err) { fail(res, err, 500); }
+}
+export async function previewStatHandler(req: Request, res: Response) {
+  try { ok(res, await serverStats.preview(req.params.communityId, req.body || {})); } catch (err) { fail(res, err); }
+}
+export async function saveStatHandler(req: Request, res: Response) {
+  try {
+    const saved = await serverStats.save(req.params.communityId, req.body || {});
+    ok(res, saved);
+  } catch (err) { fail(res, err); }
+}
+export async function refreshStatsHandler(req: Request, res: Response) {
+  try { ok(res, await serverStats.refreshCommunity(req.params.communityId)); } catch (err) { fail(res, err); }
+}
+export async function deleteStatHandler(req: Request, res: Response) {
+  try { ok(res, await serverStats.remove(req.params.communityId, req.params.id, req.query.channel === '1')); } catch (err) { fail(res, err); }
 }

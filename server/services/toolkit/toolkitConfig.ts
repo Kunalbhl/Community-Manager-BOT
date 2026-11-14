@@ -105,8 +105,21 @@ export const DEFAULT_RECRUITMENT_MESSAGES = {
   rejected: 'Hi {applicant}, thank you for applying to **{server}**. This time your application was not approved.\nReason: {reason}',
   announce: '🎉 Please welcome {mention} to the team!',
   panelTitle: '📋 Join our team',
-  panelText: 'Press **Apply** to fill in a short application. It only takes a few minutes, and you will get a DM when it is reviewed.',
+  panelText: [
+    'Want to join **{server}**? Here is how it works:',
+    '',
+    '**1️⃣ Press Apply** below. A short form opens; answer the questions honestly (about 5 minutes). If you have a recruiter code, enter it there.',
+    '**2️⃣ Read the rules** we send you and press **I agree**. You may also get a quick rules quiz; you need to pass it to continue.',
+    '**3️⃣ Wait for review.** Our team reads your application. You get a private chat with staff, and they may ask questions or invite you to a short interview.',
+    '**4️⃣ Get the result by DM.** If you are approved you get your member role and can pick your game roles. If not, you get the reason.',
+    '',
+    '🔔 Keep your **DMs open** for this server so you don’t miss our messages.',
+    '❓ Stuck or have a question? Ask a staff member.',
+  ].join('\n'),
 };
+
+/** The short text used before the step-by-step version; replaced automatically when posting. */
+export const OLD_PANEL_TEXT = 'Press **Apply** to fill in a short application. It only takes a few minutes, and you will get a DM when it is reviewed.';
 
 export const toolkitRepository = new FirestoreRepository<ToolkitConfig>('serverToolkitConfigs');
 
@@ -167,7 +180,7 @@ export async function getToolkit(communityId: string): Promise<ToolkitConfig> {
     warnings: { ...d.warnings, ...(saved.warnings || {}) },
     roleRules: { ...d.roleRules, ...(saved.roleRules || {}) },
     reviewRooms: { ...d.reviewRooms, ...(saved.reviewRooms || {}) },
-    recruitment: { ...d.recruitment, ...((saved as any).recruitment || {}), messages: { ...d.recruitment.messages, ...((saved as any).recruitment?.messages || {}) }, screening: { ...d.recruitment.screening, ...((saved as any).recruitment?.screening || {}) }, interview: { ...d.recruitment.interview, ...((saved as any).recruitment?.interview || {}) } },
+    recruitment: { ...d.recruitment, ...((saved as any).recruitment || {}), messages: (() => { const m = { ...d.recruitment.messages, ...((saved as any).recruitment?.messages || {}) }; if (m.panelText === OLD_PANEL_TEXT) m.panelText = d.recruitment.messages.panelText; return m; })(), screening: { ...d.recruitment.screening, ...((saved as any).recruitment?.screening || {}) }, interview: { ...d.recruitment.interview, ...((saved as any).recruitment?.interview || {}) } },
   };
 }
 

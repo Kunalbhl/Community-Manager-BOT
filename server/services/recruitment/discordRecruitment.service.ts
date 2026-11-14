@@ -15,7 +15,7 @@ import {
 import { logger } from '../../logging/logger.js';
 import { applicationsRepository } from '../../repositories/index.js';
 import { communityQuestionsService } from '../communityQuestions.service.js';
-import { getToolkit, guildFor, isSnowflake, communityForGuild } from '../toolkit/toolkitConfig.js';
+import { getToolkit, guildFor, isSnowflake, communityForGuild, OLD_PANEL_TEXT, DEFAULT_RECRUITMENT_MESSAGES } from '../toolkit/toolkitConfig.js';
 import { discordService } from '../../integrations/discord/discord.service.js';
 
 const PAGE = 5;
@@ -76,9 +76,9 @@ function modalFor(page: number, total: number, qs: any[], withCode: boolean, pre
 
 export const discordRecruitment = {
   /* ------------------------------ Apply ------------------------------ */
-  panel(cfg: Awaited<ReturnType<typeof getToolkit>>['recruitment']) {
+  panel(cfg: Awaited<ReturnType<typeof getToolkit>>['recruitment'], serverName = 'our server') {
     return {
-      embeds: [{ title: cfg.messages.panelTitle, description: fillMsg(cfg.messages.panelText, {}), color: 0x7c8cff }],
+      embeds: [{ title: cfg.messages.panelTitle, description: fillMsg(!cfg.messages.panelText || cfg.messages.panelText === OLD_PANEL_TEXT ? DEFAULT_RECRUITMENT_MESSAGES.panelText : cfg.messages.panelText, { server: serverName }), color: 0x7c8cff }],
       components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('cm:apply:start').setLabel('Apply').setEmoji('📋').setStyle(ButtonStyle.Success))],
     };
   },
@@ -88,7 +88,7 @@ export const discordRecruitment = {
     if (!(await secureGate.isVerified(communityId))) throw new Error('Finish Secure Setup first (Server tools → Recruitment in Discord). Recruitment stays off until your server is locked for newcomers.');
     const cfg = (await getToolkit(communityId)).recruitment;
     if (!(await questionsFor(communityId)).length) throw new Error('Add your application questions first (Recruitment → Questions).');
-    await channel.send(this.panel(cfg));
+    await channel.send(this.panel(cfg, channel.guild?.name));
     const { saveToolkit } = await import('../toolkit/toolkitConfig.js');
     await saveToolkit(communityId, { recruitment: { ...cfg, panelPostedAt: new Date().toISOString() } as any });
   },

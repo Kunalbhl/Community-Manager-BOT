@@ -143,6 +143,7 @@ export function startReminderScheduler() {
       if (ticks % 30 === 2) { const { secureGate } = await import('./recruitment/secureGate.service.js'); await secureGate.recheckAll().catch(() => undefined); }
       const { giveaways, birthdays } = await import('./features/community.service.js');
       await giveaways.tick(); // end giveaways whose time is up
+      await import('./features/serverStats.service.js').then(({ serverStats }) => serverStats.tick()).catch(() => undefined);
       {
         // Voice XP: one pass per minute.
         const { discordService } = await import('../integrations/discord/discord.service.js');

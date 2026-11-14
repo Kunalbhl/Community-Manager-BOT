@@ -837,10 +837,10 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
         <Card title="Apply panel" desc="Post it in a public channel like #apply or #join-us.">
           <div className="space-y-4">
             <label className="block text-sm font-medium text-slate-700">Title<input className={`${input} mt-1`} value={c.messages.panelTitle} onChange={(e) => setM('panelTitle', e.target.value)} /></label>
-            <label className="block text-sm font-medium text-slate-700">Text<textarea rows={3} className={`${input} mt-1`} value={c.messages.panelText} onChange={(e) => setM('panelText', e.target.value)} /></label>
+            <label className="block text-sm font-medium text-slate-700">Text<textarea rows={10} className={`${input} mt-1`} value={c.messages.panelText} onChange={(e) => setM('panelText', e.target.value)} /></label>
             <div className="rounded-xl border-l-4 border-indigo-500 bg-slate-50 p-4">
               <div className="font-bold text-slate-900">{c.messages.panelTitle}</div>
-              <div className="mt-1 whitespace-pre-line text-sm text-slate-600">{c.messages.panelText.replace(/\*\*/g, '')}</div>
+              <div className="mt-1 whitespace-pre-line text-sm text-slate-600">{c.messages.panelText.replace(/\*\*/g, "").replace(/\{server\}/g, "your server")}</div>
               <span className="mt-3 inline-block rounded bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white">📋 Apply</span>
             </div>
           </div>
