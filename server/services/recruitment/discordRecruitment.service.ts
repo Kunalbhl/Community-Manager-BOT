@@ -1,3 +1,4 @@
+import { boldBlocks } from '../../../shared/utils/discordText.js';
 /**
  * Recruitment inside Discord.
  *
@@ -97,7 +98,7 @@ export const discordRecruitment = {
   /* ------------------------------ Apply ------------------------------ */
   panel(cfg: Awaited<ReturnType<typeof getToolkit>>['recruitment'], serverName = 'our server') {
     return {
-      embeds: [{ title: cfg.messages.panelTitle, description: fillMsg(!cfg.messages.panelText || cfg.messages.panelText === OLD_PANEL_TEXT ? DEFAULT_RECRUITMENT_MESSAGES.panelText : cfg.messages.panelText, { server: serverName }), color: 0x7c8cff }],
+      embeds: [{ title: cfg.messages.panelTitle, description: boldBlocks(fillMsg(!cfg.messages.panelText || cfg.messages.panelText === OLD_PANEL_TEXT ? DEFAULT_RECRUITMENT_MESSAGES.panelText : cfg.messages.panelText, { server: serverName })), color: 0x7c8cff }],
       components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('cm:apply:start').setLabel('Apply').setEmoji('📋').setStyle(ButtonStyle.Success))],
     };
   },

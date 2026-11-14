@@ -3,6 +3,7 @@
  * button-role panels and giveaways.
  */
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle } from 'discord.js';
+import { boldBlocks } from '../../../shared/utils/discordText.js';
 import { FirestoreRepository } from '../../repositories/firestore.repository.js';
 import { logger } from '../../logging/logger.js';
 import { getFeatures, saveFeatures, fill } from './featuresConfig.js';
@@ -265,7 +266,7 @@ export const buttonRoles = {
   cards(panel: ButtonRolePanel, guild?: any) {
     const accent = (panel as any).color ? parseInt(String((panel as any).color).replace('#', ''), 16) : (guild?.roles.cache.get(panel.buttons[0]?.roleId)?.color || 0x7c8cff);
     const container: any = { type: 17, accent_color: accent, components: [
-      { type: 10, content: `## ${panel.title}${panel.description ? `\n${clip(panel.description, 3000)}` : ''}` },
+      (() => { const head = { type: 10, content: `-# ${guild?.name || ''}\n## ${panel.title}${panel.description ? `\n${clip(boldBlocks(panel.description), 3000)}` : ''}` }; const ic = guild?.iconURL?.({ size: 256 }); return ic ? { type: 9, components: [head], accessory: { type: 11, media: { url: ic } } } : head; })(),
       { type: 14, divider: true, spacing: 1 },
       ...panel.buttons.slice(0, 20).map((b: any) => ({
         type: 9,
@@ -278,7 +279,8 @@ export const buttonRoles = {
   async post(panel: ButtonRolePanel, channel: any) {
     const guild = channel.guild;
     const color = (panel as any).color ? parseInt(String((panel as any).color).replace('#', ''), 16) : (guild?.roles.cache.get(panel.buttons[0]?.roleId)?.color || 0x7c8cff);
-    const classic = { embeds: [{ title: panel.title, description: panel.description || 'Pick your roles below.', color }], components: this.components(panel, guild) };
+    const icon = guild?.iconURL?.({ size: 256 }) || undefined;
+    const classic = { embeds: [{ author: guild ? { name: guild.name, icon_url: icon } : undefined, title: panel.title, description: boldBlocks(panel.description || 'Pick your roles below.'), color, thumbnail: icon ? { url: icon } : undefined }], components: this.components(panel, guild) };
     const payload: any = (panel as any).layout === 'CARDS' ? this.cards(panel, guild) : classic;
     if (panel.messageId && panel.channelId === channel.id) {
       const existing = await channel.messages.fetch(panel.messageId).catch(() => null);
