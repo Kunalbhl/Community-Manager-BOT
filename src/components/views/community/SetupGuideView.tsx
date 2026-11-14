@@ -18,7 +18,7 @@ export function scrollToHeading(text: string) {
   const want = text.toLowerCase();
   const started = Date.now();
   const tick = () => {
-    const els = Array.from(document.querySelectorAll('main h1, main h2, main h3, main h4, main .font-bold, main .font-black, main label, main section')) as HTMLElement[];
+    const els = Array.from(document.querySelectorAll('h1, h2, h3, h4, .font-bold, .font-black, label')) as HTMLElement[];
     const hit = els.find((e) => (e.textContent || '').trim().toLowerCase().startsWith(want) && e.offsetParent !== null);
     if (hit) {
       const box = (hit.closest('section, .rounded-2xl, .rounded-xl') as HTMLElement) || hit;
