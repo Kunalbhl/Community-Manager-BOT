@@ -1,3 +1,4 @@
+import { EventPick, takeEventFor, attachToEvent, EventTag } from '../../common/EventPick.js';
 import { EmojiField } from '../../common/EmojiField.js';
 import { useRemembered } from '../../common/useRemembered.js';
 import { takeOpenTab } from './SetupGuideView.js';
@@ -74,7 +75,7 @@ export function CommunityFeaturesView({ communityId, only }: { communityId: stri
       {cfg && res && (
         <>
           {tab === 'levels' && <LevelsTab api={api} cfg={cfg.levels} res={res} onSave={(v) => save('levels', v)} />}
-          {tab === 'giveaways' && <GiveawaysTab api={api} res={res} />}
+          {tab === 'giveaways' && <GiveawaysTab api={api} res={res} communityId={communityId} />}
           {tab === 'buttonRoles' && <ButtonRolesTab api={api} res={res} communityId={communityId} />}
           {tab === 'verification' && <VerificationTab api={api} cfg={cfg.verification} res={res} onSave={(v) => save('verification', v)} />}
           {tab === 'logs' && <LogsTab cfg={cfg.logs} res={res} onSave={(v) => save('logs', v)} />}
@@ -161,7 +162,8 @@ function LevelsTab({ api, cfg, res, onSave }: any) {
 }
 
 /* ---------------- Giveaways ---------------- */
-function GiveawaysTab({ api, res }: any) {
+function GiveawaysTab({ api, res, communityId }: any) {
+  const [evt, setEvt] = useState(takeEventFor);
   const [f, setF] = useState({ channelId: '', prize: '', description: '', winners: 1, durationMinutes: 1440, requiredRoleId: '' });
   const [list, setList] = useState<any[] | null>(null);
   const [msg, setMsg] = useState('');
@@ -184,7 +186,8 @@ function GiveawaysTab({ api, res }: any) {
             </Label>
           </div>
           <Label t="Only members with this role can enter (optional)"><Pick options={res.roles} value={f.requiredRoleId} onChange={(v) => setF({ ...f, requiredRoleId: v })} placeholder="Anyone can enter" /></Label>
-          <button className={btn} onClick={async () => { setMsg(''); try { await api('/features/giveaways', 'POST', f); setMsg('Giveaway started.'); setF({ ...f, prize: '', description: '' }); load(); } catch (e: any) { setMsg(e.message); } }}><Gift className="h-4 w-4" /> Start giveaway</button>
+          <EventPick communityId={communityId} value={evt} onChange={setEvt} />
+          <button className={btn} onClick={async () => { setMsg(''); try { const g = await api('/features/giveaways', 'POST', f); await attachToEvent(communityId, evt, 'giveaway', { id: g?.id }); setMsg('Giveaway started.'); setF({ ...f, prize: '', description: '' }); load(); } catch (e: any) { setMsg(e.message); } }}><Gift className="h-4 w-4" /> Start giveaway</button>
           {msg && <p className="text-sm text-slate-600">{msg}</p>}
         </div>
       </Card>
@@ -193,7 +196,7 @@ function GiveawaysTab({ api, res }: any) {
           <ul className="divide-y divide-slate-100">
             {list.slice(0, 30).map((g) => (
               <li key={g.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                <div><div className="font-semibold text-slate-900">🎁 {g.prize}</div>
+                <div><div className="font-semibold text-slate-900">🎁 {g.prize}<EventTag item={g} /></div>
                   <div className="text-xs text-slate-500">{g.entrants.length} entries · {g.winners} winner(s) · {g.status === 'RUNNING' ? `ends ${fmtDate(new Date(g.endsAt).toISOString())}` : g.status.toLowerCase()}{g.winnerIds?.length ? ` · won by ${g.winnerIds.length}` : ''}</div></div>
                 <div className="flex gap-3 text-xs font-semibold">
                   {g.status === 'RUNNING' && <><button className="text-indigo-600 hover:underline" onClick={() => act(g.id, 'end')}>End now</button><button className="text-rose-600 hover:underline" onClick={() => act(g.id, 'cancel')}>Cancel</button></>}

@@ -274,6 +274,8 @@ import {
   resumeSchedule,
   cancelSchedule,
   linkToEvent,
+  attachToEvent,
+  linkedForEvent,
 } from '../controllers/events.controller.js';
 import {
   getWarningsHandler,
@@ -896,6 +898,8 @@ router.post('/events/:eventId/register/cancel', cancelRegistration);
 router.post('/events/:eventId/attendance/mark', requirePermission('community.manage'), markAttendance);
 router.post('/events/:eventId/check-in', checkIn);
 router.post('/events/:eventId/links', requirePermission('community.manage'), linkToEvent);
+router.post('/events/:eventId/attach', requirePermission('community.manage'), attachToEvent);
+router.get('/events/:eventId/linked', requirePermission('community.view'), linkedForEvent);
 
 // Schedules module
 router.get('/schedules', requirePermission('community.view'), listSchedules);

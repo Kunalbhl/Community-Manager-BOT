@@ -1,3 +1,4 @@
+import { EventPick, takeEventFor, attachToEvent, EventTag } from '../../common/EventPick.js';
 import { CategoryPicker } from '../../common/CategoryPicker.js';
 import { useRemembered } from '../../common/useRemembered.js';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -133,9 +134,10 @@ function Announcements({ communityId, data, run, api, busy, chanName }: P) {
   const [channelId, setChannelId] = useRemembered('announce:' + (typeof location !== 'undefined' ? location.pathname : ''));
   const [content, setContent] = useState('');
   const [at, setAt] = useState('');
+  const [eventId, setEventId] = useState(takeEventFor);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    run(() => api('announcements', 'POST', { title, content, channelId, scheduledAt: at ? new Date(at).toISOString() : undefined }),
+    run(() => api('announcements', 'POST', { title, content, channelId, scheduledAt: at ? new Date(at).toISOString() : undefined }).then((r: any) => attachToEvent(communityId, eventId, 'announcement', r)),
       at ? 'Announcement scheduled.' : 'Announcement sent to Discord.', () => { setTitle(''); setContent(''); setAt(''); });
   };
   return (
@@ -146,11 +148,12 @@ function Announcements({ communityId, data, run, api, busy, chanName }: P) {
         <label className={label}>Channel<div className="mt-1"><ChannelSelect communityId={communityId} value={channelId} onChange={setChannelId} /></div></label>
         <div><span className={label}>Message</span><div className="mt-1"><MessageComposer communityId={communityId} value={content} onChange={setContent} placeholder="Write your announcement…" defaultCategory="Announcement" /></div></div>
         <label className={label}>Send later (optional)<input type="datetime-local" className={input} value={at} onChange={(e) => setAt(e.target.value)} /><span className="mt-1 block text-xs font-normal normal-case text-slate-500">Leave empty to send now.</span></label>
+        <EventPick communityId={communityId} value={eventId} onChange={setEventId} />
         <button className={primary} disabled={busy || !channelId || !content.trim()}><Send className="h-4 w-4" />{at ? 'Schedule announcement' : 'Send to Discord now'}</button>
       </form>}
       list={!data.length ? <Empty text="No announcements yet." /> : data.map((a) => (
         <div key={a.id} className="rounded-xl border border-slate-200 p-4">
-          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{a.title}</span><Badge s={a.status} err={a.errorDetails || a.failureReason || a.lastError} /></div>
+          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{a.title}<EventTag item={a} /></span><Badge s={a.status} err={a.errorDetails || a.failureReason || a.lastError} /></div>
           <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm text-slate-600">{a.content}</p>
           <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-500"><span>#{chanName?.(a.channelId) || 'channel'}</span><span>{a.status === 'SCHEDULED' ? `Sends ${when(a.scheduledAt)}` : when(a.createdAt)}</span></div>
           <div className="mt-3 flex flex-wrap gap-3 border-t border-slate-100 pt-2 text-xs font-semibold">
@@ -188,6 +191,7 @@ function Campaigns({ communityId, data, run, api, busy, chanName, roleName }: P)
   const [ends, setEnds] = useState<'never' | 'date' | 'count'>('never');
   const [endAt, setEndAt] = useState('');
   const [maxRuns, setMaxRuns] = useState(4);
+  const [eventId, setEventId] = useState(takeEventFor);
   const ready = name && message.trim() && (where === 'CHANNEL' ? channelId : where === 'ROLE' ? roleId : where === 'MEMBERS' ? memberIds.length : true);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,7 +200,7 @@ function Campaigns({ communityId, data, run, api, busy, chanName, roleName }: P)
       startAt: startAt ? new Date(startAt).toISOString() : undefined,
       endAt: freq !== 'ONCE' && ends === 'date' && endAt ? new Date(endAt).toISOString() : undefined,
       maxRuns: freq !== 'ONCE' && ends === 'count' ? maxRuns : undefined,
-    }), startAt || freq !== 'ONCE' ? 'Campaign scheduled.' : 'Campaign is sending now.', () => { setName(''); setMessage(''); });
+    }).then((r: any) => attachToEvent(communityId, eventId, 'campaign', r)), startAt || freq !== 'ONCE' ? 'Campaign scheduled.' : 'Campaign is sending now.', () => { setName(''); setMessage(''); });
   };
   const target = (c: any) => c.targetAudience === 'CHANNEL' ? `Posts in #${chanName?.(c.channelId) || 'channel'}`
     : c.targetAudience === 'ROLE' ? `DMs everyone with @${roleName?.(c.roleId) || 'role'}` : c.targetAudience === 'MEMBERS' ? `DMs ${c.memberIds?.length || 0} picked members` : 'DMs every member';
@@ -243,11 +247,12 @@ function Campaigns({ communityId, data, run, api, busy, chanName, roleName }: P)
             {ends === 'count' && <input type="number" min={1} className={input} value={maxRuns} onChange={(e) => setMaxRuns(Math.max(1, Number(e.target.value) || 1))} />}
           </div>
         )}
+        <EventPick communityId={communityId} value={eventId} onChange={setEventId} />
         <button className={primary} disabled={busy || !ready}><Send className="h-4 w-4" />{freq === 'ONCE' && !startAt ? 'Send campaign now' : 'Schedule campaign'}</button>
       </form>}
       list={!data.length ? <Empty text="No campaigns yet." /> : data.map((c) => (
         <div key={c.id} className="rounded-xl border border-slate-200 p-4">
-          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{c.name}</span><Badge s={c.status} err={c.errorDetails || c.failureReason || c.lastError} /></div>
+          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{c.name}<EventTag item={c} /></span><Badge s={c.status} err={c.errorDetails || c.failureReason || c.lastError} /></div>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
             <span>{target(c)}</span><span>{describeFreq(c)}</span>
             {['SCHEDULED', 'PAUSED'].includes(c.status) && <span>Next: {when(c.scheduledAt)}</span>}
@@ -274,11 +279,12 @@ function Reminders({ communityId, data, run, api, busy, chanName }: P) {
   const [repeat, setRepeat] = useState('ONCE');
   const [message, setMessage] = useState('');
   const [editId, setEditId] = useState('');
+  const [eventId, setEventId] = useState(takeEventFor);
   const ready = at && message.trim() && (to === 'MEMBER' ? userId : channelId);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const body = { targetType: to, targetUser: userId, targetUserName: userName, channelId, triggerAt: new Date(at).toISOString(), recurrence: repeat, message };
-    run(() => (editId ? api(`reminders/${editId}`, 'PUT', body) : api('reminders', 'POST', body)),
+    run(() => (editId ? api(`reminders/${editId}`, 'PUT', body) : api('reminders', 'POST', body)).then((r: any) => attachToEvent(communityId, eventId, 'reminder', r)),
       editId ? 'Reminder updated.' : 'Reminder scheduled.', () => { setMessage(''); setAt(''); setEditId(''); });
   };
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -308,13 +314,14 @@ function Reminders({ communityId, data, run, api, busy, chanName }: P) {
           <label className={label}>Repeat<select className={input} value={repeat} onChange={(e) => setRepeat(e.target.value)}><option value="ONCE">Don’t repeat</option><option value="DAILY">Every day</option><option value="WEEKLY">Every week</option></select></label>
         </div>
         <div><span className={label}>Message</span><div className="mt-1"><MessageComposer communityId={communityId} value={message} onChange={setMessage} rows={4} placeholder="What should the reminder say?" defaultCategory="Reminder" /></div></div>
+        <EventPick communityId={communityId} value={eventId} onChange={setEventId} />
         <div className="flex gap-2"><button className={primary} disabled={busy || !ready}><Clock className="h-4 w-4" />{editId ? 'Save changes' : 'Schedule reminder'}</button>{editId && <button type="button" className="rounded-xl border border-slate-200 px-4 text-sm font-semibold" onClick={() => { setEditId(''); setMessage(''); setAt(''); }}>Cancel edit</button>}</div>
       </form>}
       list={!data.length ? <Empty text="No reminders yet." /> : data.map((r) => (
         <div key={r.id} className="rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-bold text-slate-900">{r.targetType === 'CHANNEL' ? `#${chanName?.(r.channelId) || 'channel'}` : <>@<MemberName id={r.targetUser} communityId={communityId} fallback={r.targetUserName} /></>}</span>
-            <Badge s={r.status} err={r.errorDetails || r.failureReason || r.lastError} />
+            <span className="flex items-center gap-1"><EventTag item={r} /><Badge s={r.status} err={r.errorDetails || r.failureReason || r.lastError} /></span>
           </div>
           <div className="mt-1 text-xs text-slate-500">{r.status === 'PENDING' ? `Sends ${when(r.triggerAt)}` : `Sent ${when(r.updatedAt)}`}{r.recurrence && r.recurrence !== 'ONCE' ? ` · repeats ${r.recurrence === 'DAILY' ? 'daily' : 'weekly'}` : ''}</div>
           <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm text-slate-600">{r.message}</p>
@@ -337,10 +344,11 @@ function Polls({ communityId, data, run, api, busy, chanName }: P) {
   const [hours, setHours] = useState(24);
   const [multi, setMulti] = useState(false);
   const [announce, setAnnounce] = useState(true);
+  const [eventId, setEventId] = useState(takeEventFor);
   const filled = options.map((o) => o.trim()).filter(Boolean);
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    run(() => api('polls', 'POST', { question, channelId, options: filled, durationHours: hours, allowMultiselect: multi, afterAction: announce ? 'ANNOUNCE' : 'NONE' }),
+    run(() => api('polls', 'POST', { question, channelId, options: filled, durationHours: hours, allowMultiselect: multi, afterAction: announce ? 'ANNOUNCE' : 'NONE' }).then((r: any) => attachToEvent(communityId, eventId, 'poll', r)),
       'Poll posted in Discord.', () => { setQuestion(''); setOptions(['', '']); });
   };
   return (
@@ -365,13 +373,14 @@ function Polls({ communityId, data, run, api, busy, chanName }: P) {
         </div>
         <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={multi} onChange={(e) => setMulti(e.target.checked)} />Let members pick more than one answer</label>
         <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={announce} onChange={(e) => setAnnounce(e.target.checked)} />When it closes, post the winning answer in the channel</label>
+        <EventPick communityId={communityId} value={eventId} onChange={setEventId} />
         <button className={primary} disabled={busy || !channelId || !question.trim() || filled.length < 2}><BarChart3 className="h-4 w-4" />Post poll to Discord</button>
       </form>}
       list={!data.length ? <Empty text="No polls yet." /> : data.map((p) => {
         const total = (p.results || []).reduce((n: number, r: any) => n + r.votes, 0);
         return (
           <div key={p.id} className="rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{p.question}</span><Badge s={p.status} err={p.errorDetails || p.failureReason || p.lastError} /></div>
+            <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{p.question}<EventTag item={p} /></span><Badge s={p.status} err={p.errorDetails || p.failureReason || p.lastError} /></div>
             <div className="mt-1 text-xs text-slate-500">#{chanName?.(p.channelId) || 'channel'} · {p.status === 'ACTIVE' ? `Closes ${when(p.endsAt)}` : `${total} vote${total === 1 ? '' : 's'}`}</div>
             {p.results ? (
               <div className="mt-3 space-y-1.5">

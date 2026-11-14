@@ -101,7 +101,6 @@ export const EventsView: React.FC<{ communityId: string }> = ({ communityId }) =
 function EventCard({ e, communityId, call, reload, flash }: any) {
   const [open, setOpen] = useState(false);
   const [regs, setRegs] = useState<any[] | null>(null);
-  const [tool, setTool] = useState<'' | 'announce' | 'reminder' | 'poll' | 'giveaway'>('');
   const st = STATUS[e.status] || { label: e.status, cls: 'bg-slate-100 text-slate-600' };
   const act = async (action: string, ok: string, body?: any) => {
     try { await call(`/api/v1/events/${e.id}/${action}`, 'POST', body); flash(true, ok); reload(); } catch (err: any) { flash(false, err.message); }
@@ -110,7 +109,6 @@ function EventCard({ e, communityId, call, reload, flash }: any) {
   useEffect(() => { if (open && !regs) loadRegs(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const going = (regs || []).filter((r) => r.status === 'REGISTERED' || r.status === 'ATTENDED');
   const upcoming = e.status === 'SCHEDULED' || e.status === 'LIVE';
-  const link = (type: string, id: string, label: string, at?: string) => call(`/api/v1/events/${e.id}/links`, 'POST', { type, id, label, at }).then(reload).catch(() => undefined);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -134,22 +132,7 @@ function EventCard({ e, communityId, call, reload, flash }: any) {
           </div>
           <p className="text-xs text-slate-500">It starts and finishes by itself at the set times. When it finishes, the private registrations channel is removed and the final list is kept here.</p>
 
-          <div>
-            <div className="mb-2 text-sm font-bold text-slate-900">Around this event</div>
-            <div className="flex flex-wrap gap-2">
-              <button className={ghost} onClick={() => setTool(tool === 'announce' ? '' : 'announce')}><Megaphone className="h-3.5 w-3.5" />Announcement</button>
-              <button className={ghost} onClick={() => setTool(tool === 'reminder' ? '' : 'reminder')}><Clock className="h-3.5 w-3.5" />Reminder</button>
-              <button className={ghost} onClick={() => setTool(tool === 'poll' ? '' : 'poll')}><BarChart3 className="h-3.5 w-3.5" />Poll</button>
-              <button className={ghost} onClick={() => setTool(tool === 'giveaway' ? '' : 'giveaway')}><Gift className="h-3.5 w-3.5" />Giveaway</button>
-            </div>
-            {tool && <Tool kind={tool} e={e} communityId={communityId} flash={flash} done={(type: string, id: string, labelText: string, at?: string) => { setTool(''); link(type, id, labelText, at); }} />}
-            {!!e.links?.length && (
-              <ul className="mt-3 space-y-1 text-xs text-slate-600">
-                {e.links.slice().reverse().map((l: any, i: number) => <li key={i}>• <b className="capitalize">{l.type}</b> · {l.label}{l.at ? ` · ${fmt(l.at)}` : ''}</li>)}
-              </ul>
-            )}
-          </div>
-
+          <Linked e={e} call={call} />
           <div>
             <div className="mb-2 flex items-center justify-between"><span className="text-sm font-bold text-slate-900"><Users className="mr-1 inline h-4 w-4" />Registered ({regs ? going.length : '…'}{e.capacity ? ` / ${e.capacity}` : ''})</span>{e.rosterChannelId && <span className="text-xs text-slate-500">Also live in the private registrations channel</span>}</div>
             {(e.finalRoster || regs) && (
@@ -167,56 +150,41 @@ function EventCard({ e, communityId, call, reload, flash }: any) {
   );
 }
 
-function Tool({ kind, e, communityId, flash, done }: any) {
-  const engagement = async (path: string, body: any) => {
-    const r = await fetch(`/api/v1/engagement/${path}?communityId=${encodeURIComponent(communityId)}`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'x-community-id': communityId }, body: JSON.stringify(body) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || j.success === false) throw new Error(j?.error?.message || j?.message || 'Could not save.');
-    return j;
-  };
-  const start = new Date(e.startAt);
-  const [channelId, setChannelId] = useState(e.channelId || '');
-  const [text, setText] = useState(kind === 'announce' ? `📢 **${e.title}** starts <t:${Math.floor(start.getTime() / 1000)}:R>!` : kind === 'reminder' ? `⏰ **${e.title}** starts <t:${Math.floor(start.getTime() / 1000)}:R>. See you there!` : '');
-  const [at, setAt] = useState(toLocalInput(new Date(Math.max(Date.now() + 5 * 60000, start.getTime() - 3600000))));
-  const [options, setOptions] = useState(['', '']);
-  const [hours, setHours] = useState(24);
-  const [winners, setWinners] = useState(1);
-  const [busy, setBusy] = useState(false);
-  const go = async () => {
-    setBusy(true);
-    try {
-      if (kind === 'announce') { const j = await engagement('announcements', { title: e.title, content: text, channelId }); done('announcement', j.announcement?.id || j.id || '', text.slice(0, 80)); }
-      if (kind === 'reminder') { const j = await engagement('reminders', { targetType: 'CHANNEL', channelId, triggerAt: new Date(at).toISOString(), recurrence: 'ONCE', message: text }); done('reminder', j.reminder?.id || j.id || '', text.slice(0, 80), new Date(at).toISOString()); }
-      if (kind === 'poll') { const filled = options.map((o) => o.trim()).filter(Boolean); const j = await engagement('polls', { question: text, channelId, options: filled, durationHours: hours, allowMultiselect: false, afterAction: 'ANNOUNCE' }); done('poll', j.poll?.id || j.id || '', text); }
-      if (kind === 'giveaway') {
-        const r = await fetch(`/api/v1/communities/${encodeURIComponent(communityId)}/features/giveaways`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json', 'x-community-id': communityId }, body: JSON.stringify({ channelId, prize: text, winners, durationMinutes: Math.max(1, Math.round(hours * 60)), description: `For ${e.title}` }) });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j.success) throw new Error(j?.error?.message || 'Could not start the giveaway.');
-        done('giveaway', j.data?.id || '', text);
-      }
-      flash(true, kind === 'reminder' ? 'Reminder scheduled.' : 'Posted in Discord.');
-    } catch (err: any) { flash(false, err.message); }
-    setBusy(false);
+
+const KINDS: { type: string; tab: string; label: string; icon: any }[] = [
+  { type: 'announcement', tab: 'announcements', label: 'Announcement', icon: Megaphone },
+  { type: 'campaign', tab: 'campaigns', label: 'Campaign', icon: Send },
+  { type: 'reminder', tab: 'reminders', label: 'Reminder', icon: Clock },
+  { type: 'poll', tab: 'polls', label: 'Poll', icon: BarChart3 },
+  { type: 'giveaway', tab: 'giveaways', label: 'Giveaway', icon: Gift },
+];
+
+/** The event's package: everything linked to it from the other Engagement features, with live status. */
+function Linked({ e, call }: any) {
+  const [items, setItems] = useState<any[] | null>(null);
+  useEffect(() => { call(`/api/v1/events/${e.id}/linked`).then((j: any) => setItems(j.items || [])).catch(() => setItems([])); }, [e.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const open = (tab: string) => {
+    try { sessionStorage.setItem('cm_event_for', e.id); sessionStorage.setItem('cm_open_tab', tab); } catch { /* ignore */ }
+    window.dispatchEvent(new CustomEvent('cm:navigate', { detail: 'engagement' }));
   };
   return (
-    <div className="mt-3 space-y-3 rounded-xl border border-indigo-100 bg-indigo-50/40 p-3">
-      <div><span className={label}>Channel</span><div className="mt-1"><ChannelSelect communityId={communityId} value={channelId} onChange={setChannelId} /></div></div>
-      {(kind === 'announce' || kind === 'reminder') && <div><span className={label}>Message</span><div className="mt-1"><MessageComposer communityId={communityId} value={text} onChange={setText} rows={3} maxLength={2000} /></div><p className="mt-1 text-[11px] text-slate-500">The &lt;t:…:R&gt; part shows as “in 2 hours” in each member’s own time.</p></div>}
-      {kind === 'reminder' && <label className={label}>Send at<input type="datetime-local" className={`${input} mt-1`} value={at} onChange={(ev) => setAt(ev.target.value)} /></label>}
-      {kind === 'poll' && <>
-        <label className={label}>Question<input className={`${input} mt-1`} value={text} maxLength={300} onChange={(ev) => setText(ev.target.value)} placeholder="e.g. Which track should we race?" /></label>
-        {options.map((o, i) => <input key={i} className={input} value={o} maxLength={55} placeholder={`Answer ${i + 1}`} onChange={(ev) => setOptions(options.map((x, j) => (j === i ? ev.target.value : x)))} />)}
-        {options.length < 10 && <button type="button" className={ghost} onClick={() => setOptions([...options, ''])}><Plus className="h-3.5 w-3.5" />Answer</button>}
-        <label className={label}>Open for (hours)<input type="number" min={1} max={768} className={`${input} mt-1 w-28`} value={hours} onChange={(ev) => setHours(Number(ev.target.value))} /></label>
-      </>}
-      {kind === 'giveaway' && <>
-        <label className={label}>Prize<input className={`${input} mt-1`} value={text} maxLength={200} onChange={(ev) => setText(ev.target.value)} placeholder="e.g. Discord Nitro" /></label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className={label}>Winners<input type="number" min={1} max={20} className={`${input} mt-1`} value={winners} onChange={(ev) => setWinners(Number(ev.target.value))} /></label>
-          <label className={label}>Runs for (hours)<input type="number" min={0.1} step={0.5} className={`${input} mt-1`} value={hours} onChange={(ev) => setHours(Number(ev.target.value))} /></label>
-        </div>
-      </>}
-      <button className={primary} disabled={busy || !text.trim() || !channelId || (kind === 'poll' && options.filter((o) => o.trim()).length < 2)} onClick={go}><Send className="h-4 w-4" />{kind === 'reminder' ? 'Schedule' : kind === 'giveaway' ? 'Start giveaway' : 'Post'}</button>
+    <div>
+      <div className="mb-1 text-sm font-bold text-slate-900">Event package</div>
+      <p className="mb-2 text-xs text-slate-500">Announcements, campaigns, reminders, polls and giveaways linked to this event. Add one here, or pick this event in “Part of an event” on any of those pages.</p>
+      {items === null ? <div className="h-10 animate-pulse rounded-lg bg-slate-100" /> : items.length ? (
+        <ul className="mb-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
+          {items.map((it) => { const k = KINDS.find((x) => x.type === it.type); const Icon = k?.icon || Calendar; return (
+            <li key={`${it.type}-${it.id}`} className="flex items-center gap-3 px-3 py-2 text-sm">
+              <Icon className="h-4 w-4 text-indigo-500" />
+              <span className="w-24 shrink-0 text-xs font-semibold text-slate-500">{k?.label}</span>
+              <span className="min-w-0 flex-1 truncate text-slate-800">{it.title || '—'}</span>
+              {it.when && <span className="shrink-0 text-xs text-slate-500">{fmt(it.when)}</span>}
+              {it.status && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{String(it.status).toLowerCase().replace(/_/g, ' ')}</span>}
+            </li>
+          ); })}
+        </ul>
+      ) : <p className="mb-3 text-xs text-slate-400">Nothing linked yet.</p>}
+      <div className="flex flex-wrap gap-2">{KINDS.map((k) => <button key={k.type} className={ghost} onClick={() => open(k.tab)}><k.icon className="h-3.5 w-3.5" />+ {k.label}</button>)}</div>
     </div>
   );
 }
