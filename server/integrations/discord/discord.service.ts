@@ -12,6 +12,9 @@ import {
   DiscordGatewayDiagnostics,
 } from './discord.interface.js';
 import { attachGatewayEventHandlers } from './events/index.js';
+import * as Djs from 'discord.js';
+import { patchSendWithSelfAccess } from './selfAccess.js';
+patchSendWithSelfAccess(Djs);
 import { config } from '../../config/env.js';
 import { logger } from '../../logging/logger.js';
 import { secretsManager } from '../../security/secrets.js';
