@@ -308,9 +308,7 @@ export class ApplicationWorkflowService {
       formId,
       formVersion,
       source,
-      applicationSource: input.applicationSource,
-      applicationSourceId: input.applicationSource?.id,
-      tags: input.applicationSource?.tag ? [input.applicationSource.tag] : undefined,
+      ...({ applicationSource: input.applicationSource, applicationSourceId: input.applicationSource?.id, tags: input.applicationSource?.tag ? [input.applicationSource.tag] : undefined } as any),
       status: 'SUBMITTED',
       questions: configuredQuestions.map((q) => ({
         questionId: q.id,
