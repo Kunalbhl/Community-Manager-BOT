@@ -1,3 +1,4 @@
+import { boldBlocks } from '../../../shared/utils/discordText.js';
 import { CategoryPicker } from './CategoryPicker.js';
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 
@@ -78,6 +79,22 @@ export function MessageComposer({
     requestAnimationFrame(() => { if (el) { el.focus(); const p = start + shownText.length; el.setSelectionRange(p, p); } });
   };
 
+  /** Discord formatting: wrap the selected text (or each selected line) in the marks. */
+  const wrap = (before: string, after = before, linePrefix = false) => {
+    const el = ref.current;
+    const start = el?.selectionStart ?? display.length;
+    const end = el?.selectionEnd ?? display.length;
+    const sel = display.slice(start, end) || 'text';
+    const out = linePrefix ? sel.split('\n').map((l) => `${before}${l}`).join('\n')
+      : sel.split('\n').map((l) => (l.trim() ? `${before}${l}${after}` : l)).join('\n');
+    commit(display.slice(0, start) + out + display.slice(end));
+    requestAnimationFrame(() => { if (el) { el.focus(); el.setSelectionRange(start, start + out.length); } });
+  };
+  const [preview, setPreview] = useState(false);
+  const fmtBtn = (label: string, title: string, fn: () => void, cls = '') => (
+    <button type="button" title={title} aria-label={title} onMouseDown={(e) => e.preventDefault()} onClick={fn} className={`rounded-md px-2 py-1 text-xs text-slate-600 hover:bg-indigo-50 hover:text-indigo-700 ${cls}`}>{label}</button>
+  );
+
   const loadTemplates = () => fetch(`/api/v1/engagement/templates?communityId=${encodeURIComponent(cid)}`, { credentials: 'include', headers: { 'x-community-id': cid } })
     .then((r) => r.json()).then((j) => setTemplates(j.templates || [])).catch(() => undefined);
   useEffect(() => { if (open === 'template' || open === 'save') loadTemplates(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -112,6 +129,16 @@ export function MessageComposer({
         {btn('member', AtSign, 'Member')}
         {btn('role', Shield, 'Role')}
         {btn('channel', Hash, 'Channel')}
+        <span className="mx-1 h-4 w-px bg-slate-200" />
+        {fmtBtn('B', 'Bold (**text**)', () => wrap('**'), 'font-black')}
+        {fmtBtn('I', 'Italic (*text*)', () => wrap('*'), 'italic font-serif')}
+        {fmtBtn('U', 'Underline (__text__)', () => wrap('__'), 'underline')}
+        {fmtBtn('S', 'Strikethrough (~~text~~)', () => wrap('~~'), 'line-through')}
+        {fmtBtn('H', 'Big heading (# )', () => wrap('# ', '', true), 'font-black')}
+        {fmtBtn('h', 'Small heading (### )', () => wrap('### ', '', true), 'font-bold')}
+        {fmtBtn('❝', 'Quote (> )', () => wrap('> ', '', true))}
+        {fmtBtn('</>', 'Code', () => wrap('`'), 'font-mono')}
+        {fmtBtn(preview ? 'Edit' : 'Preview', 'See how it looks in Discord', () => setPreview(!preview), 'font-semibold text-indigo-600')}
         {allowTemplates && <>
           <span className="mx-1 h-4 w-px bg-slate-200" />
           {btn('template', FileText, 'Use template')}
@@ -201,6 +228,7 @@ export function MessageComposer({
         </div>
       )}
 
+      {preview && <div className="max-h-96 overflow-auto rounded-none border-b border-slate-200 bg-[#313338] px-4 py-3 text-[14px] leading-relaxed text-[#dbdee1]" dangerouslySetInnerHTML={{ __html: discordPreview(display) }} />}
       <textarea ref={ref} rows={rows} value={display} placeholder={placeholder}
         onChange={(e) => commit(e.target.value)} className="block w-full resize-y rounded-b-xl border-0 bg-transparent px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-0" />
       {!!vars?.length && (
@@ -213,3 +241,22 @@ export function MessageComposer({
     </div>
   );
 }
+
+/** Rough preview of Discord markdown (bold, italic, underline, strike, headings, quotes, code, mentions). */
+export function discordPreview(text: string) {
+  const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = (t: string) => esc(t)
+    .replace(/`([^`]+)`/g, '<code style="background:#2b2d31;padding:0 4px;border-radius:4px">$1</code>')
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<b><i>$1</i></b>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+    .replace(/__(.+?)__/g, '<u>$1</u>').replace(/(^|[^*])\*(?!\s)(.+?)\*/g, '$1<i>$2</i>').replace(/~~(.+?)~~/g, '<s>$1</s>')
+    .replace(/(^|\s)([@#][\w\-·・ ]{1,40}?)(?=\s|$|[.,!])/g, '$1<span style="background:rgba(88,101,242,.3);color:#c9cdfb;border-radius:3px;padding:0 2px">$2</span>');
+  return boldBlocks(text).split('\n').map((l) => {
+    if (/^### /.test(l)) return `<div style="font-weight:700;font-size:16px">${inline(l.slice(4))}</div>`;
+    if (/^## /.test(l)) return `<div style="font-weight:700;font-size:20px">${inline(l.slice(3))}</div>`;
+    if (/^# /.test(l)) return `<div style="font-weight:800;font-size:24px">${inline(l.slice(2))}</div>`;
+    if (/^-# /.test(l)) return `<div style="font-size:12px;color:#949ba4">${inline(l.slice(3))}</div>`;
+    if (/^> /.test(l)) return `<div style="border-left:4px solid #4e5058;padding-left:8px">${inline(l.slice(2)) || '&nbsp;'}</div>`;
+    return `<div>${inline(l) || '&nbsp;'}</div>`;
+  }).join('');
+}
+

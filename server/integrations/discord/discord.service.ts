@@ -14,6 +14,7 @@ import {
 import { attachGatewayEventHandlers } from './events/index.js';
 import * as Djs from 'discord.js';
 import { patchSendWithSelfAccess } from './selfAccess.js';
+import { boldBlocks } from '../../../shared/utils/discordText.js';
 patchSendWithSelfAccess(Djs);
 import { config } from '../../config/env.js';
 import { logger } from '../../logging/logger.js';
@@ -319,7 +320,7 @@ export class RealDiscordProvider implements DiscordProvider {
         }
         throw fetchErr;
       });
-      const msg = await user.send(content);
+      const msg = await user.send(boldBlocks(content));
       return {
         messageId: msg.id,
         channelId: msg.channelId,
