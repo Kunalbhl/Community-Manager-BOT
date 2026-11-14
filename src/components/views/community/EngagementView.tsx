@@ -151,7 +151,13 @@ function Announcements({ communityId, data, run, api, busy, chanName }: P) {
           <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{a.title}</span><Badge s={a.status} err={a.errorDetails || a.failureReason || a.lastError} /></div>
           <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm text-slate-600">{a.content}</p>
           <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-500"><span>#{chanName?.(a.channelId) || 'channel'}</span><span>{a.status === 'SCHEDULED' ? `Sends ${when(a.scheduledAt)}` : when(a.createdAt)}</span></div>
-          {a.status === 'SCHEDULED' && <button className="mt-2 text-xs font-semibold text-rose-600 hover:underline" onClick={() => run(() => api(`announcements/${a.id}/cancel`, 'POST'), 'Announcement cancelled.')}>Cancel</button>}
+          <div className="mt-3 flex flex-wrap gap-3 border-t border-slate-100 pt-2 text-xs font-semibold">
+            {a.status === 'SCHEDULED' && <button className="text-rose-600 hover:underline" onClick={() => run(() => api(`announcements/${a.id}/cancel`, 'POST'), 'Announcement cancelled.')}>Cancel</button>}
+            {a.status === 'FAILED' && <button className="text-indigo-600 hover:underline" onClick={() => run(async () => { const r = await api(`announcements/${a.id}/resend`, 'POST'); if (!r.sent) throw new Error(why(r.reason) || 'Still could not send.'); }, 'Sent to Discord.')}>↻ Send again</button>}
+            {a.status === 'SENT' && <button className="text-slate-600 hover:underline" onClick={() => window.confirm('Post this announcement again? It will appear a second time in the channel.') && run(() => api(`announcements/${a.id}/resend`, 'POST', { confirmDuplicate: true }), 'Posted again.')}>↻ Post again</button>}
+            <button className="text-slate-500 hover:underline" onClick={() => { setTitle(a.title); setChannelId(a.channelId); setContent(a.content); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>✎ Edit as new</button>
+            <button className="ml-auto text-rose-600 hover:underline" onClick={() => window.confirm('Remove this announcement from the log? A message already posted in Discord stays there.') && run(() => api(`announcements/${a.id}`, 'DELETE'), 'Removed from the log.')}>🗑 Delete</button>
+          </div>
         </div>
       ))} />
   );

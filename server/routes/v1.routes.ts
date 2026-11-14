@@ -226,7 +226,7 @@ import {
   getCommunityOverview,
   getAnnouncements,
   createAnnouncement,
-  cancelAnnouncement,
+  cancelAnnouncement, resendAnnouncement, deleteAnnouncement,
   getCampaigns,
   createCampaign,
   getReminders,
@@ -813,6 +813,8 @@ router.get('/community/:id/overview-dashboard', getCommunityOverview);
 router.get('/engagement/announcements', requirePermission('community.view'), getAnnouncements);
 router.post('/engagement/announcements', requirePermission('community.manage'), createAnnouncement);
 router.post('/engagement/announcements/:id/cancel', requirePermission('community.manage'), cancelAnnouncement);
+router.post('/engagement/announcements/:id/resend', requirePermission('community.manage'), resendAnnouncement);
+router.delete('/engagement/announcements/:id', requirePermission('community.manage'), deleteAnnouncement);
 
 router.get('/engagement/campaigns', requirePermission('community.view'), getCampaigns);
 router.post('/engagement/campaigns', requirePermission('community.manage'), createCampaign);
