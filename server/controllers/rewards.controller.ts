@@ -18,10 +18,13 @@ export async function overviewHandler(req: Request, res: Response) {
       rewards: grants.filter((g) => g.recruiterId === e.id && g.status === 'GRANTED').length,
       progress: inviteRewards.progress(rules, e, grants, e.id),
     })).sort((a, b) => b.joined + b.bonus - (a.joined + a.bonus));
+    const { staffRoleIds } = await import('../services/rewards/inviteRewards.service.js');
+    const staffRoles = await staffRoleIds(c).catch(() => [] as string[]);
     ok(res, {
       rules: rules.map((r) => ({ ...r, summary: describeRule(r) })),
       grants: grants.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 300),
       leaderboard,
+      staffRoleIds: staffRoles,
       credits: credits.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100),
     });
   } catch (err) { fail(res, err); }
@@ -66,8 +69,11 @@ export async function grantActionHandler(req: Request, res: Response) {
     if (action === 'approve' || action === 'retry') {
       if (!['PENDING_APPROVAL', 'FAILED'].includes(g.status)) throw new Error('This reward was already handled.');
       await rewardGrantsRepository.update(g.id, { decidedBy: who(req), decidedAt: new Date().toISOString() } as any);
-      ok(res, await inviteRewards.deliver(g, rule));
+      const out: any = await inviteRewards.deliver(g, rule);
+      await inviteRewards.closeApproval(g, out?.status === 'FAILED' ? `⚠️ Approved by ${who(req)}, but: ${out.error}` : `✅ Approved by ${who(req)} in the dashboard.`).catch(() => undefined);
+      ok(res, out);
     } else if (action === 'reject') {
+      await inviteRewards.closeApproval(g, `✖️ Rejected by ${who(req)} in the dashboard.`).catch(() => undefined);
       if (g.status !== 'PENDING_APPROVAL' && g.status !== 'FAILED') throw new Error('Only waiting or failed rewards can be rejected.');
       ok(res, await rewardGrantsRepository.update(g.id, { status: 'REJECTED', error: note || 'Rejected by staff.', decidedBy: who(req), decidedAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as any));
     } else if (action === 'revoke') {

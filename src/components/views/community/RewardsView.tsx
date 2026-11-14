@@ -163,7 +163,7 @@ export function RewardsView({ communityId }: { communityId: string }) {
         </Card>
       )}
 
-      {editing && <RuleEditor communityId={communityId} rule={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); flash(true, 'Reward saved. Recruiters who already qualify get it now.'); load(); }} api={api} />}
+      {editing && <RuleEditor communityId={communityId} staffRoleIds={data?.staffRoleIds || []} rule={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); flash(true, 'Reward saved. Recruiters who already qualify get it now.'); load(); }} api={api} />}
     </div>
   );
 }
@@ -218,13 +218,13 @@ function Leaderboard({ data, communityId, api, reload, flash }: any) {
                   <span className="text-sm font-bold text-slate-900">{e.joined + e.bonus} invites</span>
                   {e.left > 0 && <span className="text-xs text-slate-500">{e.left} left</span>}
                   {e.bonus !== 0 && <span className="text-xs text-indigo-600">{e.bonus > 0 ? '+' : ''}{e.bonus} bonus</span>}
-                  <span className="text-xs text-emerald-700">{e.rewards} reward{e.rewards === 1 ? '' : 's'}</span>
+                  <span className="text-xs text-emerald-700" title="Rewards already given (from all reward rules)">{e.rewards} reward{e.rewards === 1 ? '' : 's'} given</span>
                 </div>
                 {e.progress.filter((p: any) => !p.done).length > 0 && (
                   <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {e.progress.filter((p: any) => !p.done).slice(0, 3).map((p: any) => (
                       <div key={p.ruleId} className="text-xs text-slate-600">
-                        <div className="flex justify-between"><span>{p.emoji} {p.name}</span><span>{Math.min(p.have, p.target)}/{p.target}{p.waiting ? ` · ${p.waiting} counting` : ''}</span></div>
+                        <div className="flex justify-between"><span>{p.emoji} {p.name}</span><span title={p.waiting ? `${p.waiting} of their invites joined less than ${p.stayDays} days ago. They count once they have stayed ${p.stayDays} days.` : undefined}>{Math.min(p.have, p.target)}/{p.target} counted{p.waiting ? ` · ${p.waiting} waiting ${p.stayDays}-day stay` : ''}</span></div>
                         <div className="mt-1 h-1.5 rounded-full bg-slate-100"><div className="h-1.5 rounded-full bg-indigo-500" style={{ width: `${Math.min(100, (p.have / Math.max(1, p.target)) * 100)}%` }} /></div>
                       </div>
                     ))}
@@ -271,7 +271,7 @@ function RoleChips({ communityId, ids, onChange, placeholder }: { communityId: s
   );
 }
 
-function RuleEditor({ communityId, rule, onClose, onSaved, api }: any) {
+function RuleEditor({ communityId, rule, onClose, onSaved, api, staffRoleIds = [] }: any) {
   const [r, setR] = useState<any>(rule);
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
@@ -343,8 +343,19 @@ function RuleEditor({ communityId, rule, onClose, onSaved, api }: any) {
           <Section n={5} title="How is it handled?">
             <div className="flex flex-wrap gap-2">
               <Choice on={r.approval === 'AUTO' && !r.actions.manualReward} disabled={!!r.actions.manualReward} onClick={() => set('approval', 'AUTO')} title="Give automatically" />
-              <Choice on={r.approval === 'STAFF' || !!r.actions.manualReward} onClick={() => set('approval', 'STAFF')} title="Staff approve first" />
+              <Choice on={r.approval === 'STAFF' || !!r.actions.manualReward} onClick={() => { set('approval', 'STAFF'); if (!(r.approverRoleIds || []).length) set('approverRoleIds', staffRoleIds); }} title="Staff approve first" />
             </div>
+            {(r.approval === 'STAFF' || !!r.actions.manualReward) && (
+              <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 md:grid-cols-2">
+                <label className="text-sm font-semibold text-slate-700">Who can approve <span className="font-normal text-slate-500">· pinged when one is waiting</span>
+                  <div className="mt-1"><RoleChips communityId={communityId} ids={r.approverRoleIds || []} onChange={(l) => set('approverRoleIds', l)} placeholder="Add a role" /></div>
+                  {!(r.approverRoleIds || []).length && <span className="text-xs font-normal text-slate-500">Empty = your staff roles (review-room ranks and application pings).</span>}
+                </label>
+                <label className="text-sm font-semibold text-slate-700">Approval channel <span className="font-normal text-slate-500">· Approve / Reject buttons are posted here and the same message shows the result</span>
+                  <div className="mt-1"><ChannelSelect communityId={communityId} value={r.approvalChannelId || ''} onChange={(id) => set('approvalChannelId', id)} placeholder="Announcement channel, else the recruitment log" /></div>
+                </label>
+              </div>
+            )}
             {t !== 'TOP_RECRUITER' && t !== 'IN_PERIOD' && (
               <div className="flex flex-wrap gap-2">
                 <Choice on={r.onLeave === 'REVOKE'} onClick={() => set('onLeave', 'REVOKE')} title="Take it back if recruits leave and they drop below" />

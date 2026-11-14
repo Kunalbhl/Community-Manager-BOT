@@ -932,3 +932,23 @@ export async function roomUninviteHandler(req: Request, res: Response) {
     ok(res, await reviewRooms.removeAccessFromDashboard(req.params.communityId, req.params.roomId, req.params.userId, (req as any).user?.userId));
   } catch (err) { fail(res, err); }
 }
+
+/** "How did you find us?" sources and what each one changes (recruiter code, extra question, pings, tag). */
+export async function sourcesHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const b = req.body || {};
+    const t: any = await getToolkit(communityId);
+    const sources = (Array.isArray(b.sources) ? b.sources : []).slice(0, 25).map((x: any, i: number) => ({
+      id: String(x.id || `s${Date.now().toString(36)}${i}`).replace(/[^\w-]/g, '').slice(0, 32),
+      name: str(x.name, 80), emoji: str(x.emoji, 64), description: str(x.description, 100), enabled: x.enabled !== false,
+      codeMode: ['INHERIT', 'NONE', 'OPTIONAL', 'REQUIRED'].includes(x.codeMode) ? x.codeMode : 'INHERIT',
+      detailLabel: str(x.detailLabel, 45), detailRequired: !!x.detailRequired,
+      pingRoleIds: (Array.isArray(x.pingRoleIds) ? x.pingRoleIds : []).filter(isSnowflake).slice(0, 10),
+      tag: str(x.tag, 40),
+    })).filter((x: any) => x.name);
+    if (b.askSource && !sources.some((x: any) => x.enabled)) throw new Error('Add at least one source (and keep it on) before asking applicants.');
+    await saveToolkit(communityId, { recruitment: { ...t.recruitment, askSource: !!b.askSource, sources } as any });
+    ok(res, { askSource: !!b.askSource, sources });
+  } catch (err) { fail(res, err); }
+}

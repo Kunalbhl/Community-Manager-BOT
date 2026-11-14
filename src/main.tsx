@@ -3,6 +3,8 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { initTheme } from './lib/theme.js';
+import { initRefreshSpin } from './lib/refreshSpin.js';
+initRefreshSpin();
 initTheme();
 
 const JoinPage = lazy(() => import('./pages/JoinPage.tsx'));

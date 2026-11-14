@@ -1,3 +1,5 @@
+import { EmojiField } from '../../common/EmojiField.js';
+import { RoleSelect, useDiscordResources } from '../../common/DiscordPickers.js';
 import { useRemembered } from '../../common/useRemembered.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronRight, Megaphone, Minus, Pencil, Plus, Search, X, XCircle } from 'lucide-react';
@@ -221,15 +223,28 @@ function ItemEditor({ communityId, item, onClose, onSave }: any) {
       <div className="my-8 w-full max-w-lg rounded-2xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4"><h3 className="text-lg font-bold">{item.id ? 'Edit item' : 'New reward item'}</h3><button onClick={onClose} aria-label="Close"><X className="h-5 w-5 text-slate-400" /></button></div>
         <div className="space-y-4 px-6 py-5">
-          <div className="flex gap-2"><input className={`${input} w-20 text-center text-lg`} value={i.emoji} maxLength={16} onChange={(e) => setI({ ...i, emoji: e.target.value })} aria-label="Emoji" /><input className={input} value={i.name} maxLength={60} onChange={(e) => setI({ ...i, name: e.target.value })} placeholder="e.g. Modded Heist" /></div>
+          <div className="flex gap-2"><EmojiField communityId={communityId} className="w-20 shrink-0" value={i.emoji} onChange={(v) => setI({ ...i, emoji: v })} /><input className={input} value={i.name} maxLength={60} onChange={(e) => setI({ ...i, name: e.target.value })} placeholder="e.g. Modded Heist" /></div>
           <input className={input} value={i.description} maxLength={300} onChange={(e) => setI({ ...i, description: e.target.value })} placeholder="What it is and how it’s used (shown on the Discord buttons)" />
           <label className="block text-sm font-semibold text-slate-700">When a member uses it<select className={`${input} mt-1`} value={i.claimApproval} onChange={(e) => setI({ ...i, claimApproval: e.target.value })}><option value="AUTO">Take it from their balance at once</option><option value="STAFF">Staff approve each use (held until then)</option></select></label>
           <label className="block text-sm font-semibold text-slate-700">Most at one time <span className="font-normal text-slate-500">· 0 = no limit (staff can always record more)</span><input type="number" min={0} className={`${input} mt-1`} value={i.maxPerClaim} onChange={(e) => setI({ ...i, maxPerClaim: Number(e.target.value) })} /></label>
           <label className="block text-sm font-semibold text-slate-700">Log channel <span className="font-normal text-slate-500">· every gain, use and approval request is posted here</span><div className="mt-1"><ChannelSelect communityId={communityId} value={i.logChannelId || ''} onChange={(id) => setI({ ...i, logChannelId: id })} placeholder="Recruitment log channel" /></div></label>
+          <RolesBox communityId={communityId} label="Ping these roles when it is used" hint="Every use (and every approval request) mentions them in the log channel." ids={i.pingRoleIds || []} onChange={(l: string[]) => setI({ ...i, pingRoleIds: l })} />
+          {i.claimApproval === 'STAFF' && <RolesBox communityId={communityId} label="Who can approve a use" hint="Only they can press Approve / Decline in Discord. Empty = your staff roles." ids={i.approverRoleIds || []} onChange={(l: string[]) => setI({ ...i, approverRoleIds: l })} />}
+          <p className="text-xs text-slate-500">Members use it with the buttons on the reward panel or <code>/reward use</code>. Approval requests and the result appear as one message in the log channel above.</p>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={i.active} onChange={(e) => setI({ ...i, active: e.target.checked })} />Members can use it now</label>
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4"><button className={ghost} onClick={onClose}>Cancel</button><button className={primary} onClick={() => onSave(i)}>Save</button></div>
       </div>
+    </div>
+  );
+}
+
+function RolesBox({ communityId, label, hint, ids, onChange }: any) {
+  const r: any = useDiscordResources(communityId);
+  return (
+    <div className="text-sm font-semibold text-slate-700">{label}<div className="text-xs font-normal text-slate-500">{hint}</div>
+      <div className="mt-1 flex flex-wrap gap-1.5">{ids.map((id: string) => <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">@{r?.roles?.find((x: any) => x.id === id)?.name || 'role'}<button type="button" onClick={() => onChange(ids.filter((x: string) => x !== id))}>×</button></span>)}</div>
+      <div className="mt-1"><RoleSelect communityId={communityId} value="" exclude={ids} onChange={(id: string) => id && onChange([...ids, id])} placeholder="Add a role" /></div>
     </div>
   );
 }

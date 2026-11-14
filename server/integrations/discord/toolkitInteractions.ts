@@ -30,6 +30,17 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
   if (!id.startsWith('cm:')) return false;
   const [, area, action, arg] = id.split(':');
 
+  // ---------- reward waiting for approval: Approve / Reject ----------
+  if (area === 'rg' && (action === 'ok' || action === 'no')) {
+    try {
+      await interaction.deferReply({ ephemeral: true });
+      const { inviteRewards } = await import('../../services/rewards/inviteRewards.service.js');
+      const msg = await inviteRewards.decideFromDiscord(arg, action === 'ok', interaction.member);
+      await interaction.editReply({ content: `✅ ${msg}` });
+    } catch (e: any) { await interaction.editReply({ content: `⚠️ ${e.message}` }).catch(() => undefined); }
+    return true;
+  }
+
   // ---------- reward wallet: Use buttons, balance, staff approval ----------
   if (area === 'rw') {
     const { wallet } = await import('../../services/rewards/wallet.service.js');
@@ -52,8 +63,10 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
         const r = await wallet.claim(communityId, { itemId, memberId: interaction.user.id, memberName: interaction.member?.displayName || interaction.user.username, amount: n, forEvent, by: interaction.user.username, byStaff: false });
         await interaction.reply({ content: r.pending ? `⏳ Sent ${n} to staff for approval. **${r.left}** left after this.` : `✅ Used ${n}× ${r.item.emoji} ${r.item.name}. **${r.left}** left.`, ephemeral: true });
       } else if (action === 'ok' || action === 'no') {
-        const p = interaction.memberPermissions;
-        if (!(p?.has('ManageGuild') || p?.has('ManageRoles') || p?.has('ModerateMembers'))) { await interaction.reply({ content: '⛔ Only staff can approve.', ephemeral: true }); return true; }
+        const tx0: any = await wallet.tx(rest).catch(() => null);
+        const item0: any = tx0 ? await wallet.item(communityId, tx0.itemId).catch(() => null) : null;
+        const { canApprove } = await import('../../services/rewards/inviteRewards.service.js');
+        if (!(await canApprove(communityId, interaction.member, item0?.approverRoleIds))) { await interaction.reply({ content: '⛔ Only the approvers of this reward can decide.', ephemeral: true }); return true; }
         const r = await wallet.decide(communityId, rest, action === 'ok', interaction.user.username, interaction.user.id);
         await interaction.update({ content: `${action === 'ok' ? '✅ Approved' : '❌ Declined'} by <@${interaction.user.id}>. <@${r.tx.memberId}> has **${r.available}** left.`, components: [], allowedMentions: { parse: [] } });
       } else return false;
@@ -141,6 +154,7 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
     }
     if (action === 'start') { await discordRecruitment.start(interaction); return true; }
     if (action === 'next') { await discordRecruitment.next(interaction, Number(arg) || 0); return true; }
+    if (action === 'src' && interaction.isStringSelectMenu()) { await discordRecruitment.sourcePicked(interaction); return true; }
     if (action === 'page' && interaction.isModalSubmit()) { await discordRecruitment.pageSubmitted(interaction, Number(arg) || 0); return true; }
   }
 

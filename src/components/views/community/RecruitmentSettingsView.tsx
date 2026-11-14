@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Save, CheckCircle2, ShieldCheck } from 'lucide-react';
-import { ChannelSelect } from '../../common/DiscordPickers.js';
+import { ChannelSelect, RoleSelect, useDiscordResources } from '../../common/DiscordPickers.js';
+import { EmojiField } from '../../common/EmojiField.js';
+import { Plus, Trash2 } from 'lucide-react';
 import { TemplateField } from '../../common/TemplateField.js';
 import { Card, useApi } from './ServerToolsView.js';
 
@@ -69,6 +71,8 @@ export function RecruitmentSettingsView({ communityId }: { communityId: string }
         </div>}
       </Card>
 
+      <SourcesCard communityId={communityId} api={api} />
+
       <Card title="Rules quiz pass mark" desc="The score an applicant needs in the rules quiz. Only staff see the score.">
         {!rec ? <div className="h-16 animate-pulse rounded-xl bg-slate-200/60" /> : (
           <div className="flex max-w-xl items-center gap-4">
@@ -115,5 +119,64 @@ function ApplyLink({ communityId }: { communityId: string }) {
       <label className="flex flex-wrap items-center gap-2 text-sm text-slate-600">Build a link for a recruiter code: <input value={code} onChange={(e) => setCode(e.target.value.replace(/[^\w-]/g, '').slice(0, 32))} placeholder="e.g. KP-007" className="w-40 rounded-lg border border-slate-300 px-2 py-1 font-mono uppercase" /></label>
       <p className="text-xs text-slate-500">Recruiters can also share their own link: <code>/mycode</code> shows it. Turn off Discord’s own “Apply to Join” so people aren’t asked twice.</p>
     </div>
+  );
+}
+
+/** "How did you find us?": the list applicants pick from, and what each choice changes. */
+const SOURCE_PRESETS = [
+  { name: 'A friend / recruiter', emoji: '🤝', description: 'Someone in the server invited me', codeMode: 'REQUIRED', detailLabel: '', tag: 'Referral' },
+  { name: 'Instagram', emoji: '📸', description: 'I saw a post or reel', codeMode: 'NONE', detailLabel: 'Which post or account?', tag: 'Instagram' },
+  { name: 'YouTube', emoji: '▶️', description: 'From a video or stream', codeMode: 'NONE', detailLabel: 'Which channel or video?', tag: 'YouTube' },
+  { name: 'In game', emoji: '🎮', description: 'I met you while playing', codeMode: 'OPTIONAL', detailLabel: 'Your in-game name', tag: 'In game' },
+  { name: 'Discord server list', emoji: '🔎', description: 'Disboard, top.gg and similar', codeMode: 'NONE', detailLabel: '', tag: 'Server list' },
+  { name: 'Other', emoji: '✨', description: '', codeMode: 'OPTIONAL', detailLabel: 'Tell us where', tag: '' },
+];
+const CODE_MODES = [['INHERIT', 'Use the setting above'], ['NONE', 'Don’t ask'], ['OPTIONAL', 'Optional'], ['REQUIRED', 'Required']];
+
+function SourcesCard({ communityId, api }: { communityId: string; api: any }) {
+  const [ask, setAsk] = useState(false);
+  const [list, setList] = useState<any[] | null>(null);
+  const [msg, setMsg] = useState('');
+  const res: any = useDiscordResources(communityId);
+  useEffect(() => { api('').then((d: any) => { setAsk(!!d.config.recruitment.askSource); setList(d.config.recruitment.sources || []); }).catch(() => setList([])); }, [api]);
+  const up = (i: number, p: any) => setList(list!.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  const save = (nextAsk = ask, nextList = list) => { setMsg('Saving…'); api('/recruitment/sources', 'PUT', { askSource: nextAsk, sources: nextList }).then((r: any) => { setList(r.sources); setAsk(r.askSource); setMsg('✓ Saved'); }).catch((e: any) => setMsg(e.message)); };
+  if (!list) return <Card title="Where applicants come from"><div className="h-16 animate-pulse rounded-xl bg-slate-200/60" /></Card>;
+  return (
+    <Card title="Where applicants come from" desc="Ask “How did you find us?” before the form. Each answer can change the form: whether a recruiter code is asked, an extra question, which roles get pinged, and a tag on the application."
+      right={<button onClick={() => save()} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"><Save className="h-4 w-4" />Save</button>}>
+      <label className="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={ask} onChange={(e) => { setAsk(e.target.checked); save(e.target.checked, list); }} />Ask applicants how they found us (Discord and the apply website)</label>
+      {msg && <p className="mt-1 text-xs text-indigo-700">{msg}</p>}
+      <div className="mt-4 space-y-3">
+        {list.map((x, i) => (
+          <div key={x.id || i} className={`rounded-xl border p-3 ${x.enabled === false ? 'border-slate-200 opacity-60' : 'border-slate-200'}`}>
+            <div className="flex flex-wrap items-center gap-2">
+              <EmojiField communityId={communityId} className="w-16 shrink-0" value={x.emoji || ''} onChange={(v) => up(i, { emoji: v })} />
+              <input className="min-w-[160px] flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Name, e.g. Instagram" value={x.name} maxLength={80} onChange={(e) => up(i, { name: e.target.value })} />
+              <input className="min-w-[200px] flex-[2] rounded-xl border border-slate-200 px-3 py-2 text-sm" placeholder="Short hint shown under it (optional)" value={x.description || ''} maxLength={100} onChange={(e) => up(i, { description: e.target.value })} />
+              <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={x.enabled !== false} onChange={(e) => up(i, { enabled: e.target.checked })} />On</label>
+              <button type="button" aria-label="Delete" className="rounded-lg p-2 text-rose-600 hover:bg-rose-50" onClick={() => setList(list.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></button>
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <label className="text-xs font-semibold text-slate-600">Recruiter code<select className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" value={x.codeMode || 'INHERIT'} onChange={(e) => up(i, { codeMode: e.target.value })}>{CODE_MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+              <label className="text-xs font-semibold text-slate-600">Extra question <span className="font-normal">(optional)</span><input className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" maxLength={45} placeholder="e.g. Which video?" value={x.detailLabel || ''} onChange={(e) => up(i, { detailLabel: e.target.value })} />
+                {x.detailLabel && <span className="mt-1 flex items-center gap-1 font-normal"><input type="checkbox" checked={!!x.detailRequired} onChange={(e) => up(i, { detailRequired: e.target.checked })} />Must answer</span>}</label>
+              <label className="text-xs font-semibold text-slate-600">Tag on the application<input className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm" maxLength={40} placeholder="e.g. Instagram" value={x.tag || ''} onChange={(e) => up(i, { tag: e.target.value })} /></label>
+              <div className="text-xs font-semibold text-slate-600">Also ping
+                <div className="mt-1 flex flex-wrap gap-1">{(x.pingRoleIds || []).map((id: string) => <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] text-indigo-700">@{res?.roles?.find((r: any) => r.id === id)?.name || 'role'}<button type="button" onClick={() => up(i, { pingRoleIds: x.pingRoleIds.filter((r: string) => r !== id) })}>×</button></span>)}</div>
+                <div className="mt-1"><RoleSelect communityId={communityId} value="" exclude={x.pingRoleIds || []} onChange={(id: string) => id && up(i, { pingRoleIds: [...(x.pingRoleIds || []), id] })} placeholder="Add a role" /></div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50" onClick={() => setList([...list, { name: '', emoji: '', description: '', enabled: true, codeMode: 'INHERIT', detailLabel: '', pingRoleIds: [], tag: '' }])}><Plus className="h-4 w-4" />Add a source</button>
+        {SOURCE_PRESETS.filter((p) => !list.some((x) => x.name.toLowerCase() === p.name.toLowerCase())).map((p) => (
+          <button key={p.name} type="button" className="rounded-full border border-dashed border-slate-300 px-3 py-1 text-xs text-slate-600 hover:border-indigo-400" onClick={() => setList([...list, { ...p, enabled: true, pingRoleIds: [] }])}>+ {p.emoji} {p.name}</button>
+        ))}
+      </div>
+      <p className="mt-3 text-xs text-slate-500">In Discord, pressing Apply first shows a menu with these choices, then the form. Changes here apply after you press <b>Save</b> (the checkbox at the top saves at once). The choice shows on the review post and in the application.</p>
+    </Card>
   );
 }
