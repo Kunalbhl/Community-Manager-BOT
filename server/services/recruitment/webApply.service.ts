@@ -104,13 +104,16 @@ export const webApply = {
       communityQuestionsService.listGuidelines(communityId).catch(() => [] as any[]),
     ]);
     const rc: any = cfg.recruitment;
+    const { sourceQuestionId } = await import('./discordRecruitment.service.js');
+    const skipQ = sourceQuestionId(rc, questions as any[]);
     return {
       server: { name: guild.name, icon: guild.iconURL?.({ size: 128 }) || '', banner: guild.bannerURL?.({ size: 1024 }) || '', members: guild.memberCount },
       open: !!rc.applyEnabled,
       rules: rules.map((r: any) => ({ title: r.title, description: r.description || '' })),
       consent: rc.screening?.consentText || '',
       quiz: (rc.screening?.questions || []).map((q: any) => ({ id: q.id, question: q.question, options: q.options })),
-      questions: questions.map((q: any) => ({ id: q.id, text: q.questionText, type: q.type, options: q.options || [], required: !!q.required, guidance: q.guidance || '' })),
+      questions: questions.filter((q: any) => q.id !== skipQ).map((q: any) => ({ id: q.id, text: q.questionText, type: q.type, options: q.options || [], required: !!q.required, guidance: q.guidance || '' })),
+      sourceQuestionId: skipQ,
       askCode: !!rc.askRecruiterCode, codeRequired: !!rc.codeRequired,
       sources: (rc.askSource ? (rc.sources || []).filter((x: any) => x?.name && x.enabled !== false) : []).map((x: any) => ({ id: x.id, name: x.name, emoji: x.emoji || '', description: x.description || '', codeMode: x.codeMode || 'INHERIT', detailLabel: x.detailLabel || '', detailRequired: !!x.detailRequired })),
     };
@@ -162,7 +165,10 @@ export const webApply = {
       communityId: s.communityId, applicantDiscordUserId: s.discordUserId, applicantUsername: s.username,
       applicantDisplayName: s.globalName || s.username, recruiterCode: code || undefined, source: 'WEB' as any,
       applicationSource: src ? { id: src.id, name: src.name, emoji: src.emoji, detail: detail || undefined, tag: full?.tag || undefined } : undefined,
-      answers: info.questions.map((q: any) => ({ questionId: q.id, answerText: String(answers[q.id] || '').slice(0, 2000) })),
+      answers: [
+        ...info.questions.map((q: any) => ({ questionId: q.id, answerText: String(answers[q.id] || '').slice(0, 2000) })),
+        ...(info.sourceQuestionId && src ? [{ questionId: info.sourceQuestionId, answerText: `${src.emoji ? `${src.emoji} ` : ''}${src.name}${detail ? ` · ${detail}` : ''}` }] : []),
+      ],
     } as any);
     await webApplyRepository.update(s.id, { applicationId: r.application.id, recruiterCode: code, updatedAt: nowIso() } as any);
     return { applicationId: r.application.id };

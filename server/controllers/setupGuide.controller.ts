@@ -48,7 +48,7 @@ export async function setupGuideHandler(req: Request, res: Response) {
         key: 'recruitment', title: 'Recruitment', description: 'People apply in Discord, get a private application chat, and staff decide.',
         steps: [
           { label: 'Rules & guidelines written', done: rules.length > 0, section: 'server-tools', tab: 'recruit', find: 'Server rules', hint: 'Shown to applicants before the quiz.' },
-          { required: true, label: 'Application questions', done: qs.length > 0, section: 'recruitment' },
+          { required: true, label: 'Application questions', done: qs.length > 0, section: 'server-tools', tab: 'recruit', find: 'Application questions' },
           { label: 'Rules quiz (4-answer questions)', done: r.screening.questions.length > 0, section: 'server-tools', tab: 'recruit', find: 'Rules quiz' },
           { label: 'Messages to applicants', done: true, section: 'server-tools', tab: 'recruit', find: 'Messages' },
           { label: 'Reviewer ranks for escalation', done: t.reviewRooms.tiers.some((x) => x.roleIds.length), section: 'server-tools', tab: 'rooms' },

@@ -835,6 +835,7 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms, commun
 
       <SheetsCard api={api} res={res} />
 
+      <AppQuestions api={api} />
       <div className="grid gap-6 2xl:grid-cols-2">
         <Card title="Apply panel" desc="Post it in a public channel like #apply or #join-us.">
           <div className="space-y-4">
@@ -1147,5 +1148,85 @@ function InterviewQuestions({ communityId, auto }: { communityId: string; auto: 
       <textarea rows={2} className={`${input} mt-2`} value={text} onChange={(e) => setText(e.target.value)} placeholder={'One question per line, e.g.\nWhy do you want to join us?\nHow many hours do you play each week?'} />
       <div className="mt-2 flex items-center gap-3"><button type="button" className={ghost} disabled={!text.trim()} onClick={add}><Plus className="h-4 w-4" /> Add questions</button>{msg && <span className="text-xs text-indigo-700">{msg}</span>}</div>
     </div>
+  );
+}
+
+/** The Apply form: questions, order, and which answers are used for the recruiter code name / source. */
+const QTYPE_LABEL: Record<string, string> = { SHORT_TEXT: 'Short answer', LONG_TEXT: 'Long answer', YES_NO: 'Yes / No', SINGLE_SELECT: 'Pick one (options)', NUMBER: 'Number' };
+function AppQuestions({ api }: { api: any }) {
+  const [d, setD] = useState<any>(null);
+  const [msg, setMsg] = useState('');
+  const [edit, setEdit] = useState<any>(null);
+  const run = (p: Promise<any>, ok: string) => { setMsg('Saving…'); p.then((r: any) => { setD(r); setMsg(ok); setEdit(null); }).catch((e: any) => setMsg(e.message)); };
+  useEffect(() => { api('/recruitment/questions').then(setD).catch((e: any) => setMsg(e.message)); }, [api]);
+  if (!d) return <Card title="Application questions"><div className="h-20 animate-pulse rounded-xl bg-slate-100" /></Card>;
+  const qs: any[] = d.questions;
+  const move = (i: number, by: number) => { const ids = qs.map((q) => q.id); const [x] = ids.splice(i, 1); ids.splice(i + by, 0, x); run(api('/recruitment/questions', 'PUT', { order: ids }), '✓ Order saved'); };
+  const srcQ = d.sourceQuestionId === 'NONE' ? '' : d.sourceQuestionId || d.autoSourceQuestionId || '';
+  return (
+    <Card title={`Application questions (${qs.length})`} desc="What people answer when they press Apply, in Discord and on the apply website. Up to 5 show per page in Discord."
+      right={<button className={btn} onClick={() => setEdit({ questionText: '', guidance: '', type: 'SHORT_TEXT', options: '', required: true, enabled: true })}><Plus className="h-4 w-4" /> Add question</button>}>
+      <ol className="space-y-2">
+        {qs.map((q, i) => (
+          <li key={q.id} className={`rounded-xl border p-3 ${q.enabled === false ? 'border-slate-200 opacity-60' : 'border-slate-200'}`}>
+            <div className="flex items-start gap-3">
+              <span className="font-bold text-slate-400">{i + 1}.</span>
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-slate-900">{q.questionText}{q.required && <span className="text-rose-500"> *</span>}</div>
+                <div className="mt-0.5 flex flex-wrap gap-1.5 text-[11px]">
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{QTYPE_LABEL[q.type] || q.type}</span>
+                  {q.enabled === false && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-500">hidden</span>}
+                  {d.codeNameQuestionId === q.id && <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700">🎟️ used for recruiter code name</span>}
+                  {d.sourcesOn && srcQ === q.id && <span className="rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">🧭 answered by “How did you find us?” · not asked again</span>}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1 text-xs">
+                <button className="rounded px-1.5 py-1 hover:bg-slate-100 disabled:opacity-30" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Up">↑</button>
+                <button className="rounded px-1.5 py-1 hover:bg-slate-100 disabled:opacity-30" disabled={i === qs.length - 1} onClick={() => move(i, 1)} aria-label="Down">↓</button>
+                <button className="rounded px-2 py-1 font-semibold text-indigo-600 hover:bg-indigo-50" onClick={() => setEdit({ ...q, options: (q.options || []).join(', ') })}>Edit</button>
+                <button className="rounded p-1 text-slate-400 hover:text-rose-600" aria-label="Delete" onClick={() => window.confirm('Delete this question?') && run(api(`/recruitment/questions/${q.id}`, 'DELETE'), '✓ Deleted')}><Trash2 className="h-4 w-4" /></button>
+              </div>
+            </div>
+          </li>
+        ))}
+        {!qs.length && <li className="text-sm text-slate-500">No questions yet. Add at least one so people can apply.</li>}
+      </ol>
+      {edit && (
+        <div className="mt-4 space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+          <label className="block text-sm font-medium text-slate-700">Question<input className={`${input} mt-1`} maxLength={300} value={edit.questionText} onChange={(e) => setEdit({ ...edit, questionText: e.target.value })} placeholder="e.g. What is your in-game name?" /></label>
+          <label className="block text-sm font-medium text-slate-700">Hint shown in the box <span className="font-normal text-slate-500">(optional)</span><input className={`${input} mt-1`} maxLength={300} value={edit.guidance || ''} onChange={(e) => setEdit({ ...edit, guidance: e.target.value })} placeholder="e.g. The name other players see" /></label>
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="block text-sm font-medium text-slate-700">Answer type<select className={`${input} mt-1`} value={edit.type} onChange={(e) => setEdit({ ...edit, type: e.target.value })}>{Object.entries(QTYPE_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+            {(edit.type === 'SINGLE_SELECT') && <label className="block text-sm font-medium text-slate-700">Options <span className="font-normal text-slate-500">(comma separated)</span><input className={`${input} mt-1`} value={edit.options} onChange={(e) => setEdit({ ...edit, options: e.target.value })} placeholder="GTA V, Minecraft, Both" /></label>}
+          </div>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2"><input type="checkbox" checked={edit.required !== false} onChange={(e) => setEdit({ ...edit, required: e.target.checked })} />Must answer</label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={edit.enabled !== false} onChange={(e) => setEdit({ ...edit, enabled: e.target.checked })} />Show it</label>
+          </div>
+          <div className="flex gap-2">
+            <button className={btn} onClick={() => run(edit.id ? api(`/recruitment/questions/${edit.id}`, 'PUT', edit) : api('/recruitment/questions', 'POST', edit), '✓ Saved')}><Save className="h-4 w-4" /> Save question</button>
+            <button className={ghost} onClick={() => setEdit(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      <div className="mt-5 grid gap-4 border-t border-slate-100 pt-4 md:grid-cols-2">
+        <label className="block text-sm font-medium text-slate-700">Name for their recruiter code comes from
+          <select className={`${input} mt-1`} value={d.codeNameQuestionId || ''} onChange={(e) => run(api('/recruitment/questions', 'PUT', { codeNameQuestionId: e.target.value }), '✓ Saved')}>
+            <option value="">Their Discord name</option>
+            {qs.map((q) => <option key={q.id} value={q.id}>Answer to: {q.questionText}</option>)}
+          </select>
+          <span className="mt-1 block text-xs font-normal text-slate-500">e.g. pick “What is your in-game name?” so codes look like their game name, not their Discord name.</span>
+        </label>
+        <label className="block text-sm font-medium text-slate-700">“How did you find us?” answers this question
+          <select className={`${input} mt-1`} value={d.sourceQuestionId || ''} onChange={(e) => run(api('/recruitment/questions', 'PUT', { sourceQuestionId: e.target.value }), '✓ Saved')}>
+            <option value="">Find it automatically{d.autoSourceQuestionId ? ` (now: ${qs.find((q) => q.id === d.autoSourceQuestionId)?.questionText || ''})` : ''}</option>
+            <option value="NONE">None, always ask every question</option>
+            {qs.map((q) => <option key={q.id} value={q.id}>{q.questionText}</option>)}
+          </select>
+          <span className="mt-1 block text-xs font-normal text-slate-500">When “How did you find us?” is on (Recruitment → Settings), this question is skipped in the form and filled with their choice, so nobody answers it twice.</span>
+        </label>
+      </div>
+      {msg && <p className="mt-3 text-xs text-indigo-700">{msg}</p>}
+    </Card>
   );
 }

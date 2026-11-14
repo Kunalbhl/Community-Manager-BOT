@@ -431,6 +431,11 @@ router.delete(`${tk}/codes/:codeId`, requireTenantAccess(), requirePermission('r
 router.get(`${tk}/codes/:codeId/history`, requireTenantAccess(), requirePermission('recruiterCodes.view'), Toolkit.codeHistoryHandler);
 router.get(`${tk}/integrations`, requireTenantAccess(), requirePermission('community.view'), Toolkit.integrationsStatusHandler);
 router.put(`${tk}/recruitment/basics`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.recruitmentBasicsHandler);
+router.get(`${tk}/recruitment/questions`, requireTenantAccess(), requirePermission('community.view'), Toolkit.appQuestionsHandler);
+router.post(`${tk}/recruitment/questions`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.appQuestionsHandler);
+router.put(`${tk}/recruitment/questions`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.appQuestionsHandler);
+router.put(`${tk}/recruitment/questions/:questionId`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.appQuestionsHandler);
+router.delete(`${tk}/recruitment/questions/:questionId`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.appQuestionsHandler);
 router.put(`${tk}/recruitment/sources`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.sourcesHandler);
 router.get(`${tk}/members`, requireTenantAccess(), requirePermission('community.view'), Toolkit.membersListHandler);
 router.put(`${tk}/bot-role`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.botRoleHandler);

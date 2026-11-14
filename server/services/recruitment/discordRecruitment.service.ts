@@ -40,6 +40,19 @@ async function questionsFor(communityId: string) {
   return qs;
 }
 
+/** The application question that asks "how did you find us" (answered by the source menu instead). */
+export function sourceQuestionId(cfg: any, qs: any[]): string | null {
+  if (!sourcesOf(cfg).length) return null;
+  if (cfg.sourceQuestionId && qs.some((q) => q.id === cfg.sourceQuestionId)) return cfg.sourceQuestionId;
+  if (cfg.sourceQuestionId === 'NONE') return null;
+  return qs.find((q) => /how (did|do) you (find|hear|come|know)|where did you (find|hear)|how.*(found|heard).*(us|server)/i.test(String(q.questionText)))?.id || null;
+}
+/** Questions shown in the form: the "how did you find us" one is skipped when the source menu already asked it. */
+function formQuestions(cfg: any, qs: any[]) {
+  const skip = sourceQuestionId(cfg, qs);
+  return skip ? qs.filter((q) => q.id !== skip) : qs;
+}
+
 /** Pages of questions; the extra fields (recruiter code, source detail) ride on the last page when there is room, else get their own page. */
 function pagesFor(questions: any[], askCode: boolean, extra = 0) {
   const pages: any[][] = [];
@@ -196,7 +209,7 @@ export const discordRecruitment = {
     const src = sourceFor(cfg, session);
     const rule = codeRule(cfg, src);
     const detail = src?.detailLabel ? { label: src.detailLabel, required: !!src.detailRequired } : null;
-    const { pages, codePage } = pagesFor(await questionsFor(session.communityId), rule.ask, detail ? 1 : 0);
+    const { pages, codePage } = pagesFor(formQuestions(cfg, await questionsFor(session.communityId)), rule.ask, detail ? 1 : 0);
     if (page >= pages.length) return interaction.reply({ content: 'Something went wrong. Press **Apply** to start again.', ephemeral: true });
     const last = codePage === page;
     return interaction.showModal(modalFor(page, pages.length, pages[page], last && rule.ask, session, rule.required, dmTag(interaction), last ? detail : null));
@@ -226,7 +239,9 @@ export const discordRecruitment = {
     const qs = await questionsFor(session.communityId);
     const src = sourceFor(cfg, session);
     const rule = codeRule(cfg, src);
-    const { pages } = pagesFor(qs, rule.ask, src?.detailLabel ? 1 : 0);
+    const { pages } = pagesFor(formQuestions(cfg, qs), rule.ask, src?.detailLabel ? 1 : 0);
+    const srcQ = sourceQuestionId(cfg, qs);
+    if (srcQ && src) session.answers[srcQ] = `${src.emoji ? `${src.emoji} ` : ''}${src.name}${session.sourceDetail ? ` · ${session.sourceDetail}` : ''}`;
 
     if (page + 1 < pages.length) {
       return interaction.reply({
