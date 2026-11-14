@@ -52,16 +52,16 @@ export async function ensureSelfPerms(channel: any, perms: bigint[], why = 'run 
     if (!missing.length) return '';
     const target = channel.isThread?.() ? channel.parent : channel;
     if (!target?.permissionOverwrites) return 'The bot can’t change permissions here.';
-    if (!me.permissions.has(PermissionFlagsBits.ManageRoles) && !me.permissions.has(PermissionFlagsBits.Administrator)) return 'The bot needs Manage Roles (server-wide) to give itself access in this channel.';
+    if (!me.permissions.has(PermissionFlagsBits.ManageRoles) && !me.permissions.has(PermissionFlagsBits.Administrator)) return explainAccess(channel, perms);
     // A channel permission the bot doesn't have server-wide can't be granted by itself; Discord refuses that.
     const grantable = missing.filter((p) => me.permissions.has(p) || p === PermissionFlagsBits.ViewChannel || p === PermissionFlagsBits.SendMessages || p === PermissionFlagsBits.Connect);
-    if (!grantable.length) return `The bot's role needs ${missing.map((p) => NAMES[String(p)]).join(', ')} in Server Settings → Roles.`;
+    if (!grantable.length) return explainAccess(channel, perms);
     await target.permissionOverwrites.edit(me.id, Object.fromEntries(grantable.map((p) => [NAMES[String(p)], true])), { reason: `Community Manager: give the bot what it needs to ${why} (only the bot is affected)` });
     logger.info(`[SelfAccess] Gave the bot ${grantable.map((p) => NAMES[String(p)]).join(', ')} in #${target.name} to ${why}`);
     const still = perms.filter((p) => !channel.permissionsFor(me)?.has(p));
-    return still.length ? `The bot still lacks ${still.map((p) => NAMES[String(p)]).join(', ')} here; a higher setting blocks it.` : '';
+    return still.length ? explainAccess(channel, perms) : '';
   } catch (err: any) {
-    return `The bot couldn’t give itself access here (${err?.message || err}).`;
+    return explainAccess(channel, perms) || `The bot couldn’t give itself access here (${err?.message || err}).`;
   }
 }
 
@@ -89,4 +89,46 @@ export function patchSendWithSelfAccess(djs: any) {
     (wrapped as any).__cmSelf = true;
     C.prototype.send = wrapped;
   }
+}
+
+const LABEL: Record<string, string> = {
+  ViewChannel: 'View Channel', ManageChannels: 'Manage Channels', Connect: 'Connect', SendMessages: 'Send Messages', EmbedLinks: 'Embed Links',
+  AttachFiles: 'Attach Files', ReadMessageHistory: 'Read Message History', ManageRoles: 'Manage Roles', CreateInstantInvite: 'Create Invite',
+  MentionEveryone: 'Mention @everyone', SendMessagesInThreads: 'Send Messages in Threads', ManageMessages: 'Manage Messages', ManageEvents: 'Manage Events',
+};
+const label = (p: bigint) => LABEL[NAMES[String(p)]] || NAMES[String(p)];
+
+/**
+ * Exactly what blocks the bot in this channel and what the admin should change, in plain words.
+ * Empty string when nothing is missing.
+ */
+export function explainAccess(channel: any, perms: bigint[]): string {
+  try {
+    const guild = channel?.guild;
+    const me = guild?.members?.me;
+    if (!me || !channel?.permissionsFor) return '';
+    const P = PermissionFlagsBits;
+    const missing = perms.filter((p) => !channel.permissionsFor(me)?.has(p));
+    if (!missing.length) return '';
+    const botRole = me.roles?.botRole?.name || me.roles?.highest?.name || 'the bot’s role';
+    const where = channel.parent ? `#${channel.name} (in category ${channel.parent.name})` : `#${channel.name}`;
+    // Which overwrite denies it: the channel's own, else the category's.
+    const denies: string[] = [];
+    for (const src of [channel, channel.parent].filter(Boolean)) {
+      for (const o of src.permissionOverwrites?.cache?.values?.() || []) {
+        const applies = o.id === me.id || o.id === guild.roles.everyone.id || me.roles.cache.has(o.id);
+        if (!applies) continue;
+        const d = missing.filter((p) => o.deny?.has?.(p));
+        if (d.length) denies.push(`${o.id === guild.roles.everyone.id ? '@everyone' : o.id === me.id ? 'the bot' : '@' + (guild.roles.cache.get(o.id)?.name || 'a role')} is denied ${d.map(label).join(', ')} on ${src === channel ? '#' + src.name : 'category ' + src.name}`);
+      }
+    }
+    const serverWide = missing.filter((p) => p !== P.ViewChannel && p !== P.Connect && p !== P.SendMessages && !me.permissions.has(p));
+    const parts = [`The bot is missing ${missing.map(label).join(', ')} in ${where}.`];
+    if (denies.length) parts.push(`Why: ${denies.slice(0, 3).join('; ')}.`);
+    if (serverWide.length) parts.push(`Fix 1: Server Settings → Roles → ${botRole} → turn on ${serverWide.map(label).join(', ')}.`);
+    parts.push(`${serverWide.length ? 'Fix 2' : 'Fix'}: Edit ${channel.parent ? `category ${channel.parent.name}` : `#${channel.name}`} → Permissions → add role ${botRole} → allow ${missing.map(label).join(', ')}.`);
+    if (!missing.includes(P.ViewChannel) && me.permissions.has(P.ManageRoles)) parts.push('(The bot will then keep this up by itself.)');
+    else parts.push('Discord does not let a bot change a channel it cannot see, even with Manage Roles; only Administrator skips this.');
+    return parts.join(' ');
+  } catch { return ''; }
 }
