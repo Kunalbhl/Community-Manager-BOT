@@ -295,6 +295,38 @@ export async function cancelAnnouncement(req: Request, res: Response, next: Next
   }
 }
 
+/** Send a failed (or any) announcement again, with the same title, message and channel. */
+export async function resendAnnouncement(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const ann: any = await announcementsRepository.getById(req.params.id);
+    if (!ann || ann.communityId !== communityId) throw new NotFoundError('Announcement not found');
+    if (ann.status === 'SENT' && req.body?.confirmDuplicate !== true) throw new BadRequestError('This announcement was already sent. Confirm to post it again.');
+    const deliver = await EngagementDeliveryService.deliverMessage({
+      communityId, actorUserId: req.user?.userId || 'system', actorRole: req.user?.role || 'OWNER',
+      targetChannelId: ann.channelId, content: ann.content, featureKey: 'ANNOUNCEMENTS',
+    });
+    const now = new Date().toISOString();
+    const updated = deliver.status === 'SENT'
+      ? await announcementsRepository.update(ann.id, { status: 'SENT', discordMessageId: deliver.messageId, errorDetails: null, resentAt: now, updatedAt: now } as any)
+      : await announcementsRepository.update(ann.id, { status: 'FAILED', errorDetails: deliver.failureReason || 'DELIVERY_FAILED', updatedAt: now } as any);
+    await auditService.log({ communityId, actorUserId: req.user?.userId || 'system', actorRole: req.user?.role || 'OWNER', action: deliver.status === 'SENT' ? 'ENGAGEMENT_SENT' : 'ENGAGEMENT_FAILED', targetType: 'ANNOUNCEMENT', targetId: ann.id, metadata: { resend: true } });
+    res.json({ success: true, announcement: updated, sent: deliver.status === 'SENT', reason: deliver.failureReason });
+  } catch (error) { next(error); }
+}
+
+/** Remove an announcement from the log (does not delete a message already posted in Discord). */
+export async function deleteAnnouncement(req: Request, res: Response, next: NextFunction) {
+  try {
+    const communityId = getCommunityId(req);
+    const ann: any = await announcementsRepository.getById(req.params.id);
+    if (!ann || ann.communityId !== communityId) throw new NotFoundError('Announcement not found');
+    await announcementsRepository.delete(ann.id);
+    await auditService.log({ communityId, actorUserId: req.user?.userId || 'system', actorRole: req.user?.role || 'OWNER', action: 'ENGAGEMENT_CANCELLED', targetType: 'ANNOUNCEMENT', targetId: ann.id, metadata: { deleted: true } });
+    res.json({ success: true });
+  } catch (error) { next(error); }
+}
+
 // 4. ENGAGEMENT - CAMPAIGNS
 export async function getCampaigns(req: Request, res: Response, next: NextFunction) {
   try {
