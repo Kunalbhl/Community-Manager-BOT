@@ -303,10 +303,12 @@ export async function draftQuizHandler(req: Request, res: Response) {
     const { communityQuestionsService } = await import('../services/communityQuestions.service.js');
     const rules = (await communityQuestionsService.listGuidelines(req.params.communityId)).filter((g: any) => g.enabled !== false);
     if (!rules.length) throw new Error('Add your server rules first (Server tools → Recruitment → Server rules, just above the quiz), then try again.');
+    const count = int(req.body?.count, 3, 15, 6);
+    // AI first; if it is unavailable for any reason, build questions straight from the rules (no AI needed).
+    const aiQuestions = await (async () => {
     const { GeminiAIProvider } = await import('../services/ai/geminiProvider.js');
     const ai = new GeminiAIProvider();
-    if (!ai.isConfigured()) throw new Error('Community Brain (AI) is not configured.');
-    const count = int(req.body?.count, 3, 15, 6);
+    if (!ai.isConfigured()) throw new Error('not configured');
     const prompt = `Write ${count} multiple-choice questions that check whether a new applicant has read and understood these Discord community rules. Each question must have exactly 4 short options, one correct. Add a one-sentence friendly explanation of the rule. Reply with JSON only: [{"question":"","options":["","","",""],"correct":0,"explain":""}]\n\nRULES:\n${rules.map((g: any) => `- ${g.title}: ${g.description}`).join('\n').slice(0, 8000)}`;
     const out = await ai.generateText(prompt, { temperature: 0.4, maxTokens: 2000 });
     const json = String(out.text || '').replace(/^[^\[]*/, '').replace(/[^\]]*$/, '');
@@ -314,14 +316,51 @@ export async function draftQuizHandler(req: Request, res: Response) {
     const questions = (Array.isArray(arr) ? arr : []).slice(0, count).map((q: any, i: number) => ({
       id: `ai${Date.now().toString(36)}${i}`, question: str(q.question, 250), options: (q.options || []).slice(0, 4).map((o: any) => str(o, 80)), correct: int(q.correct, 0, 3, 0), explain: str(q.explain, 500),
     })).filter((q: any) => q.question && q.options.length === 4);
-    if (!questions.length) throw new Error('Could not draft questions this time. Please try again.');
-    ok(res, questions);
-  } catch (err: any) {
-    const m = String(err?.message || err);
-    if (/402|429|RESOURCE_EXHAUSTED|prepay|credits|quota|billing/i.test(m)) return fail(res, new Error('AI drafting is unavailable right now: the Google AI key on the bot server has no credit or quota left. You can still add questions yourself with "Add question".'));
-    if (/api key|not configured|API_KEY_INVALID|permission/i.test(m)) return fail(res, new Error('AI drafting is not set up on the bot server. You can still add questions yourself with "Add question".'));
-    fail(res, err);
-  }
+    if (!questions.length) throw new Error('empty');
+    return questions;
+    })().catch(() => null);
+    ok(res, aiQuestions && aiQuestions.length ? aiQuestions : quizFromRules(rules, count));
+  } catch (err: any) { fail(res, err); }
+}
+
+/** Rules quiz without AI: "Which of these is one of our rules?" with clearly wrong answers. */
+const WRONG_ANSWERS = [
+  'Spamming is fine as long as it is funny', 'Staff instructions are optional', 'You may share other members’ personal info',
+  'Advertising other servers is welcome anywhere', 'Arguments are settled by fighting in-game', 'Rules only apply to new members',
+  'Insulting others is allowed in voice chat', 'Any channel can be used for anything', 'Cheats and hacks may be shared in DMs',
+  'Pinging @everyone is allowed for any reason', 'You can ignore warnings from moderators', 'NSFW content is fine in general chat',
+  'Alt accounts may be used to avoid bans', 'Leaking private staff chats is allowed', 'Breaking Discord’s Terms is fine here',
+];
+function quizFromRules(rules: any[], count: number) {
+  const pick = [...rules].sort(() => Math.random() - 0.5).slice(0, count);
+  const stems = ['Which of these is one of our server rules?', 'Which statement matches our rules?', 'You are about to post in the server. Which rule applies?', 'Which of these do our rules say?'];
+  return pick.map((g: any, i: number) => {
+    const right = str(String(g.title || '').replace(/[*_`]/g, ''), 80);
+    const wrong = [...WRONG_ANSWERS].sort(() => Math.random() - 0.5).slice(0, 3);
+    const correct = Math.floor(Math.random() * 4);
+    const options = [...wrong]; options.splice(correct, 0, right);
+    return { id: `r${Date.now().toString(36)}${i}`, question: stems[i % stems.length], options, correct, explain: str(g.description && g.description !== g.title ? g.description : `Our rule: ${g.title}`, 500) };
+  });
+}
+
+/** Where applicants read the rules: copied from rules channels (automatic) or the list below (manual). */
+export async function rulesSourceHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const t: any = await getToolkit(communityId);
+    const { welcomeOnboardingService } = await import('../services/welcomeOnboarding.service.js');
+    const w: any = await welcomeOnboardingService.getWelcomeConfig(communityId).catch(() => null);
+    const welcomeIds: string[] = (w?.rulesChannelIds?.length ? w.rulesChannelIds : w?.rulesChannelId ? [w.rulesChannelId] : []).filter(isSnowflake);
+    if (req.method === 'PUT') {
+      const b = req.body || {};
+      const source = b.source === 'LIST' ? 'LIST' : 'CHANNELS';
+      const channelIds = (Array.isArray(b.channelIds) ? b.channelIds : []).filter(isSnowflake).slice(0, 5);
+      await saveToolkit(communityId, { recruitment: { ...t.recruitment, rulesSource: source, rulesChannelIds: channelIds } as any });
+      return ok(res, { source, channelIds, welcomeChannelIds: welcomeIds });
+    }
+    const channelIds = (t.recruitment.rulesChannelIds || []).filter(isSnowflake);
+    ok(res, { source: t.recruitment.rulesSource || ((channelIds.length || welcomeIds.length) ? 'CHANNELS' : 'LIST'), channelIds, welcomeChannelIds: welcomeIds });
+  } catch (err) { fail(res, err); }
 }
 
 export async function screeningThresholdHandler(req: Request, res: Response) {
@@ -652,6 +691,25 @@ export async function codeSettingsHandler(req: Request, res: Response) {
     const { recruiterBoards } = await import('../services/recruitment/recruiterBoards.service.js');
     if (codeChannelId && codeChannelId !== prev.codeChannelId) void recruiterBoards.syncAllCodes(communityId).catch(() => undefined);
     ok(res, { series, rules, dmOnCreate: !!b.dmOnCreate, codeForNewMembers: !!b.codeForNewMembers, codeChannelId, rewardBoardChannelId, example: seriesCode(series, series.next, 'Kunal Pareek') });
+  } catch (err) { fail(res, err); }
+}
+
+/** Saves just the two channel pickers (they save as soon as one is picked). */
+export async function codeChannelsHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const b = req.body || {};
+    const t: any = await getToolkit(communityId);
+    const rec: any = { ...t.recruitment };
+    if ('codeChannelId' in b) rec.codeChannelId = isSnowflake(b.codeChannelId) ? b.codeChannelId : '';
+    if ('rewardBoardChannelId' in b) rec.rewardBoardChannelId = isSnowflake(b.rewardBoardChannelId) ? b.rewardBoardChannelId : '';
+    await saveToolkit(communityId, { recruitment: rec });
+    let posted = 0;
+    if (rec.codeChannelId && rec.codeChannelId !== t.recruitment.codeChannelId) {
+      const { recruiterBoards } = await import('../services/recruitment/recruiterBoards.service.js');
+      posted = await recruiterBoards.syncAllCodes(communityId).catch(() => 0);
+    }
+    ok(res, { codeChannelId: rec.codeChannelId || '', rewardBoardChannelId: rec.rewardBoardChannelId || '', posted });
   } catch (err) { fail(res, err); }
 }
 

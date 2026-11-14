@@ -1,3 +1,4 @@
+import { useRemembered } from '../../common/useRemembered.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Megaphone, Repeat, Clock, BarChart3, FileText, Trash2, Pause, Play, Pencil, Copy, Info, Send, CheckCircle2 } from 'lucide-react';
 import { ChannelSelect, RoleSelect, MemberSelect, MultiMemberSelect, useDiscordResources, MemberName } from '../../common/DiscordPickers.js';
@@ -128,7 +129,7 @@ const Head = ({ icon: Icon, tone, title, desc }: any) => (
 /* ---------------- Announcements ---------------- */
 function Announcements({ communityId, data, run, api, busy, chanName }: P) {
   const [title, setTitle] = useState('');
-  const [channelId, setChannelId] = useState('');
+  const [channelId, setChannelId] = useRemembered('announce:' + (typeof location !== 'undefined' ? location.pathname : ''));
   const [content, setContent] = useState('');
   const [at, setAt] = useState('');
   const submit = (e: React.FormEvent) => {
@@ -176,7 +177,7 @@ function describeFreq(c: any) {
 function Campaigns({ communityId, data, run, api, busy, chanName, roleName }: P) {
   const [name, setName] = useState('');
   const [where, setWhere] = useState<'CHANNEL' | 'ROLE' | 'MEMBERS' | 'ALL'>('CHANNEL');
-  const [channelId, setChannelId] = useState('');
+  const [channelId, setChannelId] = useRemembered('campaign:' + (typeof location !== 'undefined' ? location.pathname : ''));
   const [roleId, setRoleId] = useState('');
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [message, setMessage] = useState('');
@@ -267,7 +268,7 @@ function Reminders({ communityId, data, run, api, busy, chanName }: P) {
   const [to, setTo] = useState<'MEMBER' | 'CHANNEL'>('MEMBER');
   const [userId, setUserId] = useState('');
   const [userName, setUserName] = useState('');
-  const [channelId, setChannelId] = useState('');
+  const [channelId, setChannelId] = useRemembered('reminder:' + (typeof location !== 'undefined' ? location.pathname : ''));
   const [at, setAt] = useState('');
   const [repeat, setRepeat] = useState('ONCE');
   const [message, setMessage] = useState('');
@@ -316,7 +317,7 @@ function Reminders({ communityId, data, run, api, busy, chanName }: P) {
 const DURATIONS = [{ h: 1, l: '1 hour' }, { h: 4, l: '4 hours' }, { h: 8, l: '8 hours' }, { h: 24, l: '1 day' }, { h: 72, l: '3 days' }, { h: 168, l: '1 week' }, { h: 336, l: '2 weeks' }];
 function Polls({ communityId, data, run, api, busy, chanName }: P) {
   const [question, setQuestion] = useState('');
-  const [channelId, setChannelId] = useState('');
+  const [channelId, setChannelId] = useRemembered('poll:' + (typeof location !== 'undefined' ? location.pathname : ''));
   const [options, setOptions] = useState<string[]>(['', '']);
   const [hours, setHours] = useState(24);
   const [multi, setMulti] = useState(false);

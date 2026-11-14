@@ -29,6 +29,7 @@ export interface RewardRule {
     removeRoleIds: string[];
     /** 0 = keep the roles; otherwise the added roles are removed after this many days. */
     roleDays: number;
+    expireDays?: number;
     xp: number;
     dmMessage: string;
     announceChannelId: string;
@@ -104,7 +105,7 @@ export function sanitizeRule(b: any, cur?: Partial<RewardRule>): Omit<RewardRule
   const name = txt(b?.name, 80);
   if (!name) throw new Error('Give the reward a name.');
   const actions = {
-    addRoleIds: ids(a.addRoleIds), removeRoleIds: ids(a.removeRoleIds), roleDays: clampInt(a.roleDays, 0, 365, 0), xp: clampInt(a.xp, 0, 1_000_000, 0),
+    addRoleIds: ids(a.addRoleIds), removeRoleIds: ids(a.removeRoleIds), roleDays: clampInt(a.roleDays, 0, 365, 0), expireDays: clampInt(a.expireDays, 0, 365, 0), xp: clampInt(a.xp, 0, 1_000_000, 0),
     dmMessage: txt(a.dmMessage, 1500), announceChannelId: snow(a.announceChannelId) ? a.announceChannelId : '', announceMessage: txt(a.announceMessage, 1500), manualReward: txt(a.manualReward, 200),
     credit: a.credit?.itemId && Number(a.credit.amount) > 0 ? { itemId: txt(a.credit.itemId, 64), amount: clampInt(a.credit.amount, 1, 1000, 1) } : undefined,
   };
@@ -304,14 +305,14 @@ export const inviteRewards = {
       const bal = credited ? await import('./wallet.service.js').then(({ wallet }) => wallet.balance(g.communityId, g.recruiterId, rule!.actions.credit!.itemId)).catch(() => null) : null;
       const vars = { balance: bal ? String(bal.available) : '', recruit: g.recruitId ? `<@${g.recruitId}>` : '', recruitName: g.recruitName || '', code: g.recruiterCode || '', recruiter: `<@${g.recruiterId}>`, recruiterName: member.displayName || g.recruiterName, reward: `${rule.emoji} ${rule.name}`, count: String(g.inviteCount), reason: g.reason, server: guild.name, manualReward: rule.actions.manualReward || '' };
       if (rule.actions.dmMessage) await member.send({ content: render(rule.actions.dmMessage, vars).slice(0, 2000) }).catch(() => problems.push('could not DM the recruiter (their DMs are closed)'));
-      if (rule.actions.announceMessage && rule.actions.announceChannelId) {
+      if (rule.actions.announceChannelId) {
         const ch: any = guild.channels.cache.get(rule.actions.announceChannelId);
         if (!ch?.send) problems.push('the announcement channel is missing');
         else {
           // One message per recruiter: posted the first time, edited for every later reward.
           await rewardGrantsRepository.update(g.id, { status: 'GRANTED' } as any).catch(() => undefined);
           const { recruiterBoards } = await import('../recruitment/recruiterBoards.service.js');
-          const okBoard = await recruiterBoards.syncRecruiter(g.communityId, g.recruiterId, ch.id, render(rule.actions.announceMessage, vars));
+          const okBoard = await recruiterBoards.syncRecruiter(g.communityId, g.recruiterId, ch.id, rule.actions.announceMessage ? render(rule.actions.announceMessage, vars) : undefined);
           if (!okBoard) problems.push(`could not post in <#${ch.id}>`);
         }
       } else {
@@ -321,7 +322,13 @@ export const inviteRewards = {
     const fatal = (needsMember && (!guild || !member)) || (rule.actions.addRoleIds.length > 0 && !given.length) || (!!rule.actions.credit?.itemId && !credited);
     return rewardGrantsRepository.update(g.id, {
       status: fatal ? 'FAILED' : 'GRANTED', error: problems.length ? problems.join('; ') : '', roleIdsGiven: given,
-      expiresAt: given.length && rule.actions.roleDays ? new Date(Date.now() + rule.actions.roleDays * DAY).toISOString() : undefined,
+      expiresAt: (() => {
+        const days = [given.length ? rule.actions.roleDays : 0, rule.actions.expireDays || 0].filter((d) => d > 0);
+        return days.length ? new Date(Date.now() + Math.min(...days) * DAY).toISOString() : undefined;
+      })(),
+      bonusExpiresAt: rule.actions.expireDays ? new Date(Date.now() + rule.actions.expireDays * DAY).toISOString() : undefined,
+      roleExpiresAt: given.length && rule.actions.roleDays ? new Date(Date.now() + rule.actions.roleDays * DAY).toISOString() : undefined,
+      xpGiven: member && rule.actions.xp ? rule.actions.xp : 0,
       updatedAt: nowIso(),
     } as any);
   },
@@ -348,8 +355,29 @@ export const inviteRewards = {
 
   /** Removes temporary roles that have run out. */
   async expireRoles() {
-    const due = (await rewardGrantsRepository.list({ where: [{ field: 'status', operator: '==', value: 'GRANTED' }] })).filter((g) => g.expiresAt && Date.parse(g.expiresAt) <= Date.now());
-    for (const g of due) await this.revoke(g, null, 'The temporary role ended.', 'system', 'EXPIRED').catch(() => undefined);
+    const now = Date.now();
+    const all = await rewardGrantsRepository.list({ where: [{ field: 'status', operator: '==', value: 'GRANTED' }] });
+    for (const g of all as any[]) {
+      const roleDue = (g.roleExpiresAt ? Date.parse(g.roleExpiresAt) <= now : !g.bonusExpiresAt && g.expiresAt && Date.parse(g.expiresAt) <= now) && (g.roleIdsGiven || []).length && !g.rolesExpired;
+      const bonusDue = g.bonusExpiresAt && Date.parse(g.bonusExpiresAt) <= now && !g.bonusExpired;
+      if (!roleDue && !bonusDue) continue;
+      const guild: any = await guildFor(g.communityId).catch(() => null);
+      const member: any = guild ? await guild.members.fetch(g.recruiterId).catch(() => null) : null;
+      const patch: any = { updatedAt: nowIso() };
+      if (roleDue) {
+        if (member) for (const id of g.roleIdsGiven || []) await member.roles.remove(id, `Invite reward ended: ${g.ruleName}`).catch(() => undefined);
+        patch.rolesExpired = true;
+      }
+      if (bonusDue) {
+        await import('./wallet.service.js').then(({ wallet }) => wallet.reverse(g.communityId, g.id, `The temporary bonus “${g.ruleName}” ended.`)).catch(() => undefined);
+        if (member && g.xpGiven) await import('../features/levels.service.js').then(({ levels }) => levels.grant(g.communityId, member, -g.xpGiven, null, 'message')).catch(() => undefined);
+        patch.bonusExpired = true;
+      }
+      const done = (patch.rolesExpired || g.rolesExpired || !(g.roleIdsGiven || []).length || !g.roleExpiresAt) && (patch.bonusExpired || g.bonusExpired || !g.bonusExpiresAt);
+      if (done) patch.status = 'EXPIRED';
+      await rewardGrantsRepository.update(g.id, patch).catch(() => undefined);
+      void import('../recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.refreshRecruiter(g.communityId, g.recruiterId)).catch(() => undefined);
+    }
   },
 
   /** A recruit left the server: mark it so it stops counting, then re-check that recruiter. */

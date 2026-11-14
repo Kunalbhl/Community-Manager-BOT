@@ -422,6 +422,7 @@ router.post(`${tk}/warnings`, requireTenantAccess(), requirePermission('communit
 router.post(`${tk}/warnings/:strikeId/revoke`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.revokeWarningHandler);
 router.get(`${tk}/codes`, requireTenantAccess(), requirePermission('recruiterCodes.view'), Toolkit.listCodesHandler);
 router.put(`${tk}/codes/settings`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.codeSettingsHandler);
+router.put(`${tk}/codes/channels`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.codeChannelsHandler);
 router.post(`${tk}/codes`, requireTenantAccess(), requirePermission('recruiterCodes.create'), Toolkit.createCodeHandler);
 router.post(`${tk}/codes/import`, requireTenantAccess(), requirePermission('recruiterCodes.create'), Toolkit.importCodesHandler);
 router.put(`${tk}/codes/:codeId`, requireTenantAccess(), requirePermission('recruiterCodes.create'), Toolkit.updateCodeHandler);
@@ -435,6 +436,8 @@ router.delete(`${tk}/rooms/:roomId/access/:userId`, requireTenantAccess(), requi
 router.post(`${tk}/bot-nickname`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.botNicknameHandler);
 router.get(`${tk}/recruitment/rules`, requireTenantAccess(), requirePermission('community.view'), Toolkit.listRulesHandler);
 router.post(`${tk}/recruitment/rules`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.addRuleHandler);
+router.get(`${tk}/recruitment/rules/source`, requireTenantAccess(), requirePermission('community.view'), Toolkit.rulesSourceHandler);
+router.put(`${tk}/recruitment/rules/source`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.rulesSourceHandler);
 router.post(`${tk}/recruitment/rules/import`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.importRulesHandler);
 router.delete(`${tk}/recruitment/rules/:ruleId`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.deleteRuleHandler);
 router.post(`${tk}/recruitment/draft-quiz`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.draftQuizHandler);

@@ -1,3 +1,4 @@
+import { useRemembered } from '../../common/useRemembered.js';
 import { takeOpenTab } from './SetupGuideView.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { TrendingUp, Gift, MousePointerClick, BadgeCheck, ScrollText, Star, Cake, TerminalSquare, Plus, Trash2, Send, RefreshCw, Trophy, BarChart3 } from 'lucide-react';
@@ -286,7 +287,7 @@ function ButtonRolesTab({ api, res, communityId }: any) {
 /* ---------------- Verification ---------------- */
 function VerificationTab({ api, cfg, res, onSave }: any) {
   const [c, setC] = useState(cfg);
-  const [ch, setCh] = useState('');
+  const [ch, setCh] = useRemembered('verify:' + (typeof location !== 'undefined' ? location.pathname : ''));
   const [msg, setMsg] = useState('');
   return (
     <Card title="Verification" right={<Toggle on={c.enabled} onChange={(v) => setC({ ...c, enabled: v })} label={c.enabled ? 'On' : 'Off'} />}

@@ -1,3 +1,4 @@
+import { useRemembered } from '../../common/useRemembered.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronRight, Megaphone, Minus, Pencil, Plus, Search, X, XCircle } from 'lucide-react';
 import { ChannelSelect, MemberName, MemberSelect, MultiMemberSelect } from '../../common/DiscordPickers.js';
@@ -152,7 +153,7 @@ function Ledger({ txs, communityId, itemOf, compact }: any) {
 
 function PanelPoster({ communityId, onPost }: { communityId: string; onPost: (ch: string, ev: string) => void }) {
   const [open, setOpen] = useState(false);
-  const [ch, setCh] = useState('');
+  const [ch, setCh] = useRemembered('walletpanel:' + (typeof location !== 'undefined' ? location.pathname : ''));
   const [ev, setEv] = useState('');
   if (!open) return <button className={`${ghost} mt-3 w-full`} onClick={() => setOpen(true)}><Megaphone className="h-4 w-4" />Post “Use” buttons in Discord</button>;
   return (

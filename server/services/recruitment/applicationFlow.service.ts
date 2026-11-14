@@ -136,7 +136,9 @@ export const applicationFlow = {
     try {
       const { welcomeOnboardingService } = await import('../welcomeOnboarding.service.js');
       const w: any = await welcomeOnboardingService.getWelcomeConfig(r.communityId);
-      const ids: string[] = (w?.rulesChannelIds?.length ? w.rulesChannelIds : w?.rulesChannelId ? [w.rulesChannelId] : []).filter(Boolean);
+      const rc: any = t.recruitment;
+      const own: string[] = (rc.rulesChannelIds || []).filter(Boolean);
+      const ids: string[] = rc.rulesSource === 'LIST' ? [] : own.length ? own : (w?.rulesChannelIds?.length ? w.rulesChannelIds : w?.rulesChannelId ? [w.rulesChannelId] : []).filter(Boolean);
       for (const id of ids.slice(0, 5)) {
         const src: any = guild?.channels.cache.get(id) || (await guild?.channels.fetch(id).catch(() => null));
         const msgs: any = await src?.messages?.fetch({ limit: 50 }).catch(() => null);
