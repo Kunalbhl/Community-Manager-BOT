@@ -1,3 +1,4 @@
+import { MessageComposer } from '../../common/MessageComposer.js';
 import { takeOpenTab, goTo } from './SetupGuideView.js';
 import { MemberName } from '../../common/DiscordPickers.js';
 import { TicketPanelDesigner, TicketTypeExtras } from './TicketPanelDesigner.js';
@@ -84,7 +85,7 @@ export function ServerToolsView({ communityId, only }: { communityId: string; on
 
       {config && res && (
         <>
-          {tab === 'recruit' && <RecruitTab api={api} cfg={config.recruitment} rooms={config.reviewRooms} res={res} onSave={(v) => save('recruitment', v)} onSaveRooms={(v) => save('reviewRooms', v)} goRooms={() => setTab('rooms')} />}
+          {tab === 'recruit' && <RecruitTab communityId={communityId} api={api} cfg={config.recruitment} rooms={config.reviewRooms} res={res} onSave={(v) => save('recruitment', v)} onSaveRooms={(v) => save('reviewRooms', v)} goRooms={() => setTab('rooms')} />}
           {tab === 'tickets' && <TicketsTab communityId={communityId} api={api} cfg={config.tickets} res={res} onSave={(v) => save('tickets', v)} />}
           {tab === 'warnings' && <WarningsTab communityId={communityId} api={api} cfg={config.warnings} onSave={(v) => save('warnings', v)} />}
           {tab === 'roles' && <RoleRulesTab cfg={config.roleRules} res={res} onSave={(v) => save('roleRules', v)} />}
@@ -706,7 +707,7 @@ export function MembersPick({ communityId, value, onChange }: { communityId: str
 /* ------------------------------------------------------------------ */
 /* Recruitment in Discord                                              */
 /* ------------------------------------------------------------------ */
-function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { api: any; cfg: any; rooms: any; res: Resources; onSave: (v: any) => Promise<void>; onSaveRooms: (v: any) => Promise<void>; goRooms: () => void }) {
+function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms, communityId }: { communityId: string; api: any; cfg: any; rooms: any; res: Resources; onSave: (v: any) => Promise<void>; onSaveRooms: (v: any) => Promise<void>; goRooms: () => void }) {
   const [c, setC] = useState(cfg);
   const [threshold, setThreshold] = useState<number | null>(null);
   const [drafting, setDrafting] = useState('');
@@ -837,7 +838,7 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
         <Card title="Apply panel" desc="Post it in a public channel like #apply or #join-us.">
           <div className="space-y-4">
             <label className="block text-sm font-medium text-slate-700">Title<input className={`${input} mt-1`} value={c.messages.panelTitle} onChange={(e) => setM('panelTitle', e.target.value)} /></label>
-            <label className="block text-sm font-medium text-slate-700">Text<textarea rows={10} className={`${input} mt-1`} value={c.messages.panelText} onChange={(e) => setM('panelText', e.target.value)} /></label>
+            <div className="block text-sm font-medium text-slate-700">Text<div className="mt-1"><MessageComposer communityId={communityId} value={c.messages.panelText} onChange={(v: string) => setM('panelText', v)} rows={12} maxLength={2000} /></div><p className="mt-1 text-xs font-normal text-slate-500">Use the buttons to add @members, @roles, #channels and emojis. {"{server}"} becomes your server name. Saving updates the panel already posted.</p></div>
             <div className="rounded-xl border-l-4 border-indigo-500 bg-slate-50 p-4">
               <div className="font-bold text-slate-900">{c.messages.panelTitle}</div>
               <div className="mt-1 whitespace-pre-line text-sm text-slate-600">{c.messages.panelText.replace(/\*\*/g, "").replace(/\{server\}/g, "your server")}</div>
@@ -851,7 +852,7 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms }: { ap
             <div className="min-w-[240px] flex-1"><Pick options={res.textChannels} value={panelCh} onChange={setPanelCh} placeholder="Channel for the Apply panel" /></div>
             <button className={btn} disabled={!panelCh} onClick={async () => {
               setMsg('');
-              try { await onSave(c); await api('/recruitment/panel', 'POST', { channelId: panelCh }); setMsg('Saved and Apply panel posted.'); } catch (e: any) { setMsg(e.message); }
+              try { await onSave(c); const r = await api('/recruitment/panel', 'POST', { channelId: panelCh }); setMsg(r?.updated ? 'Saved. The Apply panel already in that channel was updated.' : 'Saved and Apply panel posted.'); } catch (e: any) { setMsg(e.message); }
             }}><Send className="h-4 w-4" /> Save & post panel</button>
           </div>
           {msg && <p className="mt-3 text-sm text-slate-600">{msg}</p>}

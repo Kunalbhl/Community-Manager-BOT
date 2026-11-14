@@ -307,7 +307,15 @@ export const inviteRewards = {
       if (rule.actions.announceMessage && rule.actions.announceChannelId) {
         const ch: any = guild.channels.cache.get(rule.actions.announceChannelId);
         if (!ch?.send) problems.push('the announcement channel is missing');
-        else await ch.send({ content: render(rule.actions.announceMessage, vars).slice(0, 2000), allowedMentions: { users: [g.recruiterId] } }).catch(() => problems.push(`could not post in <#${ch.id}>`));
+        else {
+          // One message per recruiter: posted the first time, edited for every later reward.
+          await rewardGrantsRepository.update(g.id, { status: 'GRANTED' } as any).catch(() => undefined);
+          const { recruiterBoards } = await import('../recruitment/recruiterBoards.service.js');
+          const okBoard = await recruiterBoards.syncRecruiter(g.communityId, g.recruiterId, ch.id, render(rule.actions.announceMessage, vars));
+          if (!okBoard) problems.push(`could not post in <#${ch.id}>`);
+        }
+      } else {
+        void import('../recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.refreshRecruiter(g.communityId, g.recruiterId)).catch(() => undefined);
       }
     }
     const fatal = (needsMember && (!guild || !member)) || (rule.actions.addRoleIds.length > 0 && !given.length) || (!!rule.actions.credit?.itemId && !credited);
@@ -324,7 +332,9 @@ export const inviteRewards = {
     if (status === 'REVOKED') await import('./wallet.service.js').then(({ wallet }) => wallet.reverse(g.communityId, g.id, why)).catch(() => undefined);
     if (member) for (const id of g.roleIdsGiven || []) await member.roles.remove(id, `Invite reward ${status.toLowerCase()}: ${g.ruleName}`).catch(() => undefined);
     if (member && status === 'REVOKED' && rule) await member.send({ content: `ℹ️ Your reward **${g.emoji} ${g.ruleName}** in [**${guild.name || 'the server'}**](https://discord.com/channels/${guild.id || ''}) was taken back. ${why}` }).catch(() => undefined);
-    return rewardGrantsRepository.update(g.id, { status, error: why, decidedBy: by, decidedAt: nowIso(), updatedAt: nowIso() } as any);
+    const out = await rewardGrantsRepository.update(g.id, { status, error: why, decidedBy: by, decidedAt: nowIso(), updatedAt: nowIso() } as any);
+    void import('../recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.refreshRecruiter(g.communityId, g.recruiterId)).catch(() => undefined);
+    return out;
   },
 
   async notifyStaffPending(g: RewardGrant) {

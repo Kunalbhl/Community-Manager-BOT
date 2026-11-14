@@ -9,6 +9,7 @@ import { blacklistCommand } from './blacklist.command.js';
 import { rulesCommand } from './rules.command.js';
 import { sheetCommand } from './sheet.command.js';
 import { myCodeCommand } from './mycode.command.js';
+import { recruiterCodeSearchCommand } from './recruiterCodeSearch.command.js';
 import { myRewardsCommand } from './myrewards.command.js';
 import { blacklistCheckCommand } from './blacklistCheck.command.js';
 import { rewardCommand } from './reward.command.js';
@@ -53,6 +54,7 @@ export const discordCommands: SlashCommandDefinition[] = [
   helpCommand,                  // /help
   sheetCommand,                 // /sheet
   myCodeCommand,                // /mycode
+  recruiterCodeSearchCommand,   // /recruiter-code-search (staff)
   myRewardsCommand,             // /myrewards
   rewardCommand,                // /reward balance|use|record|add|panel
 ];

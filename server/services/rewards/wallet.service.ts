@@ -174,6 +174,7 @@ export const wallet = {
     if (!tx || tx.communityId !== communityId || tx.kind !== 'CLAIM') throw new Error('Request not found.');
     if (tx.status !== 'PENDING') throw new Error(`Already ${tx.status === 'APPROVED' ? 'approved' : 'handled'}${tx.decidedBy ? ` by ${tx.decidedBy}` : ''}.`);
     const out = await walletTxRepository.update(tx.id, { status: approve ? 'APPROVED' : 'DENIED', decidedBy: by, decidedAt: nowIso() } as any);
+    void import('../recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.refreshRecruiter(communityId, tx.memberId)).catch(() => undefined);
     const item = await this.item(communityId, tx.itemId).catch(() => null);
     const bal = await this.balance(communityId, tx.memberId, tx.itemId);
     const guild: any = await guildFor(communityId);
@@ -194,6 +195,7 @@ export const wallet = {
     return chId ? guild?.channels.cache.get(chId) : null;
   },
   async log(communityId: string, tx: WalletTx, text: string) {
+    void import('../recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.refreshRecruiter(communityId, tx.memberId)).catch(() => undefined);
     const item = await this.item(communityId, tx.itemId).catch(() => null);
     if (!item) return;
     const ch: any = await this.channel(communityId, item);

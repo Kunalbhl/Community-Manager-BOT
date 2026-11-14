@@ -274,6 +274,12 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
     try {
       const msg = action === 'voice' ? await reviewRooms.toggleVoice(arg, interaction.member) : await reviewRooms.escalate(arg, interaction.member);
       await interaction.reply({ content: msg, ephemeral: action === 'escalate' });
+      if (action === 'voice') {
+        // Flip the button on the panel that was pressed: Voice room <-> End voice room.
+        const { applicationFlow } = await import('../../services/recruitment/applicationFlow.service.js');
+        const panel = await applicationFlow.currentPanel(arg).catch(() => null);
+        if (panel && interaction.message?.editable !== false) await interaction.message.edit({ components: panel as any }).catch(() => undefined);
+      }
     } catch (err: any) {
       await interaction.reply({ content: `⚠️ ${err?.message}`, ephemeral: true });
     }

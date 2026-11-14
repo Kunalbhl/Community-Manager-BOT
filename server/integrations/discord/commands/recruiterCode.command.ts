@@ -131,6 +131,7 @@ async function handleRecruiterCodeCommand(interaction: ChatInputCommandInteracti
       isActive: true,
       createdAt: new Date().toISOString(),
     });
+    void import('../../../services/recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.syncCode(communityId, newCode.id)).catch(() => undefined);
 
     await auditService.record({
       communityId,

@@ -226,6 +226,7 @@ export class ApplicationWorkflowService {
         lastUsedAt: now,
         updatedAt: now,
       });
+      void import('./recruitment/recruiterBoards.service.js').then(({ recruiterBoards }) => recruiterBoards.syncCode(codeDoc.communityId, codeDoc.id)).catch(() => undefined);
 
       validatedRecruiterCode = codeClean;
       recruiterDiscordUserId = recruiterDiscordUserIdResolved || codeDoc.recruiterUserId;
