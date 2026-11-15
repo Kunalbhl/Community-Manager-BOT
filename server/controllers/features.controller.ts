@@ -226,3 +226,16 @@ export async function refreshStatsHandler(req: Request, res: Response) {
 export async function deleteStatHandler(req: Request, res: Response) {
   try { ok(res, await serverStats.remove(req.params.communityId, req.params.id, req.query.channel === '1')); } catch (err) { fail(res, err); }
 }
+
+// ---------- growth reports ----------
+export async function growthReportHandler(req: Request, res: Response) {
+  try {
+    const { communityId } = req.params;
+    const { growthReports } = await import('../services/features/growthReports.service.js');
+    if (req.method === 'PUT') return ok(res, await growthReports.save(communityId, req.body || {}));
+    if (req.method === 'POST') return ok(res, await growthReports.send(communityId, req.body || {}));
+    const s = await growthReports.get(communityId);
+    const preview = await growthReports.build(communityId, ({ WEEKLY: 7, BIWEEKLY: 14, MONTHLY: 30 } as any)[String(req.query.frequency || s.frequency)] || 7).then((d) => ({ joins: d.joins, leaves: d.leaves, net: d.net, members: d.members, stayed: d.stayed, growthPct: d.growthPct, top: d.top, apps: d.apps, approved: d.approved, rejected: d.rejected })).catch(() => null);
+    ok(res, { settings: s, preview });
+  } catch (err) { fail(res, err); }
+}
