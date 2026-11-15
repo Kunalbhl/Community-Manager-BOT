@@ -45,7 +45,7 @@ function redirectUri() {
   // Same callback the dashboard sign-in already uses, so no new redirect needs registering with Discord.
   const c = (config as any).DISCORD_OAUTH_CALLBACK_URL;
   if (c && c.startsWith('http') && !c.includes('discord.com')) return c;
-  return 'https://community-manager-bot-720940628402.asia-southeast1.run.app/api/v1/auth/callback';
+  return 'https://community-manager.chaloone.com/api/v1/auth/callback';
 }
 
 export const webApply = {

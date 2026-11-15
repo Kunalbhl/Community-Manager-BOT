@@ -67,7 +67,7 @@ export class GoogleCalendarService {
       return { url: buildAuthorizeUrl(signed), state: signed, isConfigured: true };
     }
     const { userId, communityId, role = 'INTERVIEWER' } = params;
-    const canonicalOrigin = 'https://community-manager-bot-720940628402.asia-southeast1.run.app';
+    const canonicalOrigin = 'https://community-manager.chaloone.com';
     const redirectUri = params.redirectUri || `${canonicalOrigin}/api/v1/calendar/oauth/callback`;
 
     const statePayload = {

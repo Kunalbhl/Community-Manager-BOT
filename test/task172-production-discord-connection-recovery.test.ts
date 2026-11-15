@@ -169,7 +169,7 @@ export async function runTask172Tests(): Promise<Task172Result> {
 
   // 10. Canonical Production URL and Configuration Verification
   await runAssertion('10. Canonical production URL and Cloud Run deployment configuration are strictly locked', () => {
-    const canonicalUrl = 'https://community-manager-bot-720940628402.asia-southeast1.run.app';
+    const canonicalUrl = 'https://community-manager.chaloone.com';
     assert.equal(canonicalUrl.startsWith('https://'), true);
     assert.equal(canonicalUrl.includes('720940628402.asia-southeast1.run.app'), true);
     assert.equal(config.GOOGLE_CLOUD_REGION, 'asia-southeast1');

@@ -20,7 +20,7 @@ import { getToolkit, guildFor, isSnowflake, communityForGuild, OLD_PANEL_TEXT, D
 import { discordService } from '../../integrations/discord/discord.service.js';
 
 const PAGE = 5;
-const appUrl = () => (process.env.APP_URL || 'https://community-manager-bot-720940628402.asia-southeast1.run.app').replace(/\/$/, '');
+const appUrl = () => (process.env.APP_URL || 'https://community-manager.chaloone.com').replace(/\/$/, '');
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 export const fillMsg = (t: string, v: Record<string, string>) => t.replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m)).replace(/\\n/g, '\n');
 

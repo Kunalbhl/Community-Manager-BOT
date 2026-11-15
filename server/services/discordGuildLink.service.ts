@@ -439,7 +439,7 @@ export class DiscordGuildLinkService {
         if (entry?.executor?.id) inviterId = entry.executor.id;
       } catch { /* no audit log access */ }
 
-      const appUrl = (config.APP_URL || 'https://community-manager-bot-720940628402.asia-southeast1.run.app').replace(/\/$/, '');
+      const appUrl = (config.APP_URL || 'https://community-manager.chaloone.com').replace(/\/$/, '');
       const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
       const row = new ActionRowBuilder<any>().addComponents(
         new ButtonBuilder().setLabel('Complete setup').setStyle(ButtonStyle.Link).setURL(`${appUrl}/servers?installed=${guildId}`),

@@ -35,6 +35,7 @@ export class DiscordAuthService {
       try {
         const parsedRedirect = new URL(redirectUri);
         const allowedOrigins = [
+          'https://community-manager.chaloone.com',
           'https://community-manager-bot-720940628402.asia-southeast1.run.app',
           config.DISCORD_OAUTH_CALLBACK_URL ? new URL(config.DISCORD_OAUTH_CALLBACK_URL).origin : null,
           config.APP_URL ? new URL(config.APP_URL).origin : null,
@@ -53,7 +54,7 @@ export class DiscordAuthService {
       return config.DISCORD_OAUTH_CALLBACK_URL;
     }
     // Prioritize the authoritative production domain for the redirect callback
-    return 'https://community-manager-bot-720940628402.asia-southeast1.run.app/api/v1/auth/callback';
+    return 'https://community-manager.chaloone.com/api/v1/auth/callback';
   }
 
   /**

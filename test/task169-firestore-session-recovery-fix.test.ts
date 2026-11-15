@@ -26,7 +26,7 @@ export async function runTask169Tests(): Promise<Task169Result> {
   const skipped = 0;
   const details: Record<string, string> = {};
 
-  const EXPECTED_CANONICAL = 'https://community-manager-bot-720940628402.asia-southeast1.run.app';
+  const EXPECTED_CANONICAL = 'https://community-manager.chaloone.com';
 
   async function runAssertion(name: string, fn: () => void | Promise<void>) {
     try {

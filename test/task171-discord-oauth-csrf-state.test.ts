@@ -162,7 +162,7 @@ export async function runTask171Tests(): Promise<Task171Result> {
 
   // 9. Canonical production origin lock is maintained
   await runAssertion('9. Canonical production URL lock matches authoritative Cloud Run endpoint', () => {
-    assert.equal(CANONICAL_PRODUCTION_URL, 'https://community-manager-bot-720940628402.asia-southeast1.run.app');
+    assert.equal(CANONICAL_PRODUCTION_URL, 'https://community-manager.chaloone.com');
   });
 
   // 10. Timestamp handling is resilient across object, number, and method formats
