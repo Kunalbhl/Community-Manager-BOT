@@ -49,6 +49,16 @@ async function startServer() {
 
   // Set trust proxy for Cloud Run & reverse proxies
   app.set('trust proxy', true);
+  // The old Cloud Run address now lives at community-manager.chaloone.com. People who open the old address
+  // in a browser are sent to the new one; API calls, health checks and requests from our own proxy are untouched.
+  app.use((req, res, next) => {
+    const host = (req.header('host') || '').toLowerCase();
+    if (req.method === 'GET' && host.endsWith('.run.app') && !req.header('x-cm-proxy')
+      && !req.path.startsWith('/api/') && !req.path.startsWith('/health')) {
+      return res.redirect(301, `https://community-manager.chaloone.com${req.originalUrl}`);
+    }
+    next();
+  });
 
   // Production Security Headers & Request ID
   app.use(requestIdMiddleware);
