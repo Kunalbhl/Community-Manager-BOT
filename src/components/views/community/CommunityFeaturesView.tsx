@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { TrendingUp, Gift, MousePointerClick, BadgeCheck, ScrollText, Star, Cake, TerminalSquare, Plus, Trash2, Send, RefreshCw, Trophy, BarChart3 } from 'lucide-react';
 import { Banner, Card, Toggle, Pick, MultiPick, SaveBar, input, btn, ghost, fmtDate, Resources } from './ServerToolsView.js';
 import { MessageComposer } from '../../common/MessageComposer.js';
-import { RoleSelect, useDiscordResources } from '../../common/DiscordPickers.js';
+import { RoleSelect, MemberSelect, MemberName, useDiscordResources } from '../../common/DiscordPickers.js';
 
 export type Tab = 'stats' | 'levels' | 'giveaways' | 'buttonRoles' | 'verification' | 'logs' | 'starboard' | 'birthdays' | 'custom';
 const TABS: { id: Tab; label: string; icon: any; hint: string }[] = [
@@ -511,6 +511,7 @@ function StatsTab({ api, res, communityId }: any) {
           {msg && <p className="text-sm text-slate-600">{msg}</p>}
         </div>
       </Card>
+      <GrowthReportCard api={api} res={res} communityId={communityId} />
       <Card title="Your counters" right={<button className={ghost} disabled={busy} onClick={async () => { setBusy(true); try { setData({ ...data, counters: await api('/features/server-stats/refresh', 'POST') }); setMsg('Updated.'); } catch (e: any) { setMsg(e.message); } setBusy(false); }}><RefreshCw className="h-4 w-4" /> Update now</button>}>
         {!data ? <div className="h-24 animate-pulse rounded-xl bg-slate-100" /> : !data.counters.length ? <p className="text-sm text-slate-500">No counters yet. Add one, or link the stat channels you already have.</p> : (
           <ul className="divide-y divide-slate-100">
@@ -533,6 +534,68 @@ function StatsTab({ api, res, communityId }: any) {
             ))}
           </ul>
         )}
+      </Card>
+    </div>
+  );
+}
+
+/* ---------------- Growth reports ---------------- */
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function GrowthReportCard({ api, res, communityId }: any) {
+  const [s, setS] = useState<any>(null);
+  const [pv, setPv] = useState<any>(null);
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api('/features/growth-report').then((d: any) => { setS({ ...d.settings, timezone: d.settings.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone }); setPv(d.preview); }).catch((e: any) => setMsg(e.message)); }, [api]);
+  useEffect(() => { if (s) api(`/features/growth-report?frequency=${s.frequency}`).then((d: any) => setPv(d.preview)).catch(() => undefined); }, [s?.frequency]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!s) return <Card title="Server reports"><div className="h-24 animate-pulse rounded-xl bg-slate-100" /></Card>;
+  const chips = (key: string, label: string, hint: string) => (
+    <div className="text-sm font-medium text-slate-700">{label}<div className="text-xs font-normal text-slate-500">{hint}</div>
+      <div className="mt-1 flex flex-wrap gap-1.5">{(s[key] || []).map((id: string) => <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">{key === 'dmUserIds' ? <MemberName id={id} communityId={communityId} /> : `@${res.roles.find((r: any) => r.id === id)?.name || 'role'}`}<button type="button" onClick={() => setS({ ...s, [key]: s[key].filter((x: string) => x !== id) })}>×</button></span>)}</div>
+      <div className="mt-1">{key === 'dmUserIds' ? <MemberSelect communityId={communityId} value="" onChange={(id: any) => id && setS({ ...s, dmUserIds: [...s.dmUserIds, typeof id === 'string' ? id : id.id] })} placeholder="Add a member" /> : <RoleSelect communityId={communityId} value="" exclude={s[key]} onChange={(id: any) => id && setS({ ...s, [key]: [...s[key], id] })} placeholder="Add a role" />}</div>
+    </div>
+  );
+  const save = async () => { setBusy(true); setMsg(''); try { setS(await api('/features/growth-report', 'PUT', s)); setMsg(s.enabled ? '✓ Saved. Reports will go out on schedule.' : '✓ Saved (switched off).'); } catch (e: any) { setMsg(e.message); } setBusy(false); };
+  const sendNow = async () => { setBusy(true); setMsg(''); try { const r = await api('/features/growth-report', 'POST', s); setMsg(`Sent: ${r.result}`); } catch (e: any) { setMsg(e.message); } setBusy(false); };
+  return (
+    <div className="2xl:col-span-2">
+      <Card title="Server reports" desc="A growth report (joins, leaves, net growth, who stayed, top inviters, applications) sent on a schedule to a channel, to members of roles by DM, or to chosen members by DM.">
+        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+          <div className="space-y-4">
+            <label className="flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={s.enabled} onChange={(e) => setS({ ...s, enabled: e.target.checked })} />Send reports automatically</label>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Label t="How often"><select className={input} value={s.frequency} onChange={(e) => setS({ ...s, frequency: e.target.value })}><option value="WEEKLY">Every week</option><option value="BIWEEKLY">Every two weeks</option><option value="MONTHLY">Every month</option></select></Label>
+              {s.frequency === 'MONTHLY'
+                ? <Label t="Day of month"><select className={input} value={s.monthDay} onChange={(e) => setS({ ...s, monthDay: Number(e.target.value) })}>{Array.from({ length: 28 }, (_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}</select></Label>
+                : <Label t="Day"><select className={input} value={s.weekday} onChange={(e) => setS({ ...s, weekday: Number(e.target.value) })}>{WEEKDAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}</select></Label>}
+              <Label t="Time"><select className={input} value={s.hour} onChange={(e) => setS({ ...s, hour: Number(e.target.value) })}>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{`${((h + 11) % 12) + 1}:00 ${h < 12 ? 'AM' : 'PM'}`}</option>)}</select><span className="text-xs text-slate-500">{s.timezone}</span></Label>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Label t="Post in channel"><Pick options={res.textChannels} value={s.channelId} onChange={(v) => setS({ ...s, channelId: v })} placeholder="Don't post in a channel" /></Label>
+              {chips('pingRoleIds', 'Ping roles with the post', 'Mentioned in the channel post.')}
+              {chips('dmRoleIds', 'DM everyone with these roles', 'e.g. your staff role. Up to 100 people.')}
+              {chips('dmUserIds', 'DM these members', 'e.g. the owner.')}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button className={btn} disabled={busy} onClick={save}><Send className="h-4 w-4" />Save</button>
+              <button className={ghost} disabled={busy} onClick={sendNow}>Send one now</button>
+              {msg && <span className="text-sm text-slate-600">{msg}</span>}
+            </div>
+            {s.lastSentAt && <p className="text-xs text-slate-500">Last sent {fmtDate(s.lastSentAt)}{s.lastResult ? ` · ${s.lastResult}` : ''}</p>}
+          </div>
+          <div>
+            <div className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-400">Preview (right now)</div>
+            <div className="rounded-lg border-l-4 border-emerald-500 bg-[#2b2d31] p-3 text-[13px] text-slate-200">
+              <div className="font-bold text-white">📊 {s.frequency === 'MONTHLY' ? 'Monthly' : s.frequency === 'BIWEEKLY' ? 'Two-week' : 'Weekly'} server report</div>
+              {pv ? <>
+                <div className="mt-2 grid grid-cols-3 gap-2 text-xs"><div><b className="text-white">📥 Joined</b><br />+{pv.joins}</div><div><b className="text-white">📤 Left</b><br />-{pv.leaves}</div><div><b className="text-white">📈 Net</b><br />{pv.net >= 0 ? '+' : ''}{pv.net} ({pv.growthPct.toFixed(1)}%)</div>
+                  <div><b className="text-white">👥 Members</b><br />{pv.members}</div><div><b className="text-white">🧲 Still here</b><br />{pv.stayed}/{pv.joins}</div><div><b className="text-white">📝 Applied</b><br />{pv.apps} · ✅{pv.approved}</div></div>
+                <div className="mt-2 text-xs"><b className="text-white">🏆 Top inviters</b><br />{pv.top.length ? pv.top.map(([id, n]: any, i: number) => <div key={id}>{['🥇', '🥈', '🥉', '4.', '5.'][i]} <MemberName id={id} communityId={communityId} /> · {n}</div>) : 'No tracked invites yet.'}</div>
+              </> : <div className="mt-2 text-xs text-slate-400">Loading…</div>}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">Leaves are counted from today on; joins also use each member’s join date, so the first report is already useful.</p>
+          </div>
+        </div>
       </Card>
     </div>
   );

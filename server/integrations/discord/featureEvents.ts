@@ -28,6 +28,14 @@ export async function onFeatureMessage(message: any) {
 }
 
 export function attachFeatureHandlers(client: Client) {
+  client.on(Events.GuildMemberAdd, (member: any) => safe('growth join', async () => {
+    const { growthReports } = await import('../../services/features/growthReports.service.js');
+    await growthReports.track(member.guild.id, member.id, 'JOIN', !!member.user?.bot);
+  }));
+  client.on(Events.GuildMemberRemove, (member: any) => safe('growth leave', async () => {
+    const { growthReports } = await import('../../services/features/growthReports.service.js');
+    await growthReports.track(member.guild.id, member.id, 'LEAVE', !!member.user?.bot);
+  }));
   client.on(Events.GuildMemberAdd, (member: any) => safe('log join', async () => {
     const c = await communityOf(member.guild.id);
     await serverLogs.send(c, member.guild, 'memberJoin', '📥 Member joined', `<@${member.id}> · ${member.user.username}`, [{ name: 'Account created', value: ts(member.user.createdTimestamp), inline: true }, { name: 'Members', value: String(member.guild.memberCount), inline: true }]);
