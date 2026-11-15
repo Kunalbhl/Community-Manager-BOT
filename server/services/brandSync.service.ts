@@ -14,7 +14,7 @@ export async function syncBrandToDiscord() {
     const done = await flags.getById('discordBrand').catch(() => null);
     await syncBanner();
     if (done?.version === LOGO_VERSION) return;
-    const base = (process.env.APP_URL || 'https://community-manager-bot-720940628402.asia-southeast1.run.app').replace(/\/$/, '');
+    const base = (process.env.APP_URL || 'https://community-manager.chaloone.com').replace(/\/$/, '');
     const res = await fetch(`${base}/logo-1024.png`);
     if (!res.ok) throw new Error(`logo not reachable (${res.status})`);
     const buf = Buffer.from(await res.arrayBuffer());
@@ -37,7 +37,7 @@ async function syncBanner() {
   try {
     const done = await flags.getById('discordBanner').catch(() => null);
     if (done?.version === BANNER_VERSION) return;
-    const base = (process.env.APP_URL || 'https://community-manager-bot-720940628402.asia-southeast1.run.app').replace(/\/$/, '');
+    const base = (process.env.APP_URL || 'https://community-manager.chaloone.com').replace(/\/$/, '');
     const res = await fetch(`${base}/banner-1360x480.png`);
     if (!res.ok) throw new Error(`banner not reachable (${res.status})`);
     const buf = Buffer.from(await res.arrayBuffer());

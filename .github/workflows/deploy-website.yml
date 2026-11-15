@@ -34,6 +34,6 @@ jobs:
       - name: Health check
         run: |
           for i in $(seq 1 20); do
-            curl -sf https://community-manager-bot-720940628402.asia-southeast1.run.app/health/live && exit 0; sleep 6
+            curl -sf https://community-manager.chaloone.com/health/live && exit 0; sleep 6
           done
           echo "::error::Website did not become healthy"; exit 1

@@ -13,7 +13,7 @@ import { auditService } from '../services/audit.service.js';
 import { logger } from '../logging/logger.js';
 
 export const SOCIALCORD_APP_ID = process.env.SOCIALCORD_APP_ID || '1563337103541010453';
-export const SOCIALCORD_DASHBOARD_URL = (process.env.SOCIALCORD_DASHBOARD_URL || 'https://socialcord-notifier-517676359142.us-east1.run.app').replace(/\/$/, '');
+export const SOCIALCORD_DASHBOARD_URL = (process.env.SOCIALCORD_DASHBOARD_URL || 'https://socialcord.chaloone.com').replace(/\/$/, '');
 const SOCIALCORD_PERMISSIONS = '277025770560';
 
 function inviteUrl(guildId?: string) {

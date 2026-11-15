@@ -23,7 +23,7 @@ const REVIEWER_ROLES = new Set(['OWNER', 'CONTROLLER', 'RECRUITER', 'INTERVIEWER
 const MAX_DMS_PER_EVENT = 15;
 const DAY = 24 * 60 * 60 * 1000;
 
-const dashboardUrl = () => `${(process.env.APP_URL || 'https://community-manager-bot-720940628402.asia-southeast1.run.app').replace(/\/$/, '')}/dashboard`;
+const dashboardUrl = () => `${(process.env.APP_URL || 'https://community-manager.chaloone.com').replace(/\/$/, '')}/dashboard`;
 
 async function wantsDiscord(discordUserId: string, communityId: string): Promise<boolean> {
   try {

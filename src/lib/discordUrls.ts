@@ -102,12 +102,12 @@ export function getAddToDiscordUrl(options: AddToDiscordOptions = {}): string {
  * Canonical production application origin for Discord OAuth.
  */
 export const CANONICAL_PRODUCTION_ORIGIN =
-  'https://community-manager-bot-720940628402.asia-southeast1.run.app';
+  'https://community-manager.chaloone.com';
 
 export function getAuthoritativeAppOrigin(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.chaloone.com')) {
       return window.location.origin;
     }
   }

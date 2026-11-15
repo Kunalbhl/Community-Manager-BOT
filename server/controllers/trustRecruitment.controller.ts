@@ -902,7 +902,7 @@ export async function getGoogleOAuthAuthorizeUrlHandler(req: Request, res: Respo
     const protocol = req.protocol === 'https' || !isLocalhost ? 'https' : 'http';
     const redirectOrigin = isLocalhost
       ? `${protocol}://${host}`
-      : 'https://community-manager-bot-720940628402.asia-southeast1.run.app';
+      : 'https://community-manager.chaloone.com';
     const redirectUri = `${redirectOrigin}/api/v1/calendar/oauth/callback`;
 
     const { url, state, isConfigured } = googleCalendarService.getOAuthAuthorizeUrl({

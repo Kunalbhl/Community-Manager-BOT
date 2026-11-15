@@ -19,7 +19,7 @@ const googleClientSecret = () => (process.env.GOOGLE_CLIENT_SECRET || process.en
 export const googleOAuthConfigured = () => Boolean(googleClientId() && googleClientSecret());
 
 export function googleRedirectUri(): string {
-  const base = (config.APP_URL || 'https://community-manager-bot-720940628402.asia-southeast1.run.app').replace(/\/$/, '');
+  const base = (config.APP_URL || 'https://community-manager.chaloone.com').replace(/\/$/, '');
   return `${base}/api/v1/calendar/oauth/callback`;
 }
 

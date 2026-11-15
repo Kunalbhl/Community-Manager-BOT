@@ -23,7 +23,7 @@ export async function runTask166UrlLockTests(): Promise<Task166Result> {
   const skipped = 0;
   const details: Record<string, string> = {};
 
-  const EXPECTED_CANONICAL = 'https://community-manager-bot-720940628402.asia-southeast1.run.app';
+  const EXPECTED_CANONICAL = 'https://community-manager.chaloone.com';
   const EXPECTED_OAUTH_CALLBACK = `${EXPECTED_CANONICAL}/api/v1/auth/callback`;
 
   async function runAssertion(name: string, fn: () => void | Promise<void>) {

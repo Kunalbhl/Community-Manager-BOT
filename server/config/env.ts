@@ -63,9 +63,17 @@ export interface AppConfig {
   APP_RUNTIME_MODE: 'DEVELOPMENT_SIMULATION' | 'REAL_DISCORD_PREVIEW' | 'PRODUCTION';
 }
 
-export const CANONICAL_PRODUCTION_URL = 'https://community-manager-bot-720940628402.asia-southeast1.run.app';
+export const CANONICAL_PRODUCTION_URL = 'https://community-manager.chaloone.com';
+
+export const LEGACY_PRODUCTION_URL = 'https://community-manager-bot-720940628402.asia-southeast1.run.app';
+/** The old Cloud Run address now lives at community-manager.chaloone.com: settings that still name it are moved over. */
+function migrateLegacyUrl(name: string) {
+  const v = process.env[name];
+  if (v && v.includes(LEGACY_PRODUCTION_URL)) process.env[name] = v.split(LEGACY_PRODUCTION_URL).join(CANONICAL_PRODUCTION_URL);
+}
 
 export function loadConfig(): AppConfig {
+  for (const k of ['APP_URL', 'DISCORD_REDIRECT_URI', 'CUSTOM_DOMAIN_URL', 'GOOGLE_REDIRECT_URI']) migrateLegacyUrl(k);
   const nodeEnv = (process.env.NODE_ENV as 'development' | 'production' | 'test' | 'staging') || 'development';
   const rawAppEnv = process.env.APP_ENV;
   const validEnvs = ['development', 'production', 'test', 'staging'];

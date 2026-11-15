@@ -135,7 +135,7 @@ export async function runTask170GoogleCalendarOnboardingTest(): Promise<Task170R
 
   // 7. OAuth Redirect URI Production Accuracy
   await runAssertion('7. OAuth redirect URI is production-correct: points to canonical origin in production', async () => {
-    const canonicalProductionOrigin = 'https://community-manager-bot-720940628402.asia-southeast1.run.app';
+    const canonicalProductionOrigin = 'https://community-manager.chaloone.com';
     const canonicalRedirectUri = `${canonicalProductionOrigin}/api/v1/calendar/oauth/callback`;
 
     const oauthRes = googleCalendarService.getOAuthAuthorizeUrl({

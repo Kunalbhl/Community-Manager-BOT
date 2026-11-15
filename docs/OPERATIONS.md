@@ -9,7 +9,7 @@ Website users ─▶ Cloud Run (standby) ────────┘
 | Piece | Where | Updates |
 |---|---|---|
 | Discord bot + API (active) | Oracle Always Free VM `community-manager-bot` (137.23.46.177), containers `community-manager-bot` + `community-manager-caddy` | VM pulls `main` every 5 min (`cm-update.timer`) |
-| Website + standby bot | Cloud Run `community-manager-bot`, asia-southeast1, https://community-manager-bot-720940628402.asia-southeast1.run.app | GitHub Actions **Deploy website** on every push to `main` |
+| Website + standby bot | Cloud Run `community-manager-bot`, asia-southeast1, https://community-manager.chaloone.com | GitHub Actions **Deploy website** on every push to `main` |
 | Database | Supabase project `Community-Manager-BOT` (session pooler) | tables created automatically |
 
 * Only one bot is ever online: a database lease (VM priority 100, Cloud Run 10). If the VM is down for ~1 minute Cloud Run takes over.
