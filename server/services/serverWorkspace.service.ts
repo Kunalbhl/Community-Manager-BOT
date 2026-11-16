@@ -15,16 +15,16 @@ const NOT_STAFF_NAME = /\b(dj|music|bots?|muted?|verified|members?|vip|booster|n
 
 /** Category name: emoji + bold letters so it stands out in the channel list. */
 export const CM_CATEGORY_NAME = '💠 𝗖𝗢𝗠𝗠𝗨𝗡𝗜𝗧𝗬 𝗠𝗔𝗡𝗔𝗚𝗘𝗥';
-const isCmCategory = (c: any) => c.type === ChannelType.GuildCategory && (c.name === CM_CATEGORY_NAME || c.name.toLowerCase() === 'community manager');
+export const isCmCategory = (c: any) => c.type === ChannelType.GuildCategory && (c.name === CM_CATEGORY_NAME || c.name.toLowerCase() === 'community manager');
 
 /** First message in every channel the bot creates: why it exists and how it is used. */
-const INTROS: Record<string, { title: string; body: string }> = {
+export const INTROS: Record<string, { title: string; body: string }> = {
   applications: { title: '📥 Application reviews', body: 'Created by **Community Manager** for staff.\n\n• Every new application appears here with the applicant’s answers and quiz score.\n• Press **Approve** or **Reject**, or open it in the dashboard.\n• Each application also gets a private staff thread for discussion and escalation.\n\nOnly staff can see this channel.' },
   recruitmentLog: { title: '📋 Recruitment log', body: 'Created by **Community Manager** as a permanent record.\n\n• Every application, screening result and decision is logged here.\n• Recruiter credit is recorded when a new member joins with a code.\n\nNothing needs to be done here; it is the history you can search later. Only staff can see this channel.' },
   serverLog: { title: '🧾 Server log', body: 'Created by **Community Manager** to keep the server accountable.\n\n• Joins and leaves, edited and deleted messages, role changes and warnings are recorded here.\n\nUse it to check what happened and when. Only staff can see this channel.' },
 };
 
-async function postIntro(ch: any, key: string) {
+export async function postIntro(ch: any, key: string) {
   const intro = INTROS[key];
   if (!intro || !ch?.send) return;
   try {

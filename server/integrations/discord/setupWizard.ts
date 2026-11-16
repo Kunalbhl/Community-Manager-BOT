@@ -4,7 +4,11 @@
  * - Admin-only (Manage Server or Administrator), private (ephemeral) message that updates in place.
  * - Each step is a small module in STEPS: it renders its page and handles its own menus/buttons.
  * - Every choice is saved immediately to the SAME settings the dashboard uses, so both stay in sync.
- * - The bot never changes @everyone here. Locking the server (Secure Setup) stays in the dashboard.
+ * - Every step has a "Create missing" button (setupProvision.ts): staff channels go in the private
+ *   Community Manager category; public channels and roles are created without touching @everyone on
+ *   any existing channel. Locking the server (Secure Setup) stays in the dashboard.
+ * - The finish step reviews everything, lists what is still pending in the dashboard, and only
+ *   "Confirm & finish" marks setup complete and posts a success record in the log channel.
  *
  * Custom ids: cm:su:<step>:<action>  (routed from toolkitInteractions.ts)
  */
@@ -17,6 +21,7 @@ import { communityForGuild, getToolkit, saveToolkit } from '../../services/toolk
 import { getFeatures, saveFeatures } from '../../services/features/featuresConfig.js';
 import { welcomeOnboardingService } from '../../services/welcomeOnboarding.service.js';
 import { explainAccess, ensureSelfPerms } from './selfAccess.js';
+import { create, createdNote } from './setupProvision.js';
 
 const BRAND = 0x7c8cff;
 const P = PermissionFlagsBits;
@@ -39,6 +44,8 @@ const ch = (id?: string) => (id ? `<#${id}>` : '`not set`');
 const roles = (ids?: string[]) => (ids && ids.length ? ids.map((r) => `<@&${r}>`).join(' ') : '`not set`');
 const on = (v: boolean) => (v ? '🟢 On' : '⚪ Off');
 const id = (step: string, action: string) => `cm:su:${step}:${action}`;
+const createBtn = (step: string, label = 'Create missing') => new ButtonBuilder().setCustomId(id(step, 'create')).setStyle(ButtonStyle.Primary).setLabel(label).setEmoji('✨');
+async function made(fn: () => Promise<string[]>) { try { return createdNote(await fn()); } catch (e: any) { return `⚠️ ${e?.message || e}`; } }
 const row = <T extends ActionRowBuilder<any>>(...c: any[]) => new ActionRowBuilder<any>().addComponents(...c) as T;
 
 /* ------------------------------------------------------------------ */
@@ -48,6 +55,11 @@ const row = <T extends ActionRowBuilder<any>>(...c: any[]) => new ActionRowBuild
 const STEPS: Step[] = [
   {
     key: 'intro', title: 'Welcome', emoji: '👋',
+    async handle({ communityId, guild }, action) {
+      if (action !== 'create') return;
+      const r = await create.all(guild, communityId);
+      return createdNote(r.made, r.errors);
+    },
     async render() {
       return {
         embeds: [base('Set up Community Manager', [
@@ -57,8 +69,10 @@ const STEPS: Step[] = [
           ...STEPS.slice(1, -1).map((s, i) => `\`${i + 1}\` ${s.emoji} ${s.title}`),
           '',
           'Everything here also appears in the dashboard, so you can fine-tune it later.',
+          '',
+          '**New server?** Press **Create everything missing** and I will make the private Community Manager category with its staff channels (applications, recruitment log, server log), a public #apply and #welcome channel, and the Reviewer, Applicant and Member roles. Anything you already set is kept.',
         ].join('\n'))],
-        components: [],
+        components: [row(createBtn('intro', 'Create everything missing'))],
       };
     },
   },
@@ -77,15 +91,62 @@ const STEPS: Step[] = [
         components: [
           row(new RoleSelectMenuBuilder().setCustomId(id('staff', 'reviewers')).setPlaceholder('Reviewer roles').setMinValues(0).setMaxValues(10).setDefaultRoles(...(r.reviewerRoleIds || []).slice(0, 10))),
           row(new RoleSelectMenuBuilder().setCustomId(id('staff', 'ping')).setPlaceholder('Roles to ping on new applications (optional)').setMinValues(0).setMaxValues(10).setDefaultRoles(...(r.pingRoleIds || []).slice(0, 10))),
+          row(createBtn('staff', 'Create a Reviewer role').setDisabled(Boolean(r.reviewerRoleIds?.length))),
         ],
       };
     },
-    async handle({ communityId, interaction }, action) {
+    async handle({ communityId, interaction, guild }, action) {
+      if (action === 'create') return made(() => create.staff(guild, communityId));
       const t = await getToolkit(communityId);
       const values: string[] = interaction.values || [];
       if (action === 'reviewers') await saveToolkit(communityId, { recruitment: { ...t.recruitment, reviewerRoleIds: values } });
       else if (action === 'ping') await saveToolkit(communityId, { recruitment: { ...t.recruitment, pingRoleIds: values } });
       else return;
+      return 'Saved.';
+    },
+  },
+
+  {
+    key: 'roles', title: 'Newcomer & member roles', emoji: '🎭',
+    async render({ communityId, guild }) {
+      const { getGate } = await import('../../services/recruitment/secureGate.service.js');
+      const g = await getGate(communityId);
+      const has = (x?: string) => Boolean(x && guild.roles.cache.has(x));
+      return {
+        embeds: [base('Applicant and Member roles', [
+          '**Applicant:** given to new people while they apply. They only see the public channels (welcome, rules, apply).',
+          '**Member:** given when an application is approved. It opens the rest of the server.',
+          '',
+          `**Applicant role:** ${has(g.applicantRoleId) ? `<@&${g.applicantRoleId}>` : '`not set`'}`,
+          `**Member role:** ${has(g.memberRoleId) ? `<@&${g.memberRoleId}>` : '`not set`'}`,
+          '',
+          '-# These roles have no permissions by themselves. Secure Setup in the dashboard uses them to lock the server for newcomers.',
+        ].join('\n'))],
+        components: [
+          row(new RoleSelectMenuBuilder().setCustomId(id('roles', 'applicant')).setPlaceholder('Applicant role (newcomers)').setMinValues(1).setMaxValues(1).setDefaultRoles(...(has(g.applicantRoleId) ? [g.applicantRoleId!] : []))),
+          row(new RoleSelectMenuBuilder().setCustomId(id('roles', 'member')).setPlaceholder('Member role (approved)').setMinValues(1).setMaxValues(1).setDefaultRoles(...(has(g.memberRoleId) ? [g.memberRoleId!] : []))),
+          row(createBtn('roles', 'Create missing roles').setDisabled(has(g.applicantRoleId) && has(g.memberRoleId))),
+        ],
+      };
+    },
+    async handle({ communityId, interaction, guild }, action) {
+      if (action === 'create') return made(() => create.roles(guild, communityId));
+      if (action !== 'applicant' && action !== 'member') return;
+      const v = (interaction.values || [])[0];
+      if (!v) return;
+      const role = guild.roles.cache.get(v);
+      if (role?.permissions?.has(P.Administrator) || role?.permissions?.has(P.ManageGuild)) return '⚠️ That role has admin powers. Pick or create a plain role instead.';
+      const { getGate, secureGate } = await import('../../services/recruitment/secureGate.service.js');
+      const g = await getGate(communityId);
+      const next = { applicantRoleId: action === 'applicant' ? v : g.applicantRoleId, memberRoleId: action === 'member' ? v : g.memberRoleId };
+      if (!next.applicantRoleId || !next.memberRoleId) {
+        // Save the half we have; setRoles needs both, so store directly until the other is chosen.
+        const { gateRepository } = await import('../../services/recruitment/secureGate.service.js');
+        const doc = { ...g, ...next, id: communityId, communityId, updatedAt: new Date().toISOString() } as any;
+        if (await gateRepository.getById(communityId).catch(() => null)) await gateRepository.update(communityId, doc); else await gateRepository.create(communityId, doc);
+        return 'Saved. Now pick the other role (or press Create missing roles).';
+      }
+      await secureGate.setRoles(communityId, { applicantRoleId: next.applicantRoleId, memberRoleId: next.memberRoleId, approvedExtraRoleIds: g.approvedExtraRoleIds || [] });
       return 'Saved.';
     },
   },
@@ -111,11 +172,13 @@ const STEPS: Step[] = [
           row(
             new ButtonBuilder().setCustomId(id('apps', 'toggle')).setStyle(r.applyEnabled ? ButtonStyle.Secondary : ButtonStyle.Success).setLabel(r.applyEnabled ? 'Pause applications' : 'Open applications').setEmoji(r.applyEnabled ? '⏸️' : '▶️'),
             new ButtonBuilder().setCustomId(id('apps', 'post')).setStyle(ButtonStyle.Primary).setLabel(r.panelPostedAt ? 'Update Apply panel' : 'Post Apply panel').setEmoji('📌').setDisabled(!r.panelChannelId),
+            createBtn('apps', 'Create missing channels').setStyle(ButtonStyle.Secondary).setDisabled(Boolean(r.reviewChannelId && r.panelChannelId && r.logChannelId)),
           ),
         ],
       };
     },
     async handle({ communityId, interaction, guild }, action) {
+      if (action === 'create') return made(() => create.apps(guild, communityId));
       const t = await getToolkit(communityId);
       const r: any = t.recruitment;
       const v = (interaction.values || [])[0];
@@ -150,11 +213,15 @@ const STEPS: Step[] = [
         components: [
           row(new ChannelSelectMenuBuilder().setCustomId(id('welcome', 'ch')).setPlaceholder('Welcome channel').setChannelTypes(ChannelType.GuildText).setMinValues(0).setMaxValues(1).setDefaultChannels(...(w.welcomeChannelId ? [w.welcomeChannelId] : []))),
           row(new RoleSelectMenuBuilder().setCustomId(id('welcome', 'role')).setPlaceholder('Role to give on join (optional)').setMinValues(0).setMaxValues(1).setDefaultRoles(...(w.newMemberRoleId ? [w.newMemberRoleId] : []))),
-          row(new ButtonBuilder().setCustomId(id('welcome', 'dm')).setStyle(w.enablePersonalDm ? ButtonStyle.Secondary : ButtonStyle.Success).setLabel(w.enablePersonalDm ? 'Turn off welcome DM' : 'Turn on welcome DM').setEmoji('✉️')),
+          row(
+            new ButtonBuilder().setCustomId(id('welcome', 'dm')).setStyle(w.enablePersonalDm ? ButtonStyle.Secondary : ButtonStyle.Success).setLabel(w.enablePersonalDm ? 'Turn off welcome DM' : 'Turn on welcome DM').setEmoji('✉️'),
+            createBtn('welcome', 'Create #welcome').setStyle(ButtonStyle.Secondary).setDisabled(Boolean(w.welcomeChannelId)),
+          ),
         ],
       };
     },
     async handle({ communityId, interaction, guild }, action) {
+      if (action === 'create') return made(() => create.welcome(guild, communityId));
       const w = await welcomeOnboardingService.getWelcomeConfig(communityId);
       const v = (interaction.values || [])[0];
       if (action === 'ch') {
@@ -191,10 +258,12 @@ const STEPS: Step[] = [
         ].join('\n'))],
         components: [
           row(new ChannelSelectMenuBuilder().setCustomId(id('logs', 'ch')).setPlaceholder('Log channel (staff only)').setChannelTypes(ChannelType.GuildText).setMinValues(0).setMaxValues(1).setDefaultChannels(...(f.logs.channelId ? [f.logs.channelId] : []))),
+          row(createBtn('logs', 'Create a private log channel').setDisabled(Boolean(f.logs.enabled && f.logs.channelId))),
         ],
       };
     },
     async handle({ communityId, interaction, guild }, action) {
+      if (action === 'create') return made(() => create.logs(guild, communityId));
       if (action !== 'ch') return;
       const v = (interaction.values || [])[0];
       const f = await getFeatures(communityId, true);
@@ -237,28 +306,33 @@ const STEPS: Step[] = [
   },
 
   {
-    key: 'done', title: 'Check & finish', emoji: '✅',
+    key: 'done', title: 'Review & finish', emoji: '✅',
     async render({ communityId, guild }) {
-      const checks = await runChecks(communityId, guild);
-      const bad = checks.filter((c) => !c.ok).length;
+      const [checks, pend, summary, t] = await Promise.all([runChecks(communityId, guild), pending(communityId), reviewLines(communityId, guild), getToolkit(communityId)]);
+      const bad = checks.filter((c) => !c.ok && !c.soft).length;
+      const doneAt = (t.recruitment as any).setupCompletedAt as string | undefined;
+      const lines = [
+        '**Your setup**', ...summary, '',
+        '**Checks**', ...checks.map((c) => `${c.ok ? '✅' : c.soft ? '💡' : '⚠️'} ${c.label}${c.note ? `\n> ${c.note}` : ''}`), '',
+        pend.length ? '**Still to do in the dashboard**' : '**Dashboard**',
+        ...(pend.length ? pend.map((x) => `⏳ ${x}`) : ['✅ Nothing pending.']),
+        '',
+        bad ? 'Press **Fix my access** (I only ever give **myself** access), or **Create missing** on the step that needs it, then **Re-check**.'
+          : doneAt ? `✅ Setup confirmed <t:${Math.floor(Date.parse(doneAt) / 1000)}:R>. Press **Confirm & finish** again after changes to log them.`
+          : 'Everything checks out. Press **Confirm & finish** to complete setup and post a record in your log channel.',
+      ];
       return {
-        embeds: [base(bad ? `Almost there: ${bad} thing${bad > 1 ? 's' : ''} to fix` : 'All set! 🎉', [
-          ...checks.map((c) => `${c.ok ? '✅' : '⚠️'} **${c.label}**${c.note ? `\n> ${c.note}` : ''}`),
-          '',
-          bad ? 'Press **Fix my access** to let me give **myself** the channel access I need (I never change @everyone), then **Re-check**.'
-              : 'Community Manager is ready. Run this again any time with `/community-manager setup`.',
-          '',
-          `🔒 **Lock the server for newcomers** (Secure Setup) and **application questions** are in the [dashboard](${dashboardUrl(communityId, 'server-tools')}).`,
-        ].join('\n')).setColor(bad ? 0xf5a524 : 0x3ddc97)],
+        embeds: [base(bad ? `Review: ${bad} thing${bad > 1 ? 's' : ''} to fix` : 'Review & confirm', lines.join('\n')).setColor(bad ? 0xf5a524 : 0x3ddc97)],
         components: [row(
+          new ButtonBuilder().setCustomId(id('done', 'confirm')).setStyle(ButtonStyle.Success).setLabel('Confirm & finish').setEmoji('✅').setDisabled(bad > 0),
           new ButtonBuilder().setCustomId(id('done', 'fix')).setStyle(ButtonStyle.Primary).setLabel('Fix my access').setEmoji('🛠️').setDisabled(!bad),
           new ButtonBuilder().setCustomId(id('done', 'recheck')).setStyle(ButtonStyle.Secondary).setLabel('Re-check').setEmoji('🔄'),
-          new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(dashboardUrl(communityId)).setLabel('Open dashboard').setEmoji('🌐'),
         )],
       };
     },
-    async handle({ communityId, guild }, action) {
+    async handle({ communityId, guild, interaction }, action) {
       if (action === 'recheck') return 'Checked again.';
+      if (action === 'confirm') return confirmSetup(communityId, guild, interaction);
       if (action !== 'fix') return;
       const targets = await channelTargets(communityId);
       let fixed = 0;
@@ -302,20 +376,25 @@ async function channelTargets(communityId: string) {
 }
 
 async function runChecks(communityId: string, guild: any) {
-  const out: { ok: boolean; label: string; note?: string }[] = [];
+  const out: { ok: boolean; label: string; note?: string; soft?: boolean }[] = [];
   const me = guild.members.me;
   const gp = me?.permissions;
   out.push({ ok: Boolean(gp?.has(P.ManageRoles) && gp?.has(P.ManageChannels)), label: 'Manage Roles and Manage Channels', note: gp?.has(P.ManageRoles) && gp?.has(P.ManageChannels) ? undefined : `Server Settings → Roles → **${me?.roles?.highest?.name || 'Community Manager'}** → turn on Manage Roles and Manage Channels.` });
 
   const r: any = (await getToolkit(communityId)).recruitment;
-  out.push({ ok: Boolean(r.reviewerRoleIds?.length), label: 'Reviewer roles chosen', note: r.reviewerRoleIds?.length ? undefined : 'Step 1 → pick who reviews applications.' });
-  out.push({ ok: Boolean(r.reviewChannelId), label: 'Review channel chosen', note: r.reviewChannelId ? undefined : 'Step 2 → pick a private staff channel.' });
+  out.push({ ok: Boolean(r.reviewerRoleIds?.length), label: 'Reviewer roles chosen', note: r.reviewerRoleIds?.length ? undefined : 'Staff step → pick reviewer roles or press Create a Reviewer role.' });
+  out.push({ ok: Boolean(r.reviewChannelId), label: 'Review channel chosen', note: r.reviewChannelId ? undefined : 'Applications step → pick one or press Create missing channels.' });
 
   for (const t of await channelTargets(communityId)) {
     const c = await guild.channels.fetch(t.id).catch(() => null);
     if (!c) { out.push({ ok: false, label: `${t.label}`, note: 'That channel no longer exists. Pick another one.' }); continue; }
     const missing = c.permissionsFor(me)?.missing(SEND_PERMS) || [];
     out.push({ ok: missing.length === 0, label: `${t.label}: <#${c.id}>`, note: missing.length ? explainAccess(c, SEND_PERMS) : undefined });
+  }
+
+  const f = await getFeatures(communityId, true);
+  if (r.reviewChannelId && (r.reviewChannelId === f.logs.channelId || r.reviewChannelId === r.logChannelId)) {
+    out.push({ ok: false, soft: true, label: 'Review channel is separate from logs', note: 'Applications would be mixed with log entries. Applications step → Create missing channels makes a dedicated one (recommended).' });
   }
 
   const w = await welcomeOnboardingService.getWelcomeConfig(communityId);
@@ -338,6 +417,58 @@ async function accessNote(guild: any, channelId: string, why: string): Promise<s
 }
 
 /* ------------------------------------------------------------------ */
+/* Review, pending and confirmation                                    */
+/* ------------------------------------------------------------------ */
+
+async function reviewLines(communityId: string, guild: any) {
+  const { getGate } = await import('../../services/recruitment/secureGate.service.js');
+  const [t, f, w, g] = await Promise.all([getToolkit(communityId), getFeatures(communityId, true), welcomeOnboardingService.getWelcomeConfig(communityId), getGate(communityId)]);
+  const r: any = t.recruitment;
+  const role1 = (x?: string) => (x && guild.roles.cache.has(x) ? `<@&${x}>` : '`not set`');
+  const on2 = EXTRAS.filter((e) => extrasState(t, f)[e.key]).map((e) => e.label);
+  return [
+    `🛡️ Reviewers: ${roles(r.reviewerRoleIds)}`,
+    `🎭 Applicant: ${role1(g.applicantRoleId)} · Member: ${role1(g.memberRoleId)}`,
+    `📋 Review: ${ch(r.reviewChannelId)} · Apply panel: ${ch(r.panelChannelId)}${r.panelPostedAt ? ' (posted)' : ''} · Applications ${r.applyEnabled ? 'open' : 'paused'}`,
+    `🎉 Welcome: ${ch(w.welcomeChannelId)} · DM ${w.enablePersonalDm ? 'on' : 'off'}`,
+    `🧾 Logs: ${f.logs.enabled ? ch(f.logs.channelId) : '`off`'} · Recruitment log: ${ch(r.logChannelId)}`,
+    `✨ Features: ${on2.length ? on2.join(', ') : 'none'}`,
+  ];
+}
+
+/** Things only the dashboard can finish. */
+async function pending(communityId: string) {
+  const out: string[] = [];
+  const { getGate } = await import('../../services/recruitment/secureGate.service.js');
+  const { communityQuestionsService } = await import('../../services/communityQuestions.service.js');
+  const [g, qs, t] = await Promise.all([getGate(communityId), communityQuestionsService.listApplicationQuestions(communityId).catch(() => [] as any[]), getToolkit(communityId)]);
+  const url = dashboardUrl(communityId, 'server-tools');
+  if (!qs.filter((q: any) => q.enabled !== false).length) out.push(`**Application questions**: add what applicants answer → [Recruitment → Questions](${url})`);
+  if (!g.verified) out.push(`**Secure Setup**: lock the server so newcomers only see public channels → [Server tools → Recruitment](${url})`);
+  else if (!(t.recruitment as any).panelPostedAt) out.push('**Apply panel**: go back to Applications and press **Post Apply panel**');
+  return out;
+}
+
+async function confirmSetup(communityId: string, guild: any, interaction: any) {
+  const checks = await runChecks(communityId, guild);
+  if (checks.some((c) => !c.ok && !c.soft)) return '⚠️ Fix the items marked ⚠️ first, then confirm.';
+  const [summary, pend, t, f] = await Promise.all([reviewLines(communityId, guild), pending(communityId), getToolkit(communityId), getFeatures(communityId, true)]);
+  const at = new Date().toISOString();
+  await saveToolkit(communityId, { recruitment: { ...t.recruitment, setupCompletedAt: at, setupCompletedBy: interaction.user?.id } as any });
+  const embed = new EmbedBuilder().setColor(0x3ddc97).setTitle('✅ Community Manager setup completed')
+    .setDescription([`Confirmed by <@${interaction.user?.id}> <t:${Math.floor(Date.now() / 1000)}:f>`, '', ...summary, '',
+      pend.length ? '**Still to do in the dashboard**' : '', ...pend.map((x) => `⏳ ${x}`)].filter((x, i, a) => x || a[i - 1]).join('\n').slice(0, 4000))
+    .setFooter({ text: 'Community Manager · run /community-manager setup any time to change this' });
+  const targets = Array.from(new Set([f.logs.enabled ? f.logs.channelId : undefined, (t.recruitment as any).logChannelId].filter(Boolean))) as string[];
+  let posted = 0;
+  for (const cid of targets) {
+    const c = await guild.channels.fetch(cid).catch(() => null);
+    if (c?.send && (await c.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => null))) posted++;
+  }
+  return `✅ Setup confirmed${posted ? ` and logged in ${targets.map((x) => `<#${x}>`).join(' ')}` : ''}.${pend.length ? ` ${pend.length} item${pend.length > 1 ? 's' : ''} still pending in the dashboard.` : ''}`;
+}
+
+/* ------------------------------------------------------------------ */
 /* Page frame and navigation                                           */
 /* ------------------------------------------------------------------ */
 
@@ -353,7 +484,7 @@ async function page(c: Ctx, index: number, note?: string) {
   const progress = index === 0 ? 'Setup' : index === STEPS.length - 1 ? 'Finish' : `Step ${index} of ${total} · ${'●'.repeat(index)}${'○'.repeat(total - index)}`;
   embed.setAuthor({ name: `Community Manager setup · ${progress}`, iconURL: c.guild?.client?.user?.displayAvatarURL?.() });
   embed.setFooter({ text: `${step.emoji} ${step.title}${note ? '  ·  ' : ''}${note ? note.replace(/[*_`>]/g, '').slice(0, 180) : ''}` });
-  if (note && /⚠️|can’t|can't|missing|Finish Secure Setup|Add your application/i.test(note)) embed.addFields({ name: 'Note', value: note.slice(0, 1000) });
+  if (note && /⚠️|✅ Created|Setup confirmed|can’t|can't|missing|Finish Secure Setup|Add your application/i.test(note)) embed.addFields({ name: 'Note', value: note.slice(0, 1000) });
 
   const nav = row(
     new ButtonBuilder().setCustomId(id('nav', `go-${Math.max(0, index - 1)}`)).setStyle(ButtonStyle.Secondary).setLabel('Back').setEmoji('⬅️').setDisabled(index === 0),
@@ -361,14 +492,14 @@ async function page(c: Ctx, index: number, note?: string) {
       ? [new ButtonBuilder().setCustomId(id('nav', 'go-1')).setStyle(ButtonStyle.Success).setLabel('Start setup').setEmoji('🚀')]
       : index < STEPS.length - 1
         ? [
-            new ButtonBuilder().setCustomId(id('nav', `go-${index + 1}`)).setStyle(ButtonStyle.Success).setLabel(index === STEPS.length - 2 ? 'Check & finish' : 'Next').setEmoji('➡️'),
+            new ButtonBuilder().setCustomId(id('nav', `go-${index + 1}`)).setStyle(ButtonStyle.Success).setLabel(index === STEPS.length - 2 ? 'Review & finish' : 'Next').setEmoji('➡️'),
             // On the last step before "done", Next already goes to finish; a second button with the
             // same custom id makes Discord reject the whole message.
             ...(index < STEPS.length - 2
               ? [new ButtonBuilder().setCustomId(id('nav', `go-${STEPS.length - 1}`)).setStyle(ButtonStyle.Secondary).setLabel('Skip to finish')]
               : []),
           ]
-        : [new ButtonBuilder().setCustomId(id('nav', 'go-0')).setStyle(ButtonStyle.Secondary).setLabel('Start over')]),
+        : [new ButtonBuilder().setCustomId(id('nav', 'close')).setStyle(ButtonStyle.Secondary).setLabel('Close').setEmoji('✖️')]),
     new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(dashboardUrl(c.communityId)).setLabel('Dashboard'),
   );
   return { embeds: [embed], components: [...p.components, nav].slice(0, 5) };
@@ -399,6 +530,7 @@ export async function handleSetupWizard(interaction: any): Promise<boolean> {
   const c: Ctx = { communityId, guild: interaction.guild, interaction };
   try {
     if (stepKey === 'nav') {
+      if (action === 'close') { await interaction.deleteReply().catch(() => interaction.editReply({ content: 'Setup closed. Run `/community-manager setup` any time.', embeds: [], components: [] })); return true; }
       const to = Math.min(STEPS.length - 1, Math.max(0, Number(action.replace('go-', '')) || 0));
       await interaction.editReply(await page(c, to));
       return true;

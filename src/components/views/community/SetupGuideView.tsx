@@ -57,6 +57,14 @@ export function SetupGuideView({ communityId, onNavigate }: { communityId: strin
   const load = () => fetch(`/api/v1/communities/${encodeURIComponent(communityId)}/setup-guide`, { credentials: 'include', headers: { 'x-community-id': communityId } })
     .then((r) => r.json()).then((j) => (j.success ? setD(j.data) : setErr(j.error?.message || 'Could not load the setup guide.'))).catch(() => setErr('Could not load the setup guide.'));
   useEffect(() => { if (communityId) load(); }, [communityId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Live: changes made in Discord (/community-manager setup) show up without a manual refresh.
+  useEffect(() => {
+    if (!communityId) return;
+    const onFocus = () => { if (document.visibilityState === 'visible') load(); };
+    const t = setInterval(onFocus, 15000);
+    window.addEventListener('focus', onFocus); document.addEventListener('visibilitychange', onFocus);
+    return () => { clearInterval(t); window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus); };
+  }, [communityId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (err) return <p className="text-rose-600">{err}</p>;
   if (!d) return <div className="h-96 animate-pulse rounded-3xl bg-slate-100" />;
