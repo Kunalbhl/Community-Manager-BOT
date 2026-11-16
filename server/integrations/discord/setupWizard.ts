@@ -362,7 +362,11 @@ async function page(c: Ctx, index: number, note?: string) {
       : index < STEPS.length - 1
         ? [
             new ButtonBuilder().setCustomId(id('nav', `go-${index + 1}`)).setStyle(ButtonStyle.Success).setLabel(index === STEPS.length - 2 ? 'Check & finish' : 'Next').setEmoji('➡️'),
-            new ButtonBuilder().setCustomId(id('nav', `go-${STEPS.length - 1}`)).setStyle(ButtonStyle.Secondary).setLabel('Skip to finish'),
+            // On the last step before "done", Next already goes to finish; a second button with the
+            // same custom id makes Discord reject the whole message.
+            ...(index < STEPS.length - 2
+              ? [new ButtonBuilder().setCustomId(id('nav', `go-${STEPS.length - 1}`)).setStyle(ButtonStyle.Secondary).setLabel('Skip to finish')]
+              : []),
           ]
         : [new ButtonBuilder().setCustomId(id('nav', 'go-0')).setStyle(ButtonStyle.Secondary).setLabel('Start over')]),
     new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(dashboardUrl(c.communityId)).setLabel('Dashboard'),
