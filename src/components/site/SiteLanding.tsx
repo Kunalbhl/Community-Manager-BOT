@@ -375,8 +375,8 @@ function CommandCenterMock() {
       <div className="relative overflow-hidden rounded-[26px] border border-[var(--site-line)] bg-[var(--site-panel)] shadow-[0_40px_120px_-40px_rgba(124,140,255,.6)]">
         <div className="flex items-center justify-between border-b border-[var(--site-line)] px-5 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="grid h-8 w-8 place-items-center rounded-xl bg-[var(--site-rose)] text-sm font-bold text-[#1A0610]">B</div>
-            <span className="font-semibold">Bharat Esports</span>
+            <img src="/ktech-logo.svg" alt="K. Tech Services logo" className="h-8 w-8 rounded-xl" />
+            <span className="font-semibold">K. Tech Services</span>
             <span className="rounded-full bg-[var(--site-mint)]/15 px-2 py-0.5 text-[12px] font-semibold text-[var(--site-mint)]">Bot online</span>
           </div>
           <span className="text-[13px] text-[var(--site-muted)]">Example</span>

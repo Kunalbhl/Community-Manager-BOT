@@ -28,7 +28,7 @@ export function TemplateField({ value, onChange, vars, rows = 3, label, braces =
 export const RECRUIT_VARS: TemplateVar[] = [
   { token: 'applicant', label: 'Applicant name', sample: 'Rishabh' },
   { token: 'mention', label: '@Applicant', sample: '@Rishabh' },
-  { token: 'server', label: 'Server name', sample: 'Bharat Esports' },
+  { token: 'server', label: 'Server name', sample: 'K. Tech Services' },
   { token: 'reviewer', label: 'Reviewer', sample: 'Kunal' },
   { token: 'reason', label: 'Rejection reason', sample: 'Not active enough yet' },
 ];
@@ -39,9 +39,9 @@ export const RECORD_VARS: TemplateVar[] = [
   { token: 'applicantName', label: 'New member', sample: 'Sufiyan' },
   { token: 'successfulRecruitmentCount', label: 'Total recruits', sample: '12' },
   { token: 'benefit', label: 'Benefit', sample: 'Elite Recruiter role' },
-  { token: 'communityName', label: 'Server name', sample: 'Bharat Esports' },
+  { token: 'communityName', label: 'Server name', sample: 'K. Tech Services' },
 ];
 export const GREETING_VARS: TemplateVar[] = [
   { token: 'recruiterName', label: 'Bot persona name', sample: 'Community Recruiter' },
-  { token: 'communityName', label: 'Server name', sample: 'Bharat Esports' },
+  { token: 'communityName', label: 'Server name', sample: 'K. Tech Services' },
 ];

@@ -11,7 +11,7 @@ const RECORD_VARS = [
   { token: 'recruiterMention', label: '@Recruiter', sample: '@Kunal' },
   { token: 'recruiterName', label: 'Recruiter name', sample: 'Kunal' },
   { token: 'applicantName', label: 'New member', sample: 'Aarav' },
-  { token: 'recruiterCode', label: 'Recruiter code', sample: 'BHARAT-007' },
+  { token: 'recruiterCode', label: 'Recruiter code', sample: 'KTECH-007' },
   { token: 'successfulRecruitmentCount', label: 'Recruiter’s total', sample: '12' },
 ];
 const chip = (on: boolean) => `rounded-lg border px-3 py-2 text-sm font-semibold transition ${on ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-indigo-300'}`;

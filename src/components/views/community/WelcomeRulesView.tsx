@@ -8,11 +8,11 @@ import { RulesCard, useApi, Card } from './ServerToolsView.js';
 const WELCOME_VARS = [
   { token: 'member', label: '@New member', sample: '@Aarav' },
   { token: 'memberName', label: 'Member name', sample: 'Aarav' },
-  { token: 'communityName', label: 'Server name', sample: 'Bharat Esports' },
+  { token: 'communityName', label: 'Server name', sample: 'K. Tech Services' },
   { token: 'memberCount', label: 'Member count', sample: '1,248' },
   { token: 'recruiter', label: '@Recruiter', sample: '@Kunal' },
   { token: 'recruiterName', label: 'Recruiter name', sample: 'Kunal' },
-  { token: 'recruiterCode', label: 'Recruiter code', sample: 'BHARAT-07' },
+  { token: 'recruiterCode', label: 'Recruiter code', sample: 'KTECH-07' },
 ];
 
 const Toggle = ({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) => (

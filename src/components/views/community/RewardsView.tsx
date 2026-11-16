@@ -13,7 +13,7 @@ const REWARD_VARS: TemplateVar[] = [
   { token: 'reward', label: 'Reward', sample: '🥈 Silver Recruiter' },
   { token: 'count', label: 'Invite count', sample: '5' },
   { token: 'reason', label: 'Why', sample: 'Reached 5 invites' },
-  { token: 'server', label: 'Server name', sample: 'Bharat Esports' },
+  { token: 'server', label: 'Server name', sample: 'K. Tech Services' },
   { token: 'manualReward', label: 'Hand-out reward', sample: 'Discord Nitro (1 month)' },
   { token: 'recruit', label: '@New member', sample: '@Rahul' },
   { token: 'recruitName', label: 'New member name', sample: 'Rahul' },

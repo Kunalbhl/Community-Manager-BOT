@@ -45,7 +45,7 @@ export function RecruiterCodesManager({ communityId }: { communityId: string }) 
 
   const exportFile = async (template: boolean) => {
     const { default: writeXlsxFile } = await import('write-excel-file');
-    const rows = template ? [{ code: data?.series?.enabled ? `${data.series.prefix || ''}${String(data.series.next || 1).padStart(data.series.padding || 3, '0')}${data.series.suffix || ''}` : 'BHARAT-001', recruiterDiscordId: '123456789012345678', recruiterUsername: 'their.username', recruiterName: 'Kunal', status: 'ACTIVE', maxUses: '', expiresAt: '', totalUses: '0', notes: 'Example row, replace it' }]
+    const rows = template ? [{ code: data?.series?.enabled ? `${data.series.prefix || ''}${String(data.series.next || 1).padStart(data.series.padding || 3, '0')}${data.series.suffix || ''}` : 'KTECH-001', recruiterDiscordId: '123456789012345678', recruiterUsername: 'their.username', recruiterName: 'Kunal', status: 'ACTIVE', maxUses: '', expiresAt: '', totalUses: '0', notes: 'Example row, replace it' }]
       : (data?.codes || []).map((c) => ({ code: c.code, recruiterDiscordId: c.recruiterDiscordId || c.recruiterUserId || '', recruiterUsername: '', recruiterName: c.recruiterName || '', status: c.status || (c.isActive === false ? 'INACTIVE' : 'ACTIVE'), maxUses: c.usesRemaining ? String(c.usesRemaining) : '', expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : '', totalUses: String(c.totalUses || 0), notes: c.notes || '' }));
     const header = COLUMNS.map((col) => ({ value: col.title, fontWeight: 'bold' as const }));
     const body = rows.map((r: any) => COLUMNS.map((col) => ({ type: String, value: String(r[col.key] ?? '') })));
@@ -245,7 +245,7 @@ function SeriesEditor({ s, setS }: { s: any; setS: (v: any) => void }) {
           ))}
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <label className="w-32 text-xs font-semibold text-slate-600">{s.mode === 'FIXED' ? 'Text' : 'Text before (optional)'}<input className={input} value={s.prefix || ''} onChange={(e) => setS({ ...s, prefix: e.target.value })} placeholder={s.mode === 'FIXED' ? 'BHARAT-' : 'e.g. BE-'} /></label>
+          <label className="w-32 text-xs font-semibold text-slate-600">{s.mode === 'FIXED' ? 'Text' : 'Text before (optional)'}<input className={input} value={s.prefix || ''} onChange={(e) => setS({ ...s, prefix: e.target.value })} placeholder={s.mode === 'FIXED' ? 'KTECH-' : 'e.g. KT-'} /></label>
           {(s.mode === 'FIRST' || s.mode === 'FIRST_LAST') && <label className={field}>Letters from start<input type="number" min={1} max={8} className={input} value={s.firstN} onChange={(e) => setS({ ...s, firstN: Number(e.target.value) })} /></label>}
           {s.mode === 'FIRST_LAST' && <label className={field}>Letters from end<input type="number" min={1} max={8} className={input} value={s.lastM} onChange={(e) => setS({ ...s, lastM: Number(e.target.value) })} /></label>}
           {s.mode !== 'FIXED' && <label className={field}>Separator<select className={input} value={s.separator} onChange={(e) => setS({ ...s, separator: e.target.value })}><option value="-">-</option><option value="_">_</option><option value="">none</option></select></label>}
@@ -356,7 +356,7 @@ function EditDialog({ api, communityId, code, series, dmDefault, onClose, onSave
           <div className="mt-1"><MemberSelect communityId={communityId} value={f.recruiterDiscordId} onChange={(id, m) => setF({ ...f, recruiterDiscordId: id, recruiterName: m?.name || f.recruiterName })} placeholder="Search a member" /></div>
         </label>
         <label className="block text-xs font-semibold text-slate-600"><span className="flex items-center gap-1"><Hash className="h-3.5 w-3.5" />Code</span>
-          <input className={`${input} font-mono uppercase`} value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} placeholder={!code && series?.enabled ? 'Leave empty for the next code in your series' : 'e.g. BHARAT-007'} />
+          <input className={`${input} font-mono uppercase`} value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} placeholder={!code && series?.enabled ? 'Leave empty for the next code in your series' : 'e.g. KTECH-007'} />
         </label>
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-xs font-semibold text-slate-600">Max uses<input type="number" min={1} className={input} value={f.maxUses} onChange={(e) => setF({ ...f, maxUses: e.target.value })} placeholder="No limit" /></label>
