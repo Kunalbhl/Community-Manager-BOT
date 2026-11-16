@@ -584,7 +584,7 @@ async function codeLog(communityId: string, codeId: string, code: string, action
 
 /**
  * Code pattern. Modes:
- *  FIXED       prefix + number              e.g. BHARAT-007
+ *  FIXED       prefix + number              e.g. KTECH-007
  *  INITIALS    initials of the member's name e.g. Kunal Pareek -> KP-007
  *  FIRST       first N letters               e.g. KUN-007
  *  FIRST_LAST  first N + last M letters      e.g. KU + EK -> KUEK-007

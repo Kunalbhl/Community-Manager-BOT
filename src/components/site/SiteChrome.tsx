@@ -96,7 +96,7 @@ export function SiteFooter() {
           <MadeInIndia className="mt-5 text-[15px] font-semibold" />
         </div>
         <FooterCol title="Product" links={[['Features', '/#features'], ['Compare', '/#compare'], ['Security', '/#security'], ['Dashboard', '/servers']]} />
-        <FooterCol title="Help" links={[['Contact us', '/contact'], ['Support', '/support'], ['Privacy', '/privacy'], ['Terms', '/terms']]} />
+        <FooterCol title="Help" links={[['Contact us', '/contact'], ['Support', '/support'], ['Privacy', '/privacy'], ['Terms', '/terms'], ['K. Tech Services', 'https://k-tech.chaloone.com']]} />
         <div>
           <h4 className="text-[13px] font-semibold uppercase tracking-[.14em] text-[var(--site-muted)]">Talk to the developer</h4>
           <div className="mt-4 flex items-center gap-3">
@@ -112,8 +112,11 @@ export function SiteFooter() {
         </div>
       </div>
       <div className={`${WRAP} flex flex-col gap-2 border-t border-[var(--site-line)] py-6 text-[14px] text-[var(--site-muted)] sm:flex-row sm:justify-between`}>
-        <span>© {new Date().getFullYear()} Kunal Pareek. Community Manager is not affiliated with Discord Inc.</span>
-        <span>Also by Kunal: SocialCord Notifier, The Social Media Alert Bot for Discord.</span>
+        <a href="https://k-tech.chaloone.com" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-white">
+          <img src="/ktech-logo.svg" alt="K. Tech Services logo" className="h-5 w-5 rounded" />
+          <span>© {new Date().getFullYear()} K. Tech Services. All rights reserved. Owned and built by Kunal Pareek.</span>
+        </a>
+        <span>Community Manager and SocialCord Notifier are products of K. Tech Services, an Udyam-registered MSME in India. Not affiliated with Discord Inc.</span>
       </div>
     </footer>
   );

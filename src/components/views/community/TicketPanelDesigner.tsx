@@ -16,7 +16,7 @@ export const TICKET_VARS = [
   { token: 'type', label: 'Ticket type', sample: 'Report a member' },
   { token: 'number', label: 'Ticket number', sample: '#0042' },
   { token: 'subject', label: 'Subject', sample: 'Griefing in heist' },
-  { token: 'server', label: 'Server name', sample: 'Bharat Esports' },
+  { token: 'server', label: 'Server name', sample: 'K. Tech Services' },
 ];
 const BTN_COLORS: Record<string, string> = { PRIMARY: 'bg-[#5865f2] text-white', SECONDARY: 'bg-[#4e5058] text-white', SUCCESS: 'bg-[#248046] text-white', DANGER: 'bg-[#da373c] text-white' };
 
