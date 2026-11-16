@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MessagesSquare, Users, Server, Bot, Clock, Send, CheckCircle2, Handshake, Bug, Lightbulb, Rocket } from 'lucide-react';
 import { SiteHeader, SiteFooter, WRAP, usePublicContact, MadeInIndia } from './SiteChrome.js';
+import { CompanyCard } from './LegalPage.js';
 
 const TOPICS = ['Business', 'Collaboration', 'Feedback', 'Bug report', 'Support', 'Other'];
 
@@ -81,6 +82,14 @@ export function ContactPage() {
                 <div key={t} className="flex items-center gap-3 rounded-2xl border border-[var(--site-line)] px-5 py-4"><I className="h-5 w-5 text-[var(--site-rose)]" aria-hidden />{t}</div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* Company */}
+        <section className={`${WRAP} pb-20`}>
+          <div className="mx-auto max-w-xl">
+            <p className="cm-kicker mb-4 text-center">The company behind it</p>
+            <CompanyCard />
           </div>
         </section>
 
