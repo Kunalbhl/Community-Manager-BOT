@@ -358,8 +358,9 @@ export class DiscordGuildLinkService {
           });
         }
         if (source === 'BOT_JOIN') {
-          import('./serverWorkspace.service.js')
-            .then(({ workspace }) => workspace.provision(targetCommunityId))
+          // Channels, roles and category: reuse similar existing ones, create only what is missing.
+          import('../integrations/discord/setupProvision.js')
+            .then(({ autoProvisionOnJoin }) => autoProvisionOnJoin(targetCommunityId))
             .catch((err) => logger.warn(`[DiscordGuildLink] Workspace setup notice: ${err?.message}`));
         }
       } catch (err) {
