@@ -220,3 +220,15 @@ html[data-theme='dark'] body:not(:has(.cm-site)) {
   body:not(:has(.cm-site)) main > * { animation: cm-enter 0.25s ease both; }
 }
 @keyframes cm-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Legal pages (site theme) */
+.cm-legal-card { border: 1px solid var(--site-line); background: color-mix(in srgb, var(--site-panel) 70%, transparent); border-radius: 22px; padding: 22px 24px; backdrop-filter: blur(6px); }
+.cm-legal-body { color: var(--site-muted); font-size: 16px; line-height: 1.75; }
+.cm-legal-body p + p { margin-top: .75rem; }
+.cm-legal-body ul, .cm-legal-body ol { margin-top: .5rem; padding-left: 1.2rem; display: grid; gap: .45rem; }
+.cm-legal-body ul { list-style: disc; } .cm-legal-body ol { list-style: decimal; }
+.cm-legal-body b { color: var(--site-text); }
+.cm-legal-body a, .cm-legal-card dd a, .cm-legal-card p a { color: var(--site-signal); text-decoration: underline; text-underline-offset: 3px; }
+.cm-legal-row { display: grid; grid-template-columns: 1fr 1.6fr 1.2fr; gap: 14px; padding: 12px 0; border-top: 1px solid var(--site-line); font-size: 15px; }
+.cm-legal-row:first-child { border-top: 0; }
+@media (max-width: 760px) { .cm-legal-row { grid-template-columns: 1fr; gap: 4px; } }

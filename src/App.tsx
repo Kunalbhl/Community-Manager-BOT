@@ -3,6 +3,7 @@ import { Header } from './components/layout/Header.js';
 import { Sidebar } from './components/layout/Sidebar.js';
 import { NotificationDrawer } from './components/layout/NotificationDrawer.js';
 import { ContactPage } from './components/site/ContactPage.js';
+import { LegalPage } from './components/site/LegalPage.js';
 import { DiscordRedirect } from './components/site/DiscordRedirect.js';
 import { CommunityFeaturesView } from './components/views/community/CommunityFeaturesView.js';
 import { TeamAccessView } from './components/views/community/TeamAccessView.js';
@@ -62,8 +63,6 @@ import { LifecycleIntelligenceView } from './components/views/lifecycle/Lifecycl
 import { CommandMenu } from './components/common/CommandMenu.js';
 import { SupportTroubleshootingModal } from './components/common/SupportTroubleshootingModal.js';
 
-import { PrivacyPolicyView } from './components/views/public/PrivacyPolicyView.js';
-import { TermsOfServiceView } from './components/views/public/TermsOfServiceView.js';
 import { SupportView } from './components/views/public/SupportView.js';
 import { PublicLandingView } from './components/views/public/PublicLandingView.js';
 import { MultiServerSelectorView } from './components/common/MultiServerSelectorView.js';
@@ -133,10 +132,13 @@ export default function App() {
   const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
 
   if (currentPath === '/privacy' || currentPath === '/privacy-policy') {
-    return <PrivacyPolicyView onBack={() => { window.location.href = '/'; }} />;
+    return <LegalPage kind="privacy" />;
   }
   if (currentPath === '/terms' || currentPath === '/terms-of-service') {
-    return <TermsOfServiceView onBack={() => { window.location.href = '/'; }} />;
+    return <LegalPage kind="terms" />;
+  }
+  if (currentPath === '/data-deletion') {
+    return <LegalPage kind="deletion" />;
   }
   if (currentPath === '/support') {
     return <SupportView onBack={() => { window.location.href = '/'; }} />;
