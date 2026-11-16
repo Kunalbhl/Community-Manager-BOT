@@ -34,7 +34,7 @@ export async function setupGuideHandler(req: Request, res: Response) {
           { required: true, label: 'Bot is online in this server', done: Boolean(guild), section: 'home' },
           { required: true, label: 'Manage Roles and Manage Channels', done: perm(PermissionFlagsBits.ManageRoles) && perm(PermissionFlagsBits.ManageChannels), section: 'home', hint: 'Server Settings → Roles → Community Manager' },
           { label: 'Moderation permissions (timeout, kick, ban)', done: perm(PermissionFlagsBits.ModerateMembers) && perm(PermissionFlagsBits.KickMembers) && perm(PermissionFlagsBits.BanMembers), section: 'home' },
-          { required: true, label: 'Workspace channels ready (applications, logs)', done: Boolean(r.reviewChannelId && r.logChannelId), section: 'server-tools', tab: 'recruit', find: '⚙️ Auto-configure', hint: 'Press “Auto-configure workspace”.' },
+          { required: true, label: 'Workspace channels ready (applications, logs)', done: Boolean(r.reviewChannelId && r.logChannelId), section: 'server-tools', tab: 'recruit', find: 'Where things happen', hint: 'Press “Auto-configure workspace”.' },
         ],
       },
       {
@@ -50,7 +50,7 @@ export async function setupGuideHandler(req: Request, res: Response) {
           { label: 'Rules & guidelines written', done: rules.length > 0, section: 'server-tools', tab: 'recruit', find: 'Server rules', hint: 'Shown to applicants before the quiz.' },
           { required: true, label: 'Application questions', done: qs.length > 0, section: 'server-tools', tab: 'recruit', find: 'Application questions' },
           { label: 'Rules quiz (4-answer questions)', done: r.screening.questions.length > 0, section: 'server-tools', tab: 'recruit', find: 'Rules quiz' },
-          { label: 'Messages to applicants', done: true, section: 'server-tools', tab: 'recruit', find: 'Messages' },
+          { label: 'Messages to applicants', done: true, section: 'server-tools', tab: 'recruit', find: 'Your messages' },
           { label: 'Reviewer ranks for escalation', done: t.reviewRooms.tiers.some((x) => x.roleIds.length), section: 'server-tools', tab: 'rooms' },
           { label: 'Roles given on approval', done: Boolean(gate.memberRoleId) || t.roleRules.rules.length > 0, section: 'server-tools', tab: 'roles' },
           { label: 'Apply panel posted', done: Boolean((r as any).panelPostedAt), section: 'server-tools', tab: 'recruit', find: 'Apply panel' },

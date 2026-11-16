@@ -15,11 +15,15 @@ export function openSection(onNavigate: (s: string) => void, section: string, ta
 
 /** After opening a screen, scroll to the box whose heading starts with this text and highlight it. */
 export function scrollToHeading(text: string) {
-  const want = text.toLowerCase();
+  // Compare letters and digits only, so emoji, icons and punctuation ("🔒 Secure Setup…") don't break the match.
+  const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const want = norm(text);
   const started = Date.now();
   const tick = () => {
-    const els = Array.from(document.querySelectorAll('h1, h2, h3, h4, .font-bold, .font-black, label')) as HTMLElement[];
-    const hit = els.find((e) => (e.textContent || '').trim().toLowerCase().startsWith(want) && e.offsetParent !== null);
+    const visible = (e: HTMLElement) => e.offsetParent !== null && !e.closest('[data-setup-guide]');
+    const pick = (sel: string, exact: boolean) => (Array.from(document.querySelectorAll(sel)) as HTMLElement[])
+      .find((e) => visible(e) && (exact ? norm(e.textContent || '').startsWith(want) : norm(e.textContent || '').includes(want)));
+    const hit = pick('h1, h2, h3, h4', true) || pick('.font-bold, .font-black, .font-semibold, label', true) || pick('h1, h2, h3, h4, button', false);
     if (hit) {
       const box = (hit.closest('section, .rounded-2xl, .rounded-xl') as HTMLElement) || hit;
       box.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -27,7 +31,7 @@ export function scrollToHeading(text: string) {
       setTimeout(() => box.classList.remove('ring-4', 'ring-indigo-300'), 2500);
       return;
     }
-    if (Date.now() - started < 6000) setTimeout(tick, 200);
+    if (Date.now() - started < 8000) setTimeout(tick, 200);
   };
   setTimeout(tick, 300);
 }
@@ -61,7 +65,7 @@ export function SetupGuideView({ communityId, onNavigate }: { communityId: strin
   const next = d.modules.flatMap((m) => m.steps.map((s) => ({ ...s, module: m.title }))).find((s) => !s.done);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-setup-guide>
       <div className="relative overflow-hidden rounded-3xl bg-slate-900 p-7 text-white sm:p-9">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(40%_60%_at_15%_20%,rgba(124,140,255,.35),transparent_70%)]" />
         <div className="relative flex flex-wrap items-center justify-between gap-6">
