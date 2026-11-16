@@ -30,6 +30,12 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
   if (!id.startsWith('cm:')) return false;
   const [, area, action, arg] = id.split(':');
 
+  // ---------- /community-manager setup wizard ----------
+  if (area === 'su') {
+    const { handleSetupWizard } = await import('./setupWizard.js');
+    return handleSetupWizard(interaction);
+  }
+
   // ---------- reward waiting for approval: Approve / Reject ----------
   if (area === 'rg' && (action === 'ok' || action === 'no')) {
     try {

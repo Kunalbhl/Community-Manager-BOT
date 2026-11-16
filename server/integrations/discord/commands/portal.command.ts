@@ -11,6 +11,11 @@ export const communityManagerPortalCommand: SlashCommandDefinition = {
     .setDescription('Community Manager bot portal, status, and command help')
     .addSubcommand((sub) =>
       sub
+        .setName('setup')
+        .setDescription('Step-by-step setup: reviewers, applications, welcome, logs and features (admins)')
+    )
+    .addSubcommand((sub) =>
+      sub
         .setName('portal')
         .setDescription('Open the Community Manager Web Portal directly for your community')
     )
@@ -30,6 +35,12 @@ export const communityManagerPortalCommand: SlashCommandDefinition = {
 
   async execute(interaction, ctx: CommandContext) {
     const subcommand = interaction.options.getSubcommand(false);
+
+    if (subcommand === 'setup') {
+      const { startSetupWizard } = await import('../setupWizard.js');
+      await startSetupWizard(interaction);
+      return;
+    }
 
     if (subcommand === 'help') {
       const { communityId, effectiveRole, permissions } = ctx;

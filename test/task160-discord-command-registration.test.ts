@@ -65,6 +65,7 @@ export async function runTask160Tests(): Promise<Task160Result> {
     assert.ok(subcommandNames.includes('portal'), 'Subcommand portal missing');
     assert.ok(subcommandNames.includes('help'), 'Subcommand help missing');
     assert.ok(subcommandNames.includes('status'), 'Subcommand status missing');
+    assert.ok(subcommandNames.includes('setup'), 'Subcommand setup missing');
   });
 
   // 3. Duplicate-Safe Command Deduplication
