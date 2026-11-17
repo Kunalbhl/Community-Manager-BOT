@@ -20,7 +20,8 @@ export function scrollToHeading(text: string) {
   const want = norm(text);
   const started = Date.now();
   const tick = () => {
-    const visible = (e: HTMLElement) => e.offsetParent !== null && !e.closest('[data-setup-guide]');
+    // Only the page content: never the sidebar, top bar, module tabs or the guide itself.
+    const visible = (e: HTMLElement) => e.offsetParent !== null && !e.closest('[data-setup-guide], nav, aside, header, [role="tablist"], [role="navigation"]');
     const pick = (sel: string, exact: boolean) => (Array.from(document.querySelectorAll(sel)) as HTMLElement[])
       .find((e) => visible(e) && (exact ? norm(e.textContent || '').startsWith(want) : norm(e.textContent || '').includes(want)));
     const hit = pick('h1, h2, h3, h4', true) || pick('.font-bold, .font-black, .font-semibold, label', true) || pick('h1, h2, h3, h4, button', false);
@@ -33,7 +34,7 @@ export function scrollToHeading(text: string) {
     }
     if (Date.now() - started < 8000) setTimeout(tick, 200);
   };
-  setTimeout(tick, 300);
+  setTimeout(tick, 600);
 }
 
 /** Open a section from screens that don't receive onNavigate. */

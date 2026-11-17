@@ -1,6 +1,7 @@
 import { BlacklistView } from '../views/community/BlacklistView.js';
 import { RewardsView } from '../views/community/RewardsView.js';
 import React, { useEffect, useState } from 'react';
+import { WarningsPanel } from '../views/community/WarningsPanel.js';
 import {
   ClipboardList, Inbox, Mic, MessageSquareText, DoorOpen, Gift, Settings as SettingsIcon, Activity,
   HandHeart, BadgeCheck, MousePointerClick, UserCheck, TrendingUp, Cake, Users,
@@ -14,7 +15,6 @@ import { CommunityFeaturesView } from '../views/community/CommunityFeaturesView.
 import { CommunitySettingsView } from '../views/community/CommunitySettingsView.js';
 import { EngagementView } from '../views/community/EngagementView.js';
 import { EventsView } from '../views/community/EventsView.js';
-import { ModerationView } from '../views/community/ModerationView.js';
 import { TeamAccessView } from '../views/community/TeamAccessView.js';
 import { ConnectionCenterView } from '../views/community/ConnectionCenterView.js';
 import { WelcomeRulesView } from '../views/community/WelcomeRulesView.js';
@@ -71,7 +71,7 @@ export const MODULES: Record<string, ModuleDef> = {
   moderation: {
     id: 'moderation', title: 'Moderation', desc: 'Warnings, tickets, logs and tools that keep the server safe.',
     tabs: [
-      { id: 'warnings', label: 'Warnings', icon: ShieldAlert, hint: 'Every warning given, by whom and why.', render: (c) => <ModerationView embedded communityId={c.communityId} initialTab="warnings" /> },
+      { id: 'warnings', label: 'Warnings', icon: ShieldAlert, hint: 'Every warning given, by whom and why.', render: (c) => <WarningsPanel communityId={c.communityId} /> },
       { id: 'warning-rules', label: 'Warning rules', icon: Scale, hint: 'Points per reason and the action taken at each level.', render: (c) => <ServerToolsView communityId={c.communityId} only="warnings" /> },
       { id: 'tickets', label: 'Tickets', icon: Ticket, hint: 'Members open private tickets by type; staff claim and close them.', render: (c) => <ServerToolsView communityId={c.communityId} only="tickets" /> },
       { id: 'logs', label: 'Server logs', icon: ScrollText, hint: 'Joins, leaves, deleted and edited messages, role changes and warnings in one channel.', render: (c) => <CommunityFeaturesView communityId={c.communityId} only="logs" /> },
