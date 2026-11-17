@@ -246,7 +246,7 @@ export const secureGate = {
     let apply: any = guild.channels.cache.find((c: any) => c.type === ChannelType.GuildText && /(^|[^a-z])apply([^a-z]|$)/i.test(c.name) && c.permissionOverwrites?.cache?.get(applicant.id)?.allow?.has(V));
     if (!apply) {
       apply = await guild.channels.create({
-        name: '📋・apply', type: ChannelType.GuildText, position: 0, reason: 'Secure Setup: where newcomers apply',
+        name: (await import('../../integrations/discord/channelEmoji.js')).uniqueName(guild, '📝・apply-to-join'), type: ChannelType.GuildText, position: 0, reason: 'Secure Setup: where newcomers apply',
         topic: 'Press Apply to join. Only new people waiting for approval can see this channel.',
         permissionOverwrites: [
           { id: guild.roles.everyone.id, deny: [V] },

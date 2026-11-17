@@ -13,6 +13,37 @@ import { getToolkit, saveToolkit } from '../../services/toolkit/toolkitConfig.js
 import { getFeatures, saveFeatures } from '../../services/features/featuresConfig.js';
 import { welcomeOnboardingService } from '../../services/welcomeOnboarding.service.js';
 import { CM_CATEGORY_NAME, isCmCategory, postIntro } from '../../services/serverWorkspace.service.js';
+import { tidyChannelNames, uniqueName } from './channelEmoji.js';
+
+/** Default name for the public apply channel (Discord shows it as #📝・apply-to-join). */
+export const APPLY_CHANNEL = 'apply-to-join';
+
+const unique = uniqueName;
+
+async function counterChannelIds(communityId: string): Promise<string[]> {
+  try {
+    const { statCountersRepository } = await import('../../services/features/serverStats.service.js');
+    return (await statCountersRepository.list({ where: [{ field: 'communityId', operator: '==', value: communityId }] })).map((c: any) => c.channelId);
+  } catch { return []; }
+}
+
+/** Adds a matching unique emoji to channels/categories without one (counters skipped). */
+export async function tidyNames(guild: any, communityId: string) {
+  return tidyChannelNames(guild, await counterChannelIds(communityId));
+}
+
+/** Bot-made apply channels named just "apply" become "apply-to-join" (emoji kept). */
+export async function renameApplyChannels(guild: any, communityId: string) {
+  const { getGate } = await import('../../services/recruitment/secureGate.service.js');
+  const g: any = await getGate(communityId).catch(() => ({}));
+  const r: any = (await getToolkit(communityId)).recruitment;
+  for (const id of new Set([g.applyChannelId, r.panelChannelId].filter(Boolean))) {
+    const c: any = guild.channels.cache.get(id);
+    const m = c?.name?.match(/^((?:\p{Extended_Pictographic}\uFE0F?)?\s*[・·\-]?\s*)apply$/iu);
+    if (!c || !m || !c.permissionsFor(guild.members.me)?.has([P.ViewChannel, P.ManageChannels])) continue;
+    await c.setName(`${m[1] || ''}${APPLY_CHANNEL}`, 'Community Manager: clearer apply channel name').catch(() => undefined);
+  }
+}
 
 const BOT_PERMS = [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory, P.ManageChannels, P.ManageThreads, P.CreatePrivateThreads, P.SendMessagesInThreads, P.AttachFiles];
 const live = (guild: any, id?: string) => Boolean(id && guild.channels.cache.has(id));
@@ -82,7 +113,7 @@ async function staffChannel(guild: any, communityId: string, name: string, topic
   const cat = await category(guild, communityId, made);
   const existing = guild.channels.cache.find((c: any) => c.parentId === cat.id && c.name === name);
   if (existing) return existing;
-  const c = await guild.channels.create({ name, type: ChannelType.GuildText, parent: cat.id, topic, reason: 'Community Manager setup' });
+  const c = await guild.channels.create({ name: unique(guild, name), type: ChannelType.GuildText, parent: cat.id, topic, reason: 'Community Manager setup' });
   made.push(`<#${c.id}> (staff only)`);
   await postIntro(c, intro);
   return c;
@@ -93,7 +124,7 @@ async function publicChannel(guild: any, name: string, topic: string, made: Crea
   if (existing) return existing;
   // Only overwrite: the bot itself. @everyone is left exactly as the server's defaults.
   const c = await guild.channels.create({
-    name, type: ChannelType.GuildText, topic, reason: 'Community Manager setup',
+    name: unique(guild, name), type: ChannelType.GuildText, topic, reason: 'Community Manager setup',
     permissionOverwrites: [{ id: guild.members.me.id, allow: [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory] }],
   });
   made.push(`<#${c.id}>`);
@@ -137,7 +168,7 @@ export const create = {
     const patch: any = {};
     if (!live(guild, r.reviewChannelId)) patch.reviewChannelId = (await staffChannel(guild, communityId, '📥・applications', 'New applications with Approve / Reject. Staff only.', 'applications', made, 'review', [r.logChannelId].filter(Boolean))).id;
     if (!live(guild, r.logChannelId)) patch.logChannelId = (await staffChannel(guild, communityId, '📋・recruitment-log', 'Every application, screening result, decision and recruiter credit.', 'recruitmentLog', made, 'recruitmentLog', [patch.reviewChannelId || r.reviewChannelId].filter(Boolean))).id;
-    if (!live(guild, r.panelChannelId)) { patch.panelChannelId = (await publicChannel(guild, '📝・apply', 'Press Apply to join. Your answers go privately to the staff.', made, 'apply')).id; patch.panelMessageId = undefined; patch.panelPostedAt = undefined; }
+    if (!live(guild, r.panelChannelId)) { patch.panelChannelId = (await publicChannel(guild, `📝・${APPLY_CHANNEL}`, 'Press Apply to join. Your answers go privately to the staff.', made, 'apply')).id; patch.panelMessageId = undefined; patch.panelPostedAt = undefined; }
     if (Object.keys(patch).length) { const t = await getToolkit(communityId); await saveToolkit(communityId, { recruitment: { ...t.recruitment, ...patch } }); }
     return made;
   },
@@ -168,6 +199,8 @@ export const create = {
     for (const k of ['staff', 'roles', 'apps', 'welcome', 'logs'] as const) {
       try { await (create as any)[k](guild, communityId, made); } catch (e: any) { errors.push(`${k}: ${e?.message || e}`); }
     }
+    try { await renameApplyChannels(guild, communityId); } catch { /* optional */ }
+    try { const t = await tidyNames(guild, communityId); if (t.renamed.length) made.push(`emoji added to ${t.renamed.length} channel name${t.renamed.length > 1 ? 's' : ''}`); } catch { /* optional */ }
     return { made, errors };
   },
 };
