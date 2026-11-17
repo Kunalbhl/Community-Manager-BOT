@@ -179,7 +179,12 @@ export const serverStats = {
       if (!me?.permissions.has(PermissionFlagsBits.ManageChannels)) throw new Error('The bot needs the Manage Channels permission to create counter channels.');
       let parentId: string | undefined = isSnowflake(body.categoryId) ? body.categoryId : undefined;
       if (!parentId && body.newCategoryName) {
-        const cat = await guild.channels.create({ name: String(body.newCategoryName).slice(0, 100), type: ChannelType.GuildCategory, position: 0 });
+        // Reuse a stats category with the same name instead of making a second one.
+        const wanted = String(body.newCategoryName).slice(0, 100);
+        const same: any = guild.channels.cache.find((c: any) => c.type === ChannelType.GuildCategory && c.name === wanted);
+        // Only the bot's own overwrite, so it can always see and rename its counters. @everyone is untouched.
+        const cat = same || await guild.channels.create({ name: wanted, type: ChannelType.GuildCategory, position: 0, reason: 'Server stats',
+          permissionOverwrites: [{ id: me.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.ManageChannels] }] });
         parentId = cat.id;
       }
       const value = await valueOf(guild, data as StatCounter);

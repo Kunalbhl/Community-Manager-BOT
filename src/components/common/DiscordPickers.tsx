@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { MemberPick, MemberOpt } from '../views/community/ServerToolsView.js';
+import { useLive } from '../../lib/live.js';
 
 /**
  * Pick channels, roles and members straight from the Discord server (no typing names or IDs).
@@ -17,6 +18,9 @@ export function currentCommunityId(): string {
 export function useDiscordResources(communityId?: string): Res | null {
   const id = communityId || currentCommunityId();
   const [res, setRes] = useState<Res | null>(null);
+  const [rev, setRev] = useState(0);
+  // A channel, role or emoji changed in Discord: drop the shared copy and load it again.
+  useLive(id, () => { cache.delete(id); setRev((n) => n + 1); }, ['channels', 'roles', 'emojis', 'guild']);
   useEffect(() => {
     if (!id) return;
     if (!cache.has(id)) {
@@ -27,7 +31,7 @@ export function useDiscordResources(communityId?: string): Res | null {
     let alive = true;
     cache.get(id)!.then((r) => alive && setRes(r));
     return () => { alive = false; };
-  }, [id]);
+  }, [id, rev]);
   return res;
 }
 
@@ -120,6 +124,8 @@ const nameCache = new Map<string, Promise<string>>();
 export function MemberName({ id, communityId, fallback }: { id?: string; communityId?: string; fallback?: string }) {
   const cid = communityId || currentCommunityId();
   const [name, setName] = useState<string>(fallback || '');
+  const [rev, setRev] = useState(0);
+  useLive(cid, () => { if (id) nameCache.delete(`${cid}:${id}`); setRev((n) => n + 1); }, ['members']);
   useEffect(() => {
     if (!id || !/^\d{15,21}$/.test(id) || !cid) return;
     const key = `${cid}:${id}`;
@@ -130,6 +136,6 @@ export function MemberName({ id, communityId, fallback }: { id?: string; communi
     let alive = true;
     nameCache.get(key)!.then((n) => alive && n && setName(n));
     return () => { alive = false; };
-  }, [id, cid]);
+  }, [id, cid, rev]);
   return <>{name || fallback || 'Member left the server'}</>;
 }
