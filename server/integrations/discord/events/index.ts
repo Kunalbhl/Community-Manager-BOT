@@ -39,6 +39,15 @@ export function attachGatewayEventHandlers(client: Client): void {
       }
     }
 
+    // Apply channels made by the bot are called "apply-to-join" (renames older "apply" ones once).
+    void (async () => {
+      const { renameApplyChannels } = await import('../setupProvision.js');
+      const { communityForGuild } = await import('../../../services/toolkit/toolkitConfig.js');
+      for (const guild of readyClient.guilds.cache.values()) {
+        await renameApplyChannels(guild, await communityForGuild(guild.id)).catch(() => undefined);
+      }
+    })().catch(() => undefined);
+
     // Auto-register slash commands
     try {
       await registerSlashCommands();

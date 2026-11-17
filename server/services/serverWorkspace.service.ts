@@ -107,7 +107,8 @@ export const workspace = {
       if (inCat) { chosen[p.key] = inCat.id; report.used.push({ purpose: p.label, channel: inCat.name, created: false }); continue; }
       try {
         const parent = await ensureCategory();
-        const ch = await guild.channels.create({ name: p.name, type: ChannelType.GuildText, parent: parent.id, topic: p.topic, reason: 'Community Manager workspace' });
+        const { uniqueName } = await import('../integrations/discord/channelEmoji.js');
+        const ch = await guild.channels.create({ name: uniqueName(guild, p.name), type: ChannelType.GuildText, parent: parent.id, topic: p.topic, reason: 'Community Manager workspace' });
         chosen[p.key] = ch.id;
         report.used.push({ purpose: p.label, channel: ch.name, created: true });
         await postIntro(ch, p.key);

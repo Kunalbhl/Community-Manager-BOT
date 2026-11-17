@@ -332,7 +332,7 @@ const STEPS: Step[] = [
     },
     async handle({ communityId, guild, interaction }, action) {
       if (action === 'recheck') return 'Checked again.';
-      if (action === 'confirm') return confirmSetup(communityId, guild, interaction);
+      if (action === 'confirm') return confirmSetup(communityId, guild, interaction); // normally handled in handleSetupWizard
       if (action !== 'fix') return;
       const targets = await channelTargets(communityId);
       let fixed = 0;
@@ -449,6 +449,36 @@ async function pending(communityId: string) {
   return out;
 }
 
+/**
+ * Confirm: validate, record, then show (1) a completion page with everything configured and
+ * (2) a separate private message with only what is still pending, each with its dashboard link.
+ */
+async function finishPages(c: Ctx) {
+  const { communityId, guild, interaction } = c;
+  const note = await confirmSetup(communityId, guild, interaction);
+  if (/^⚠️/.test(note)) { await interaction.editReply(await page(c, STEPS.length - 1, note)); return; }
+  const [summary, pend, checks] = await Promise.all([reviewLines(communityId, guild), pending(communityId), runChecks(communityId, guild)]);
+  const done = new EmbedBuilder().setColor(0x3ddc97)
+    .setAuthor({ name: 'Community Manager setup · Complete', iconURL: guild?.client?.user?.displayAvatarURL?.() })
+    .setTitle('🎉 Setup complete')
+    .setDescription([
+      'Everything below is saved and working. The dashboard shows the same settings.',
+      '', '**Configured**', ...summary,
+      '', '**Validated**', ...checks.map((x) => `${x.ok ? '✅' : '💡'} ${x.label}`),
+      '', note.replace(/^✅\s*/, '✅ '),
+    ].join('\n').slice(0, 4000))
+    .setFooter({ text: 'Run /community-manager setup any time to change something' });
+  await interaction.editReply({ embeds: [done], components: [row(
+    new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(dashboardUrl(communityId)).setLabel('Open dashboard').setEmoji('🌐'),
+    new ButtonBuilder().setCustomId(id('nav', 'close')).setStyle(ButtonStyle.Secondary).setLabel('Close').setEmoji('✖️'),
+  )] });
+  const pendEmbed = new EmbedBuilder().setColor(pend.length ? 0xf5a524 : 0x3ddc97)
+    .setTitle(pend.length ? `⏳ ${pend.length} thing${pend.length > 1 ? 's' : ''} left, in the dashboard` : '✅ Nothing pending')
+    .setDescription(pend.length ? pend.map((x, i) => `\`${i + 1}\` ${x}`).join('\n') : 'Your server is fully set up.')
+    .setFooter({ text: 'Only you can see this' });
+  await interaction.followUp({ embeds: [pendEmbed], ephemeral: true, components: pend.length ? [row(new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(dashboardUrl(communityId, 'server-tools')).setLabel('Finish in the dashboard').setEmoji('🌐'))] : [] }).catch(() => undefined);
+}
+
 async function confirmSetup(communityId: string, guild: any, interaction: any) {
   const checks = await runChecks(communityId, guild);
   if (checks.some((c) => !c.ok && !c.soft)) return '⚠️ Fix the items marked ⚠️ first, then confirm.';
@@ -535,6 +565,7 @@ export async function handleSetupWizard(interaction: any): Promise<boolean> {
       await interaction.editReply(await page(c, to));
       return true;
     }
+    if (stepKey === 'done' && action === 'confirm') { await finishPages(c); return true; }
     const index = STEPS.findIndex((s) => s.key === stepKey);
     if (index < 0) return true;
     let note: string | void;
