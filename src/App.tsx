@@ -174,11 +174,16 @@ export default function App() {
   const sectionHistory = React.useRef<CommunitySection[]>([]);
   const [, setHistoryTick] = useState(0);
   const setActiveCommunitySection = React.useCallback((next: CommunitySection | ((p: CommunitySection) => CommunitySection)) => {
+    // Resolve old screen names (+ the tab the setup guide asked for) ONCE, outside the state updater:
+    // React may run an updater twice, and the second run used to lose the tab and open a default one.
+    const pre = typeof next === 'function' ? null : resolveSection(String(next));
+    if (pre?.tab) { setPendingModuleTab(pre.tab); window.dispatchEvent(new CustomEvent('cm:module-tab', { detail: pre.tab })); }
     setSectionRaw((prev) => {
-      const raw = typeof next === 'function' ? (next as any)(prev) : next;
-      // Old screen names open their new module + tab.
-      const r = resolveSection(String(raw));
-      if (r.tab) { setPendingModuleTab(r.tab); window.dispatchEvent(new CustomEvent('cm:module-tab', { detail: r.tab })); }
+      let r = pre;
+      if (!r) {
+        r = resolveSection(String((next as any)(prev)));
+        if (r.tab) { setPendingModuleTab(r.tab); window.dispatchEvent(new CustomEvent('cm:module-tab', { detail: r.tab })); }
+      }
       const value = r.section as CommunitySection;
       const h = sectionHistory.current;
       if (value !== prev && h[h.length - 1] !== prev) h.push(prev);
