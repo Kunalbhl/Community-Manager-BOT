@@ -137,7 +137,7 @@ export class RealDiscordProvider implements DiscordProvider {
         // Hot standby: a waiting instance stays logged in to Discord but ignores events until it becomes
         // the active bot, so a handoff takes about two seconds instead of a full login.
         {
-          const pass = new Set(['ready', 'clientReady', 'error', 'warn', 'debug', 'invalidated', 'shardReady', 'shardResume', 'shardDisconnect', 'shardReconnecting', 'shardError']);
+          const pass = new Set(['raw', 'ready', 'clientReady', 'error', 'warn', 'debug', 'invalidated', 'shardReady', 'shardResume', 'shardDisconnect', 'shardReconnecting', 'shardError']);
           const c: any = this.client;
           const orig = c.emit.bind(c);
           c.emit = (event: string, ...args: any[]) => ((globalThis as any).__cmBotActive === false && !pass.has(event) ? false : orig(event, ...args));
@@ -145,6 +145,12 @@ export class RealDiscordProvider implements DiscordProvider {
 
         // Attach all real Gateway event listeners
         attachGatewayEventHandlers(this.client);
+        // Live dashboard updates (works on the standby website instance too: 'raw' is always passed through).
+        {
+          let hub: any = null;
+          void import('../../services/liveHub.js').then((m) => { hub = m.liveHub; }).catch(() => undefined);
+          this.client.on('raw', (packet: any) => { try { hub?.onRaw(packet); } catch { /* never break the gateway */ } });
+        }
 
         // Setup connection lifecycle listeners
         this.client.once('ready', (readyClient: any) => {

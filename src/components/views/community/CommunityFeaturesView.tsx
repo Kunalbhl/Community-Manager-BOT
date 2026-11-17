@@ -1,3 +1,4 @@
+import { useLive } from '../../../lib/live.js';
 import { EventPick, takeEventFor, attachToEvent, EventTag } from '../../common/EventPick.js';
 import { EmojiField } from '../../common/EmojiField.js';
 import { useRemembered } from '../../common/useRemembered.js';
@@ -46,6 +47,8 @@ export function CommunityFeaturesView({ communityId, only }: { communityId: stri
     } catch (e: any) { setError(e.message); }
   }, [api]);
   useEffect(() => { if (communityId) load(); }, [communityId, load]);
+  // Live: channel/role/name changes made in Discord appear here without reloading (your unsaved edits are kept).
+  useLive(communityId, () => { api('/toolkit').then((t: any) => setRes(t.resources)).catch(() => undefined); }, ['channels', 'roles', 'emojis', 'guild']);
 
   const save = async (section: string, value: any) => setCfg(await api(`/features/settings/${section}`, 'PUT', value));
   const current = TABS.find((t) => t.id === tab)!;
@@ -437,15 +440,34 @@ const STAT_HELP: Record<string, string> = {
   roles: 'Roles in the server.',
 };
 
+const QUICK = ['members', 'humans', 'bots', 'online', 'boosts', 'inVoice'];
+
+/** Short, readable status for a counter. */
+function counterStatus(c: any): { tone: 'ok' | 'warn' | 'bad' | 'off'; text: string; fix?: string } {
+  if (!c.enabled) return { tone: 'off', text: 'Paused' };
+  if (c.channelMissing || c.lastError === 'missing') return { tone: 'bad', text: 'Channel deleted in Discord', fix: 'Delete this counter, or add it again.' };
+  if (c.lastError && /View Channel|Manage Channels|Missing Access|Missing Permissions/i.test(c.lastError)) {
+    return { tone: 'warn', text: 'I can’t rename this channel', fix: 'In Discord: right-click the channel (or its category) → Edit → Permissions → add Community Manager → allow View Channel and Manage Channels. Then press Update now.' };
+  }
+  if (c.lastError && /limit/i.test(c.lastError)) return { tone: 'ok', text: 'Live · Discord is pacing renames' };
+  if (c.lastError) return { tone: 'warn', text: c.lastError.slice(0, 140) };
+  return { tone: 'ok', text: 'Live' };
+}
+
 function StatsTab({ api, res, communityId }: any) {
-  const blank = { kind: 'members', template: '👥 · MEMBERS : {count}', format: 'plain', roleId: '', goal: '', mode: 'new', categoryId: '', newCategoryName: '📊 • SERVER STATS • 📊', channelId: '', lock: true };
+  const statsCat = (res?.categories || []).find((c: any) => /server\s*stats/i.test(c.name));
+  const blank = { kind: 'members', template: '👥 · MEMBERS : {count}', format: 'plain', roleId: '', goal: '', mode: 'new', categoryId: statsCat?.id || '', newCategoryName: '📊 • SERVER STATS • 📊', channelId: '', lock: true };
   const [data, setData] = useState<any>(null);
   const [f, setF] = useState<any>(blank);
   const [preview, setPreview] = useState<any>(null);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [more, setMore] = useState(false);
+  const [open, setOpen] = useState<string>('');
   const load = useCallback(() => api('/features/server-stats').then(setData).catch((e: any) => setMsg(e.message)), [api]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); const t = setInterval(load, 60_000); return () => clearInterval(t); }, [load]);
+  // Live: renamed/deleted channels and member changes show up here straight away.
+  useLive(communityId, () => { load(); }, ['channels', 'roles', 'members', 'guild']);
   useEffect(() => {
     const t = setTimeout(() => {
       if (f.kind === 'role' && !f.roleId) return setPreview(null);
@@ -455,86 +477,122 @@ function StatsTab({ api, res, communityId }: any) {
   }, [f.kind, f.template, f.format, f.roleId, f.goal, api]);
   const kinds = data?.kinds || [];
   const voice = (res as any).voiceChannels || [];
-  const chName = (id: string) => voice.find((c: any) => c.id === id)?.name;
+  const counters: any[] = data?.counters || [];
+  const has = (k: string) => counters.some((c) => c.kind === k && !c.channelMissing);
   const pickKind = (k: string) => { const ex = kinds.find((x: any) => x.id === k)?.example; setF({ ...f, kind: k, template: f.id ? f.template : ex || f.template }); };
+  const body = (x: any) => {
+    const b: any = { ...x };
+    if (x.id || x.mode === 'existing') { delete b.categoryId; delete b.newCategoryName; } else { delete b.channelId; if (x.categoryId) delete b.newCategoryName; }
+    return b;
+  };
   const save = async () => {
     setBusy(true); setMsg('');
     try {
-      const body: any = { ...f };
-      if (f.id || f.mode === 'existing') { delete body.categoryId; delete body.newCategoryName; } else { delete body.channelId; if (f.categoryId) delete body.newCategoryName; }
-      await api('/features/server-stats', 'POST', body);
-      setMsg(f.id ? 'Saved. The channel name is updated now.' : f.mode === 'existing' ? 'Linked. The channel now updates on its own.' : 'Counter channel created.');
+      await api('/features/server-stats', 'POST', body(f));
+      setMsg(f.id ? '✓ Saved. The channel name is updated now.' : f.mode === 'existing' ? '✓ Linked. The channel now updates on its own.' : '✓ Counter channel created.');
       setF(blank); load();
     } catch (e: any) { setMsg(e.message); }
     setBusy(false);
   };
+  const quickAdd = async (k: string) => {
+    const ex = kinds.find((x: any) => x.id === k)?.example;
+    setBusy(true); setMsg('');
+    try { await api('/features/server-stats', 'POST', body({ ...blank, kind: k, template: ex })); setMsg(`✓ ${kinds.find((x: any) => x.id === k)?.label} counter added.`); load(); } catch (e: any) { setMsg(e.message); }
+    setBusy(false);
+  };
+  const refresh = async () => { setBusy(true); try { setData({ ...data, counters: await api('/features/server-stats/refresh', 'POST') }); setMsg('✓ Updated.'); } catch (e: any) { setMsg(e.message); } setBusy(false); };
+  const tone = { ok: 'bg-emerald-50 text-emerald-700', warn: 'bg-amber-50 text-amber-700', bad: 'bg-rose-50 text-rose-700', off: 'bg-slate-100 text-slate-500' } as const;
+
   return (
-    <div className="grid gap-6 2xl:grid-cols-[1.2fr_1fr]">
-      <Card title={f.id ? 'Edit counter' : 'Add a counter'} desc="The bot renames a voice channel to show a live number. Discord lets a channel be renamed about twice in 10 minutes, so numbers update within 5 minutes." right={f.id && <button className={ghost} onClick={() => setF(blank)}>New counter</button>}>
-        <div className="space-y-4">
-          <Label t="What to count">
-            <select className={input} value={f.kind} onChange={(e) => pickKind(e.target.value)}>{kinds.map((k: any) => <option key={k.id} value={k.id}>{k.label}</option>)}</select>
-            <p className="mt-1 text-xs text-slate-500">{STAT_HELP[f.kind]}</p>
-          </Label>
-          {f.kind === 'role' && <Label t="Role to count"><RoleSelect communityId={communityId} value={f.roleId} onChange={(v) => setF({ ...f, roleId: v || '' })} placeholder="Pick a role" /></Label>}
-          {f.kind === 'goal' && <Label t="Member goal"><input type="number" min={1} className={input} value={f.goal} onChange={(e) => setF({ ...f, goal: e.target.value })} placeholder="500" /></Label>}
-          <div className="grid gap-4 md:grid-cols-[1fr_180px]">
+    <div className="space-y-6">
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        <Card title={f.id ? 'Edit counter' : 'Add a counter'} desc="A voice channel whose name shows a live number. Numbers update within 5 minutes (Discord’s rename limit)." right={f.id && <button className={ghost} onClick={() => setF(blank)}>Cancel</button>}>
+          <div className="space-y-4">
+            {!f.id && kinds.length > 0 && (
+              <div>
+                <div className="mb-1.5 text-sm font-medium text-slate-700">Quick add <span className="font-normal text-slate-500">· one click, ready to use</span></div>
+                <div className="flex flex-wrap gap-2">
+                  {QUICK.map((k) => { const kd = kinds.find((x: any) => x.id === k); if (!kd) return null; const done = has(k); return (
+                    <button key={k} type="button" disabled={busy || done} onClick={() => quickAdd(k)} className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${done ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-700 hover:border-indigo-400 hover:bg-indigo-50'}`}>{done ? '✓ ' : '+ '}{kd.label}</button>
+                  ); })}
+                </div>
+                <div className="my-4 border-t border-slate-100" />
+                <div className="text-sm font-medium text-slate-700">Or build your own</div>
+              </div>
+            )}
+            <Label t="What to count">
+              <select className={input} value={f.kind} onChange={(e) => pickKind(e.target.value)}>{kinds.map((k: any) => <option key={k.id} value={k.id}>{k.label}</option>)}</select>
+              <p className="mt-1 text-xs text-slate-500">{STAT_HELP[f.kind]}</p>
+            </Label>
+            {f.kind === 'role' && <Label t="Role to count"><RoleSelect communityId={communityId} value={f.roleId} onChange={(v) => setF({ ...f, roleId: v || '' })} placeholder="Pick a role" /></Label>}
+            {f.kind === 'goal' && <Label t="Member goal"><input type="number" min={1} className={input} value={f.goal} onChange={(e) => setF({ ...f, goal: e.target.value })} placeholder="500" /></Label>}
             <Label t="Channel name">
               <input className={input} value={f.template} maxLength={100} onChange={(e) => setF({ ...f, template: e.target.value })} />
-              <p className="mt-1 text-xs text-slate-500">Put <b>{'{count}'}</b> where the number goes. Emojis and styled letters work. Also: {'{goal}'}, {'{server}'}.</p>
+              <p className="mt-1 text-xs text-slate-500">Keep <b>{'{count}'}</b> where the number goes.</p>
             </Label>
-            <Label t="Number style"><select className={input} value={f.format} onChange={(e) => setF({ ...f, format: e.target.value })}><option value="plain">1234</option><option value="comma">1,234</option><option value="short">1.2k</option></select></Label>
-          </div>
-          <div className="rounded-xl bg-slate-800 px-4 py-3 text-sm text-slate-200">🔊 {preview ? preview.name : <span className="text-slate-400">Preview appears here</span>}{preview && <span className="ml-2 text-xs text-slate-400">(live value {preview.value})</span>}</div>
-          {!f.id && (
-            <div className="space-y-3 rounded-xl border border-slate-200 p-3">
-              <div className="flex gap-2 text-sm">
-                <button type="button" className={`rounded-lg px-3 py-1.5 font-semibold ${f.mode === 'new' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`} onClick={() => setF({ ...f, mode: 'new' })}>Create a new channel</button>
-                <button type="button" className={`rounded-lg px-3 py-1.5 font-semibold ${f.mode === 'existing' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`} onClick={() => setF({ ...f, mode: 'existing' })}>Use a channel I already have</button>
+            <div className="rounded-xl bg-slate-800 px-4 py-3 text-sm text-slate-200">🔊 {preview ? preview.name : <span className="text-slate-400">Preview appears here</span>}</div>
+            <button type="button" className="text-xs font-semibold text-indigo-600 hover:underline" onClick={() => setMore(!more)}>{more ? '▾ Fewer options' : '▸ More options'} (number style{f.id ? '' : ', category, use an existing channel'})</button>
+            {more && (
+              <div className="space-y-3 rounded-xl border border-slate-200 p-3">
+                <Label t="Number style"><select className={input} value={f.format} onChange={(e) => setF({ ...f, format: e.target.value })}><option value="plain">1234</option><option value="comma">1,234</option><option value="short">1.2k</option></select></Label>
+                {!f.id && (<>
+                  <div className="flex gap-2 text-sm">
+                    <button type="button" className={`rounded-lg px-3 py-1.5 font-semibold ${f.mode === 'new' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`} onClick={() => setF({ ...f, mode: 'new' })}>New channel</button>
+                    <button type="button" className={`rounded-lg px-3 py-1.5 font-semibold ${f.mode === 'existing' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`} onClick={() => setF({ ...f, mode: 'existing' })}>Channel I already have</button>
+                  </div>
+                  {f.mode === 'new' ? (<>
+                    <Label t="Category"><Pick options={res.categories} value={f.categoryId} onChange={(v) => setF({ ...f, categoryId: v })} placeholder="Make a new category" /></Label>
+                    {!f.categoryId && <Label t="New category name"><input className={input} value={f.newCategoryName} onChange={(e) => setF({ ...f, newCategoryName: e.target.value })} /></Label>}
+                    <label className="flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" className="mt-1" checked={f.lock} onChange={(e) => setF({ ...f, lock: e.target.checked })} /><span>Nobody can join it<span className="block text-xs text-slate-500">Only this new channel is affected.</span></span></label>
+                  </>) : (<>
+                    {data?.existing?.length > 0 && <div className="flex flex-wrap gap-2">{data.existing.map((c: any) => <button key={c.id} type="button" className={`rounded-full border px-3 py-1 text-xs font-semibold ${f.channelId === c.id ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-indigo-300'}`} onClick={() => setF({ ...f, channelId: c.id, template: c.template })}>🔊 {c.name}</button>)}</div>}
+                    <Label t="Channel"><Pick options={voice} value={f.channelId} onChange={(v) => setF({ ...f, channelId: v })} placeholder="Pick a voice channel" /></Label>
+                    <p className="text-xs text-slate-500">Only its name is changed; permissions stay as they are.</p>
+                  </>)}
+                </>)}
               </div>
-              {f.mode === 'new' ? (
-                <>
-                  <Label t="Category"><Pick options={res.categories} value={f.categoryId} onChange={(v) => setF({ ...f, categoryId: v })} placeholder="Make a new category" /></Label>
-                  {!f.categoryId && <Label t="New category name"><input className={input} value={f.newCategoryName} onChange={(e) => setF({ ...f, newCategoryName: e.target.value })} /></Label>}
-                  <label className="flex items-start gap-2 text-sm text-slate-700"><input type="checkbox" className="mt-1" checked={f.lock} onChange={(e) => setF({ ...f, lock: e.target.checked })} /><span>Nobody can join it<span className="block text-xs text-slate-500">Members can see the channel but not connect. This only applies to the new channel; no other channel or role is changed.</span></span></label>
-                </>
-              ) : (
-                <>
-                  {data?.existing?.length > 0 && <div className="flex flex-wrap gap-2">{data.existing.map((c: any) => <button key={c.id} type="button" className={`rounded-full border px-3 py-1 text-xs font-semibold ${f.channelId === c.id ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-indigo-300'}`} onClick={() => setF({ ...f, channelId: c.id, template: c.template })}>🔊 {c.name}</button>)}</div>}
-                  <Label t="Channel"><Pick options={voice} value={f.channelId} onChange={(v) => setF({ ...f, channelId: v })} placeholder="Pick a voice channel" /></Label>
-                  <p className="text-xs text-slate-500">The channel’s permissions stay exactly as you set them. The bot only changes its name, so it needs Manage Channels on it.</p>
-                </>
-              )}
-            </div>
+            )}
+            <button className={btn} disabled={busy} onClick={save}><Send className="h-4 w-4" /> {f.id ? 'Save changes' : f.mode === 'existing' ? 'Link channel' : 'Create counter'}</button>
+            {msg && <p className="text-sm text-slate-600">{msg}</p>}
+          </div>
+        </Card>
+
+        <Card title={`Your counters${counters.length ? ` (${counters.length})` : ''}`} desc="Updates by itself. Changes in Discord show here straight away." right={<button className={ghost} disabled={busy} onClick={refresh}><RefreshCw className="h-4 w-4" /> Update now</button>}>
+          {!data ? <div className="h-24 animate-pulse rounded-xl bg-slate-100" /> : !counters.length ? <p className="text-sm text-slate-500">No counters yet. Use <b>Quick add</b> to make one in a click.</p> : (
+            <ul className="space-y-2">
+              {counters.map((c: any) => { const st = counterStatus(c); return (
+                <li key={c.id} className={`rounded-xl border px-3 py-2.5 text-sm ${f.id === c.id ? 'border-indigo-400 bg-indigo-50/40' : 'border-slate-200'}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold text-slate-900">🔊 {c.channelName || c.lastName || 'Channel'}</div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        <span className={`rounded-full px-2 py-0.5 font-semibold ${tone[st.tone]}`}>{st.tone === 'ok' ? '● ' : st.tone === 'off' ? '' : '⚠ '}{st.text}</span>
+                        <span>{kinds.find((k: any) => k.id === c.kind)?.label}</span>
+                        {typeof c.lastValue === 'number' && <span>· value {c.lastValue}</span>}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 gap-3 text-xs font-semibold">
+                      <button className="text-indigo-600 hover:underline" onClick={() => { setF({ ...blank, ...c, roleId: c.roleId || '', goal: c.goal || '' }); setMsg(''); }}>Edit</button>
+                      <button className="text-rose-600 hover:underline" onClick={async () => {
+                        const both = c.createdByBot ? window.confirm('Also delete the channel in Discord? Press Cancel to keep the channel and only stop updating it.') : false;
+                        try { await api(`/features/server-stats/${c.id}${both ? '?channel=1' : ''}`, 'DELETE'); load(); } catch (e: any) { setMsg(e.message); }
+                      }}>Delete</button>
+                    </div>
+                  </div>
+                  {st.fix && (
+                    <div className="mt-2 rounded-lg bg-amber-50/70 px-3 py-2 text-xs text-amber-800">
+                      <b>How to fix:</b> {st.fix}
+                      {c.lastError && c.lastError !== 'missing' && <button type="button" className="ml-2 font-semibold underline" onClick={() => setOpen(open === c.id ? '' : c.id)}>{open === c.id ? 'Hide details' : 'Details'}</button>}
+                      {open === c.id && <div className="mt-1 text-amber-700">{c.lastError}</div>}
+                    </div>
+                  )}
+                </li>
+              ); })}
+            </ul>
           )}
-          <button className={btn} disabled={busy} onClick={save}><Send className="h-4 w-4" /> {f.id ? 'Save' : f.mode === 'existing' ? 'Link channel' : 'Create counter'}</button>
-          {msg && <p className="text-sm text-slate-600">{msg}</p>}
-        </div>
-      </Card>
+        </Card>
+      </div>
       <GrowthReportCard api={api} res={res} communityId={communityId} />
-      <Card title="Your counters" right={<button className={ghost} disabled={busy} onClick={async () => { setBusy(true); try { setData({ ...data, counters: await api('/features/server-stats/refresh', 'POST') }); setMsg('Updated.'); } catch (e: any) { setMsg(e.message); } setBusy(false); }}><RefreshCw className="h-4 w-4" /> Update now</button>}>
-        {!data ? <div className="h-24 animate-pulse rounded-xl bg-slate-100" /> : !data.counters.length ? <p className="text-sm text-slate-500">No counters yet. Add one, or link the stat channels you already have.</p> : (
-          <ul className="divide-y divide-slate-100">
-            {data.counters.map((c: any) => (
-              <li key={c.id} className="flex items-start justify-between gap-3 py-3 text-sm">
-                <div className="min-w-0">
-                  <div className="truncate font-semibold text-slate-900">🔊 {c.channelName || c.lastName || chName(c.channelId) || 'Channel'}</div>
-                  <div className="text-xs text-slate-500">{kinds.find((k: any) => k.id === c.kind)?.label}{c.lastUpdatedAt ? ` · updated ${fmtDate(c.lastUpdatedAt)}` : ''}</div>
-                  {c.channelMissing && <div className="text-xs text-rose-600">The channel was deleted in Discord. Delete this counter or make a new one.</div>}
-                  {c.lastError && c.lastError !== 'missing' && <div className="text-xs text-amber-700">{c.lastError}</div>}
-                </div>
-                <div className="flex shrink-0 gap-3 text-xs font-semibold">
-                  <button className="text-indigo-600 hover:underline" onClick={() => setF({ ...blank, ...c, roleId: c.roleId || '', goal: c.goal || '' })}>Edit</button>
-                  <button className="text-rose-600 hover:underline" onClick={async () => {
-                    const both = c.createdByBot ? window.confirm('Also delete the channel in Discord? Press Cancel to keep the channel and only stop updating it.') : false;
-                    try { await api(`/features/server-stats/${c.id}${both ? '?channel=1' : ''}`, 'DELETE'); load(); } catch (e: any) { setMsg(e.message); }
-                  }}>Delete</button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
     </div>
   );
 }

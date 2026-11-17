@@ -381,6 +381,13 @@ router.get(`${ft}/birthdays`, ...view, Features.listBirthdaysHandler);
 router.get(`${ft}/button-roles`, ...view, Features.listPanelsHandler);
 router.post(`${ft}/button-roles`, ...manage, Features.savePanelHandler);
 router.delete(`${ft}/button-roles/:panelId`, ...manage, Features.deletePanelHandler);
+router.get('/communities/:communityId/live', ...view, async (req: any, res: any) => {
+  const { communitiesRepository } = await import('../repositories/index.js');
+  const c: any = await communitiesRepository.getById(req.params.communityId).catch(() => null);
+  const guildId = c?.guildId || String(req.params.communityId).replace(/^comm_/, '');
+  const { liveHub } = await import('../services/liveHub.js');
+  liveHub.subscribe(guildId, res);
+});
 router.get(`${ft}/server-stats`, ...view, Features.listStatsHandler);
 router.get(`${ft}/growth-report`, ...view, Features.growthReportHandler);
 router.put(`${ft}/growth-report`, ...manage, Features.growthReportHandler);

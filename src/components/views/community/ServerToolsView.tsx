@@ -1,3 +1,4 @@
+import { useLive } from '../../../lib/live.js';
 import { MessageComposer } from '../../common/MessageComposer.js';
 import { takeOpenTab, goTo } from './SetupGuideView.js';
 import { MemberName } from '../../common/DiscordPickers.js';
@@ -55,6 +56,8 @@ export function ServerToolsView({ communityId, only }: { communityId: string; on
   }, [api]);
 
   useEffect(() => { if (communityId) load(); }, [communityId, load]);
+  // Live: channel/role/name changes made in Discord appear here without reloading (your unsaved edits are kept).
+  useLive(communityId, () => { api('').then((d: any) => setRes(d.resources)).catch(() => undefined); }, ['channels', 'roles', 'emojis', 'guild']);
 
   const save = async (section: string, value: any) => {
     const saved = await api(`/settings/${section}`, 'PUT', value);
