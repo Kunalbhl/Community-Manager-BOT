@@ -59,18 +59,21 @@ export const words = (name: string) => String(name || '').toLowerCase().normaliz
 
 /** Name patterns per purpose, tried in order (best first). Matched against words(name). */
 export const PATTERNS = {
-  serverLog: [/^server log$/, /^(mod|moderation|audit|activity|bot) log$/, /^log$/, /server log/, /(mod|audit) log/],
-  recruitmentLog: [/^(recruitment|recruit|application|applicant) log$/, /(recruitment|application) (log|record)/],
-  review: [/^application$/, /^(application|app|applicant) review$/, /^(staff )?review$/, /application review/, /^applications?$/],
-  apply: [/^apply$/, /^(apply here|apply now|join u|how to join|join)$/, /apply/],
-  welcome: [/^welcome$/, /^(welcome and rule|arrival|greeting|new member)$/, /welcome/],
-  reviewerRole: [/^reviewer$/, /^(application|app) reviewer$/, /^recruiter$/, /reviewer/],
-  applicantRole: [/^applicant$/, /^(pending|unverified|new member|newcomer|guest)$/, /applicant/],
-  memberRole: [/^member$/, /^(verified|approved|verified member|community member)$/, /^member/],
+  serverLog: [/^server log$/, /^(mod|moderation|audit|activity|bot) log$/, /^log$/, /\bserver log\b/, /\b(mod|audit) log\b/],
+  recruitmentLog: [/^(recruitment|recruit|application|applicant) log$/, /\b(recruitment|application) (log|record)\b/],
+  review: [/^application$/, /^(application|app|applicant) review$/, /^(staff )?review$/, /\bapplication review\b/, /^applications?$/],
+  apply: [/^apply$/, /^apply to join$/, /^(apply here|apply now|join u|how to join)$/, /\bapply\b/],
+  // words() drops plurals and symbols: "Joined & Left" → "joined left", "Welcomes" → "welcome".
+  welcome: [/^welcome$/, /^(join|joining|joined|joiner)$/, /^(join|joined|joining) (and |n )?(left|leave|leaving|exit)$/,
+    /^(welcome and rule|welcome and goodbye|welcome goodbye|arrival|greeting|new member|new arrival|hello)$/,
+    /\bwelcome\b/, /\b(join|joined|joining)\b/, /\b(arrival|greeting)\b/],
+  reviewerRole: [/^reviewer$/, /^(application|app) reviewer$/, /^recruiter$/, /\breviewer\b/],
+  applicantRole: [/^applicant$/, /^(pending|unverified|new member|newcomer|guest)$/, /\bapplicant\b/],
+  memberRole: [/^member$/, /^(verified|approved|verified member|community member)$/, /^member\b/],
 };
 
-function best<T extends { name: string }>(items: T[], pats: RegExp[]): T | undefined {
-  for (const re of pats) { const hit = items.find((x) => re.test(words(x.name))); if (hit) return hit; }
+function best<T extends { name: string }>(items: T[], pats: RegExp[], not?: RegExp): T | undefined {
+  for (const re of pats) { const hit = items.find((x) => re.test(words(x.name)) && !(not && not.test(words(x.name)))); if (hit) return hit; }
   return undefined;
 }
 
@@ -80,7 +83,7 @@ const isPrivate = (guild: any, c: any) => !c.permissionsFor(guild.roles.everyone
 export function findChannel(guild: any, key: keyof typeof PATTERNS, opts: { private?: boolean; exclude?: string[] } = {}) {
   const text = Array.from(guild.channels.cache.values()).filter((c: any) => (c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement)
     && !(opts.exclude || []).includes(c.id) && (opts.private === undefined || isPrivate(guild, c) === opts.private)) as any[];
-  return best(text, PATTERNS[key]);
+  return best(text, PATTERNS[key], key === 'welcome' ? /\b(apply|how to join|join u)\b/ : undefined);
 }
 
 /** Existing plain role for a purpose: not managed, no admin powers, below the bot (so it can be given). */
@@ -120,7 +123,7 @@ async function staffChannel(guild: any, communityId: string, name: string, topic
 }
 
 async function publicChannel(guild: any, name: string, topic: string, made: Created, key?: keyof typeof PATTERNS) {
-  const existing = (key && findChannel(guild, key, { private: false })) || guild.channels.cache.find((c: any) => c.type === ChannelType.GuildText && c.name === name && !c.parent?.name?.includes('𝗖𝗢𝗠𝗠𝗨𝗡𝗜𝗧𝗬'));
+  const existing = (key && (findChannel(guild, key, { private: false }) || (key === 'welcome' ? findChannel(guild, key) : undefined))) || guild.channels.cache.find((c: any) => c.type === ChannelType.GuildText && c.name === name && !c.parent?.name?.includes('𝗖𝗢𝗠𝗠𝗨𝗡𝗜𝗧𝗬'));
   if (existing) return existing;
   // Only overwrite: the bot itself. @everyone is left exactly as the server's defaults.
   const c = await guild.channels.create({
