@@ -52,6 +52,8 @@ export function ServerToolsView({ communityId, only }: { communityId: string; on
       const d = await api('');
       setConfig(d.config);
       setRes(d.resources);
+      // The bot may still be reconnecting: ask once more shortly so names fill in by themselves.
+      if (!d.resources?.roles?.length) setTimeout(() => api('').then((x: any) => setRes(x.resources)).catch(() => undefined), 4000);
     } catch (e: any) { setError(e.message); }
   }, [api]);
 
@@ -67,6 +69,12 @@ export function ServerToolsView({ communityId, only }: { communityId: string; on
   const current = TABS.find((t) => t.id === tab)!;
   return (
     <div className="space-y-6">
+      {res && (!res.connected || !res.roles.length) && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <span>Couldn’t load your Discord roles and channels right now, so names may show as numbers. Your settings are safe.</span>
+          <button className={ghost} onClick={() => load()}>Retry</button>
+        </div>
+      )}
       {!only && <div>
         <h1 className="text-3xl font-bold text-slate-900">Server tools</h1>
         <p className="mt-1 text-slate-500">Tickets, warnings, recruitment roles, review rooms and bulk actions for your Discord server.</p>
@@ -136,23 +144,34 @@ export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boo
   );
 }
 
+/** Channels or roles that share a name get the end of their ID added so they can be told apart. */
+export function useLabels(options: Opt[]) {
+  return useMemo(() => {
+    const count = new Map<string, number>();
+    for (const o of options) count.set(o.name, (count.get(o.name) || 0) + 1);
+    return (o: Opt) => ((count.get(o.name) || 0) > 1 ? `${o.name}  ·  …${o.id.slice(-4)}` : o.name);
+  }, [options]);
+}
+
 export function Pick({ options, value, onChange, placeholder }: { options: Opt[]; value?: string; onChange: (v: string) => void; placeholder: string }) {
+  const label = useLabels(options);
   return (
     <select className={input} value={value || ''} onChange={(e) => onChange(e.target.value)}>
       <option value="">{placeholder}</option>
-      {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+      {options.map((o) => <option key={o.id} value={o.id}>{label(o)}</option>)}
     </select>
   );
 }
 
 export function MultiPick({ options, value, onChange, placeholder, prefix = '' }: { options: Opt[]; value: string[]; onChange: (v: string[]) => void; placeholder: string; prefix?: string }) {
   const byId = useMemo(() => new Map(options.map((o) => [o.id, o])), [options]);
+  const label = useLabels(options);
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1.5">
         {value.map((id) => (
           <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">
-            {prefix}{byId.get(id)?.name || id}
+            {prefix}{byId.get(id) ? label(byId.get(id)!) : (options.length ? 'deleted item' : `…${id.slice(-4)}`)}
             <button type="button" onClick={() => onChange(value.filter((v) => v !== id))} aria-label="Remove"><X className="h-3 w-3" /></button>
           </span>
         ))}
@@ -160,7 +179,7 @@ export function MultiPick({ options, value, onChange, placeholder, prefix = '' }
       </div>
       <select className={input} value="" onChange={(e) => e.target.value && onChange([...value, e.target.value])}>
         <option value="">{placeholder}</option>
-        {options.filter((o) => !value.includes(o.id)).map((o) => <option key={o.id} value={o.id}>{prefix}{o.name}</option>)}
+        {options.filter((o) => !value.includes(o.id)).map((o) => <option key={o.id} value={o.id}>{prefix}{label(o)}</option>)}
       </select>
     </div>
   );
