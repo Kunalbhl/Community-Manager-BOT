@@ -218,6 +218,7 @@ export const giveawayForms = {
       name: session.name, email: session.email, answers, status: 'VALID', won: [], createdAt: nowIso(),
     } as any);
     sessionsRepository.delete(session.id).catch(() => undefined);
+    import('./giveawaySheets.service.js').then((m) => m.giveawaySheets.appendEntry(f, entry)).catch(() => undefined);
     return entry;
   },
 };
