@@ -254,7 +254,7 @@ export const CATALOG: { icon: any; title: string; items: string[] }[] = [
   { icon: PartyPopper, title: 'Onboarding', items: ['Goodbye note when someone leaves', 'Private goodbye DM (best effort)', 'Auto-creates missing channels and roles', 'Reuses channels you already have', 'Roles given on approval', 'Welcome messages', 'Welcome DMs', 'Server rules command', 'Guided setup wizard', 'Setup checklist for admins', 'One-time welcome that thanks whoever added the bot', 'Automatic channel setup (reuses what you have)', 'Server rules imported from your Discord channel'] },
   { icon: Users, title: 'Members', items: ['Live server stats counter channels', 'Join and leave growth reports', 'Invite rewards and /myrewards', 'Dashboard updates live, no refresh', 'Member directory sync', 'Member 360 timeline', 'Lifecycle stages', 'Member status lookups', 'Cohorts', 'Search across everything'] },
   { icon: ShieldCheck, title: 'Moderation & safety', items: ['/warn and /warnings in Discord', 'Points-based warning system', 'Automatic timeout, kick or ban', 'Warnings and cases', 'Blacklists', 'Auto-moderation rules', 'Escalation queue', 'Staff audit trail', 'Security audit log'] },
-  { icon: CalendarDays, title: 'Events & engagement', items: ['Messages now, later or repeating', 'Reminders to a member or channel', 'Saved message templates', 'Rich message composer', 'Events with sign-ups', 'Register / Can’t go buttons right in Discord', 'Members-only, everyone or private events', 'Event reminders', 'Announcements', 'Polls', 'Engagement campaigns', 'Re-engagement campaigns', 'Rewards and recognition'] },
+  { icon: CalendarDays, title: 'Events & engagement', items: ['Web-form giveaways with Discord or Google sign-in', 'Entries saved and copied to your Google Sheet', 'Several prizes per giveaway, nobody wins twice', 'Winners highlighted with delivery details', 'Final winners report', 'Link events, polls, giveaways and messages together', 'Messages now, later or repeating', 'Reminders to a member or channel', 'Saved message templates', 'Rich message composer', 'Events with sign-ups', 'Register / Can’t go buttons right in Discord', 'Members-only, everyone or private events', 'Event reminders', 'Announcements', 'Polls', 'Engagement campaigns', 'Re-engagement campaigns', 'Rewards and recognition'] },
   { icon: Workflow, title: 'Automation', items: ['Workflow triggers', 'Scheduled jobs', 'New-application DMs', 'Daily reviewer digests', 'Follow-ups and nudges', 'Notification routing'] },
   { icon: BarChart3, title: 'Insights & AI', items: ['Application funnel', 'Drop-off analysis', 'Retention by cohort', 'Recruiter quality scores', 'Exportable reports', 'Community Brain suggestions', 'Lifecycle intelligence'] },
   { icon: Ticket, title: 'Tickets', items: ['Ticket panel with types', '/ticket command', 'Private ticket channels', 'Staff teams per type', 'Claim and close', 'Transcripts and log channel'] },
@@ -277,7 +277,7 @@ export const COMMANDS: [string, string][] = [
   ['/blacklist · /blacklist-check', 'Keep people out and check them'],
   ['/ticket · /support', 'Open a private ticket'],
   ['/rank · /leaderboard', 'Levels and XP'],
-  ['/birthday · /giveaway', 'Birthdays and giveaways'],
+  ['/birthday · /giveaway', 'Birthdays and button giveaways (web-form giveaways run from the dashboard)'],
   ['/rules · /help', 'Server rules and help'],
 ];
 
