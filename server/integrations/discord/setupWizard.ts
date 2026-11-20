@@ -207,14 +207,17 @@ const STEPS: Step[] = [
           `**Welcome channel:** ${ch(w.welcomeChannelId)} · ${on(Boolean(w.enableServerWelcome && w.welcomeChannelId))}`,
           `**Welcome DM:** ${on(w.enablePersonalDm)}`,
           `**Role on join:** ${w.newMemberRoleId ? `<@&${w.newMemberRoleId}>` : '`none`'}`,
+          `**Goodbye note:** ${on(Boolean(w.enableLeaveMessage))} · **Goodbye DM:** ${on(Boolean(w.enableLeaveDm))}`,
           '',
-          '-# Edit the welcome text and rules in the dashboard → Welcome & rules.',
+          '-# The goodbye goes to the welcome channel when someone leaves (not for kicks, bans or bots). Edit all texts in the dashboard → Welcome & rules.',
         ].join('\n'))],
         components: [
           row(new ChannelSelectMenuBuilder().setCustomId(id('welcome', 'ch')).setPlaceholder('Welcome channel').setChannelTypes(ChannelType.GuildText).setMinValues(0).setMaxValues(1).setDefaultChannels(...(w.welcomeChannelId ? [w.welcomeChannelId] : []))),
           row(new RoleSelectMenuBuilder().setCustomId(id('welcome', 'role')).setPlaceholder('Role to give on join (optional)').setMinValues(0).setMaxValues(1).setDefaultRoles(...(w.newMemberRoleId ? [w.newMemberRoleId] : []))),
           row(
             new ButtonBuilder().setCustomId(id('welcome', 'dm')).setStyle(w.enablePersonalDm ? ButtonStyle.Secondary : ButtonStyle.Success).setLabel(w.enablePersonalDm ? 'Turn off welcome DM' : 'Turn on welcome DM').setEmoji('✉️'),
+            new ButtonBuilder().setCustomId(id('welcome', 'bye')).setStyle(w.enableLeaveMessage ? ButtonStyle.Secondary : ButtonStyle.Success).setLabel(w.enableLeaveMessage ? 'Turn off goodbye note' : 'Turn on goodbye note').setEmoji('👋'),
+            new ButtonBuilder().setCustomId(id('welcome', 'byedm')).setStyle(w.enableLeaveDm ? ButtonStyle.Secondary : ButtonStyle.Success).setLabel(w.enableLeaveDm ? 'Turn off goodbye DM' : 'Turn on goodbye DM').setEmoji('💌'),
             createBtn('welcome', 'Create #welcome').setStyle(ButtonStyle.Secondary).setDisabled(Boolean(w.welcomeChannelId)),
           ),
         ],
@@ -241,6 +244,18 @@ const STEPS: Step[] = [
         return 'Saved.';
       }
       if (action === 'dm') { await welcomeOnboardingService.updateWelcomeConfig(communityId, { enablePersonalDm: !w.enablePersonalDm }); return w.enablePersonalDm ? 'Welcome DM off.' : 'Welcome DM on.'; }
+      if (action === 'bye') {
+        const next = !w.enableLeaveMessage;
+        const { DEFAULT_LEAVE_MESSAGE } = await import('../../services/leaveMessages.service.js');
+        await welcomeOnboardingService.updateWelcomeConfig(communityId, { enableLeaveMessage: next, ...(next && !w.leaveMessage ? { leaveMessage: DEFAULT_LEAVE_MESSAGE } : {}) });
+        return next ? (w.leaveChannelId || w.welcomeChannelId ? 'Goodbye note on.' : '⚠️ Goodbye note is on, but pick a welcome channel first so I know where to post it.') : 'Goodbye note off.';
+      }
+      if (action === 'byedm') {
+        const next = !w.enableLeaveDm;
+        const { DEFAULT_LEAVE_DM } = await import('../../services/leaveMessages.service.js');
+        await welcomeOnboardingService.updateWelcomeConfig(communityId, { enableLeaveDm: next, ...(next && !w.leaveDm ? { leaveDm: DEFAULT_LEAVE_DM } : {}) });
+        return next ? 'Goodbye DM on. Discord may block it if the person no longer shares a server with me.' : 'Goodbye DM off.';
+      }
     },
   },
 
@@ -430,7 +445,7 @@ async function reviewLines(communityId: string, guild: any) {
     `🛡️ Reviewers: ${roles(r.reviewerRoleIds)}`,
     `🎭 Applicant: ${role1(g.applicantRoleId)} · Member: ${role1(g.memberRoleId)}`,
     `📋 Review: ${ch(r.reviewChannelId)} · Apply panel: ${ch(r.panelChannelId)}${r.panelPostedAt ? ' (posted)' : ''} · Applications ${r.applyEnabled ? 'open' : 'paused'}`,
-    `🎉 Welcome: ${ch(w.welcomeChannelId)} · DM ${w.enablePersonalDm ? 'on' : 'off'}`,
+    `🎉 Welcome: ${ch(w.welcomeChannelId)} · DM ${w.enablePersonalDm ? 'on' : 'off'} · Goodbye ${w.enableLeaveMessage ? 'on' : 'off'}${w.enableLeaveDm ? ' + DM' : ''}`,
     `🧾 Logs: ${f.logs.enabled ? ch(f.logs.channelId) : '`off`'} · Recruitment log: ${ch(r.logChannelId)}`,
     `✨ Features: ${on2.length ? on2.join(', ') : 'none'}`,
   ];
