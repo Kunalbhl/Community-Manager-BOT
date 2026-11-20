@@ -28,6 +28,31 @@ interface TabDef { id: string; label: string; icon: any; hint: string; render: (
 export interface ModuleDef { id: string; title: string; desc: string; tabs: TabDef[] }
 
 /** One place per module: setup, daily work and settings live together as tabs. */
+/** Two or three closely related screens under one tab, chosen with a simple switch (no duplicate tabs). */
+function Switcher({ id, options }: { id: string; options: { id: string; label: string; icon: React.ComponentType<{ className?: string }>; render: () => React.ReactNode }[] }) {
+  const [sel, setSel] = useState<string>(() => {
+    try {
+      const v = sessionStorage.getItem('cm_sub') || '';
+      if (v.startsWith(`${id}:`)) { sessionStorage.removeItem('cm_sub'); const o = v.slice(id.length + 1); if (options.some((x) => x.id === o)) return o; }
+    } catch { /* ignore */ }
+    return options[0].id;
+  });
+  const cur = options.find((o) => o.id === sel) || options[0];
+  return (
+    <div className="space-y-4">
+      <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
+        {options.map((o) => (
+          <button key={o.id} role="tab" aria-selected={o.id === cur.id} onClick={() => setSel(o.id)}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${o.id === cur.id ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+            <o.icon className="h-4 w-4" />{o.label}
+          </button>
+        ))}
+      </div>
+      <div key={cur.id}>{cur.render()}</div>
+    </div>
+  );
+}
+
 export const MODULES: Record<string, ModuleDef> = {
   recruitment: {
     id: 'recruitment', title: 'Recruitment', desc: 'Applications, interviews, recruiters and the whole apply flow in Discord.',
@@ -56,28 +81,25 @@ export const MODULES: Record<string, ModuleDef> = {
     ],
   },
   engagement: {
-    id: 'engagement', title: 'Engagement', desc: 'Announcements, campaigns, reminders, polls, events and giveaways, all posted by the bot.',
+    id: 'engagement', title: 'Engagement', desc: 'Messages, polls, events, giveaways and starboard, all posted by the bot.',
     tabs: [
-      { id: 'announcements', label: 'Announcements', icon: Megaphone, hint: 'Post a message in a channel now or later.', render: (c) => <EngagementView communityId={c.communityId} only="announcements" /> },
-      { id: 'campaigns', label: 'Campaigns', icon: Repeat, hint: 'One-time or repeating messages to a channel or by DM.', render: (c) => <EngagementView communityId={c.communityId} only="campaigns" /> },
-      { id: 'reminders', label: 'Reminders', icon: Clock, hint: 'A timed message to one member or a channel.', render: (c) => <EngagementView communityId={c.communityId} only="reminders" /> },
+      { id: 'messages', label: 'Messages', icon: Megaphone, hint: 'Send a message now or later, repeat it, or remind someone. One place for every message the bot sends on a schedule.', render: (c) => <Switcher id="messages" options={[{ id: 'once', label: 'Send once or later', icon: Megaphone, render: () => <EngagementView communityId={c.communityId} only="announcements" /> }, { id: 'repeat', label: 'Repeat or send by DM', icon: Repeat, render: () => <EngagementView communityId={c.communityId} only="campaigns" /> }, { id: 'remind', label: 'Remind someone', icon: Clock, render: () => <EngagementView communityId={c.communityId} only="reminders" /> }]} /> },
       { id: 'polls', label: 'Polls', icon: BarChart3, hint: 'Native Discord polls that close on time.', render: (c) => <EngagementView communityId={c.communityId} only="polls" /> },
       { id: 'events', label: 'Events', icon: CalendarDays, hint: 'Events members register for with buttons in Discord.', render: (c) => <EventsView communityId={c.communityId} /> },
       { id: 'giveaways', label: 'Giveaways', icon: PartyPopper, hint: 'Members press Enter; winners are picked fairly when time runs out.', render: (c) => <CommunityFeaturesView communityId={c.communityId} only="giveaways" /> },
       { id: 'commands', label: 'Custom commands', icon: TerminalSquare, hint: 'Your own text commands, like !rules or !socials.', render: (c) => <CommunityFeaturesView communityId={c.communityId} only="custom" /> },
+      { id: 'starboard', label: 'Starboard', icon: Star, hint: 'Messages with enough star reactions are reposted in a highlight channel.', render: (c) => <CommunityFeaturesView communityId={c.communityId} only="starboard" /> },
       { id: 'templates', label: 'Templates', icon: FileText, hint: 'Saved messages you can reuse from any message box.', render: (c) => <EngagementView communityId={c.communityId} only="templates" /> },
     ],
   },
   moderation: {
-    id: 'moderation', title: 'Moderation', desc: 'Warnings, tickets, logs and tools that keep the server safe.',
+    id: 'moderation', title: 'Moderation', desc: 'Warnings, tickets, logs, the blacklist and tools that keep the server safe.',
     tabs: [
-      { id: 'warnings', label: 'Warnings', icon: ShieldAlert, hint: 'Every warning given, by whom and why.', render: (c) => <WarningsPanel communityId={c.communityId} /> },
-      { id: 'warning-rules', label: 'Warning rules', icon: Scale, hint: 'Points per reason and the action taken at each level.', render: (c) => <ServerToolsView communityId={c.communityId} only="warnings" /> },
+      { id: 'warnings', label: 'Warnings', icon: ShieldAlert, hint: 'Every warning given, plus the points per reason and the action taken at each level.', render: (c) => <Switcher id="warnings" options={[{ id: 'log', label: 'Warnings given', icon: ShieldAlert, render: () => <WarningsPanel communityId={c.communityId} /> }, { id: 'rules', label: 'Rules and actions', icon: Scale, render: () => <ServerToolsView communityId={c.communityId} only="warnings" /> }]} /> },
       { id: 'tickets', label: 'Tickets', icon: Ticket, hint: 'Members open private tickets by type; staff claim and close them.', render: (c) => <ServerToolsView communityId={c.communityId} only="tickets" /> },
       { id: 'logs', label: 'Server logs', icon: ScrollText, hint: 'Joins, leaves, deleted and edited messages, role changes and warnings in one channel.', render: (c) => <CommunityFeaturesView communityId={c.communityId} only="logs" /> },
       { id: 'blacklist', label: 'Blacklist', icon: Ban, hint: 'People kept out of the server, known by Discord ID, Discord name or only their game name. Search, filters, alerts and /blacklist-check.', render: (c) => <BlacklistView communityId={c.communityId} /> },
       { id: 'bulk', label: 'Bulk tools', icon: Layers, hint: 'Do one thing to many members or channels at once.', render: (c) => <ServerToolsView communityId={c.communityId} only="bulk" /> },
-      { id: 'starboard', label: 'Starboard', icon: Star, hint: 'Messages with enough star reactions are reposted in a highlight channel.', render: (c) => <CommunityFeaturesView communityId={c.communityId} only="starboard" /> },
     ],
   },
   settings: {
@@ -94,17 +116,17 @@ export const MODULES: Record<string, ModuleDef> = {
 };
 
 /** Old screen names → where they live now (keeps setup-guide links and bookmarks working). */
-const LEGACY: Record<string, [string, string?]> = {
+const LEGACY: Record<string, [string, string?, string?]> = {
   'server-tools:recruit': ['recruitment', 'discord'], 'server-tools:rooms': ['recruitment', 'rooms'], 'server-tools:roles': ['members', 'role-rules'],
-  'server-tools:warnings': ['moderation', 'warning-rules'], 'server-tools:tickets': ['moderation', 'tickets'], 'server-tools:bulk': ['moderation', 'bulk'], 'server-tools': ['recruitment', 'discord'],
+  'server-tools:warnings': ['moderation', 'warnings', 'rules'], 'server-tools:tickets': ['moderation', 'tickets'], 'server-tools:bulk': ['moderation', 'bulk'], 'server-tools': ['recruitment', 'discord'],
   'community-features:levels': ['members', 'levels'], 'community-features:verification': ['members', 'verification'], 'community-features:buttonRoles': ['members', 'role-panels'],
-  'community-features:birthdays': ['members', 'birthdays'], 'community-features:logs': ['moderation', 'logs'], 'community-features:starboard': ['moderation', 'starboard'],
+  'community-features:birthdays': ['members', 'birthdays'], 'community-features:logs': ['moderation', 'logs'], 'community-features:starboard': ['engagement', 'starboard'],
   'community-features:giveaways': ['engagement', 'giveaways'], 'community-features:custom': ['engagement', 'commands'], 'community-features': ['members', 'levels'],
   'settings:recruitment': ['recruitment', 'settings'], 'applications': ['recruitment', 'applications'], 'interviews': ['recruitment', 'interviews'], 'onboarding-interview': ['recruitment', 'interviews'],
   'recruitment-settings': ['recruitment', 'settings'], 'recruiters': ['recruitment', 'recruiters'], 'recruiter-codes': ['recruitment', 'recruiters'], 'rewards': ['recruitment', 'rewards'],
   'recruitment-command-center': ['recruitment', 'overview'], 'candidates': ['recruitment', 'applications'],
   'community': ['members', 'welcome'], 'community-config': ['members', 'welcome'], 'welcome-onboarding': ['members', 'welcome'], 'members': ['members', 'directory'],
-  'announcements': ['engagement', 'announcements'], 'campaigns': ['engagement', 'campaigns'], 'polls': ['engagement', 'polls'], 'templates': ['engagement', 'templates'],
+  'announcements': ['engagement', 'messages', 'once'], 'campaigns': ['engagement', 'messages', 'repeat'], 'reminders': ['engagement', 'messages', 'remind'], 'polls': ['engagement', 'polls'], 'templates': ['engagement', 'templates'],
   'events': ['engagement', 'events'], 'events-automation': ['engagement', 'events'],
   'warnings': ['moderation', 'warnings'], 'blacklist': ['moderation', 'blacklist'],
   'team-access': ['settings', 'team'], 'integrations': ['settings', 'integrations'], 'google-calendar': ['settings', 'integrations'], 'spreadsheet': ['recruitment', 'discord'],
@@ -119,7 +141,7 @@ export function resolveSection(section: string): { section: string; tab?: string
   try { pending = sessionStorage.getItem('cm_open_tab'); } catch { /* ignore */ }
   const hit = (pending && LEGACY[`${section}:${pending}`]) || LEGACY[section];
   if (hit) {
-    try { sessionStorage.removeItem('cm_open_tab'); } catch { /* ignore */ }
+    try { sessionStorage.removeItem('cm_open_tab'); if (hit[2]) sessionStorage.setItem('cm_sub', `${hit[1]}:${hit[2]}`); } catch { /* ignore */ }
     return { section: hit[0], tab: hit[1] };
   }
   if (MODULES[section] && pending && MODULES[section].tabs.some((t) => t.id === pending)) {
