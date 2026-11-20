@@ -30,6 +30,7 @@ export interface GateDoc {
   snapshotAt?: string;
   job?: { status: 'RUNNING' | 'DONE' | 'FAILED' | 'UNDONE'; step: string; done: number; total: number; error?: string; at: string };
   lastCheck?: { at: string; leaks: { id: string; name: string }[] };
+  lastAlertKey?: string;
   updatedAt: string;
 }
 
@@ -60,13 +61,23 @@ function newcomerVisible(guild: any) {
     .map((c: any) => ({ id: c.id, name: c.name, type: c.type, parent: c.parent?.name || null }));
 }
 
+/** Stats counter channels (Members, Bots, Followers...) are meant to be seen by everyone, so they are not leaks. */
+async function statChannelIds(communityId: string): Promise<Set<string>> {
+  try {
+    const { statCountersRepository } = await import('../features/serverStats.service.js');
+    const rows = await statCountersRepository.list({ where: [{ field: 'communityId', operator: '==', value: communityId }] });
+    return new Set(rows.map((r: any) => String(r.channelId)));
+  } catch { return new Set(); }
+}
+
 export const secureGate = {
   async status(communityId: string) {
     const gate = await getGate(communityId);
     const guild = await guildFor(communityId);
     if (!guild) return { gate, connected: false, visible: [], leaks: [], botOk: false, problems: ['The bot is not connected to this server.'] };
     const visible = newcomerVisible(guild);
-    const leaks = visible.filter((c) => !gate.publicChannelIds.includes(c.id));
+    const statIds = await statChannelIds(communityId);
+    const leaks = visible.filter((c) => !gate.publicChannelIds.includes(c.id) && !statIds.has(c.id));
     const me = guild.members.me;
     const problems: string[] = [];
     if (!me?.permissions.has(PermissionFlagsBits.ManageRoles)) problems.push('The bot needs the **Manage Roles** permission.');
@@ -404,8 +415,10 @@ export const secureGate = {
       if (g.lastCheck && Date.now() - Date.parse(g.lastCheck.at) < 23 * 3_600_000) continue;
       const s = await this.status(g.communityId).catch(() => null);
       if (!s?.connected) continue;
-      await saveGate(g.communityId, { lastCheck: { at: new Date().toISOString(), leaks: s.leaks.map((l: any) => ({ id: l.id, name: l.name })) } });
-      if (s.leaks.length) {
+      const key = s.leaks.map((l: any) => l.id).sort().join(',');
+      await saveGate(g.communityId, { lastCheck: { at: new Date().toISOString(), leaks: s.leaks.map((l: any) => ({ id: l.id, name: l.name })) }, lastAlertKey: key } as any);
+      // Only post when the list of exposed channels is new; the same list is not repeated every day.
+      if (s.leaks.length && key !== (g as any).lastAlertKey) {
         const { recruitmentLog } = await import('./recruitmentLog.service.js');
         await recruitmentLog.post(g.communityId, `⚠️ **Secure Setup check:** these channels are now visible to newcomers: ${s.leaks.map((l: any) => `<#${l.id}>`).join(', ')}. Recruitment stays on, but please lock them or mark them public in the dashboard.`, true);
       }
