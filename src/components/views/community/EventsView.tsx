@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Calendar, Users, Plus, Play, CheckCircle, XCircle, Copy, Send, Megaphone, Clock, BarChart3, Gift, ChevronDown, ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
 import { ChannelSelect, MemberName } from '../../common/DiscordPickers.js';
+import { LinkedPanel } from '../../common/Linked.js';
 import { MessageComposer } from '../../common/MessageComposer.js';
 import { useRemembered } from '../../common/useRemembered.js';
 
@@ -132,7 +133,7 @@ function EventCard({ e, communityId, call, reload, flash }: any) {
           </div>
           <p className="text-xs text-slate-500">It starts and finishes by itself at the set times. When it finishes, the private registrations channel is removed and the final list is kept here.</p>
 
-          <Linked e={e} call={call} />
+          <Linked e={e} call={call} communityId={communityId} />
           <div>
             <div className="mb-2 flex items-center justify-between"><span className="text-sm font-bold text-slate-900"><Users className="mr-1 inline h-4 w-4" />Registered ({regs ? going.length : '…'}{e.capacity ? ` / ${e.capacity}` : ''})</span>{e.rosterChannelId && <span className="text-xs text-slate-500">Also live in the private registrations channel</span>}</div>
             {(e.finalRoster || regs) && (
@@ -160,9 +161,7 @@ const KINDS: { type: string; tab: string; label: string; icon: any }[] = [
 ];
 
 /** The event's package: everything linked to it from the other Engagement features, with live status. */
-function Linked({ e, call }: any) {
-  const [items, setItems] = useState<any[] | null>(null);
-  useEffect(() => { call(`/api/v1/events/${e.id}/linked`).then((j: any) => setItems(j.items || [])).catch(() => setItems([])); }, [e.id]); // eslint-disable-line react-hooks/exhaustive-deps
+function Linked({ e, call, communityId }: any) {
   const open = (tab: string) => {
     try { sessionStorage.setItem('cm_event_for', e.id); sessionStorage.setItem('cm_open_tab', tab); } catch { /* ignore */ }
     window.dispatchEvent(new CustomEvent('cm:navigate', { detail: 'engagement' }));
@@ -170,20 +169,8 @@ function Linked({ e, call }: any) {
   return (
     <div>
       <div className="mb-1 text-sm font-bold text-slate-900">Event package</div>
-      <p className="mb-2 text-xs text-slate-500">Announcements, campaigns, reminders, polls and giveaways linked to this event. Add one here, or pick this event in “Part of an event” on any of those pages.</p>
-      {items === null ? <div className="h-10 animate-pulse rounded-lg bg-slate-100" /> : items.length ? (
-        <ul className="mb-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
-          {items.map((it) => { const k = KINDS.find((x) => x.type === it.type); const Icon = k?.icon || Calendar; return (
-            <li key={`${it.type}-${it.id}`} className="flex items-center gap-3 px-3 py-2 text-sm">
-              <Icon className="h-4 w-4 text-indigo-500" />
-              <span className="w-24 shrink-0 text-xs font-semibold text-slate-500">{k?.label}</span>
-              <span className="min-w-0 flex-1 truncate text-slate-800">{it.title || '—'}</span>
-              {it.when && <span className="shrink-0 text-xs text-slate-500">{fmt(it.when)}</span>}
-              {it.status && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{String(it.status).toLowerCase().replace(/_/g, ' ')}</span>}
-            </li>
-          ); })}
-        </ul>
-      ) : <p className="mb-3 text-xs text-slate-400">Nothing linked yet.</p>}
+      <p className="mb-2 text-xs text-slate-500">Everything linked to this event, and anything else you link to it, shows here and on the other side too. Create a new one below, or pick this event in “Part of an event” on any of those pages.</p>
+      <div className="mb-3"><LinkedPanel communityId={communityId} type="event" id={e.id} /></div>
       <div className="flex flex-wrap gap-2">{KINDS.map((k) => <button key={k.type} className={ghost} onClick={() => open(k.tab)}><k.icon className="h-3.5 w-3.5" />+ {k.label}</button>)}</div>
     </div>
   );

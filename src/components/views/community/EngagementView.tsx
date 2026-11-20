@@ -1,3 +1,4 @@
+import { LinksButton } from '../../common/Linked.js';
 import { EventPick, takeEventFor, attachToEvent, EventTag } from '../../common/EventPick.js';
 import { CategoryPicker } from '../../common/CategoryPicker.js';
 import { useRemembered } from '../../common/useRemembered.js';
@@ -153,7 +154,7 @@ function Announcements({ communityId, data, run, api, busy, chanName }: P) {
       </form>}
       list={!data.length ? <Empty text="No announcements yet." /> : data.map((a) => (
         <div key={a.id} className="rounded-xl border border-slate-200 p-4">
-          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{a.title}<EventTag item={a} /></span><Badge s={a.status} err={a.errorDetails || a.failureReason || a.lastError} /></div>
+          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{a.title}<EventTag item={a} /><LinksButton communityId={communityId} type="announcement" id={a.id} /></span><Badge s={a.status} err={a.errorDetails || a.failureReason || a.lastError} /></div>
           <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm text-slate-600">{a.content}</p>
           <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-500"><span>#{chanName?.(a.channelId) || 'channel'}</span><span>{a.status === 'SCHEDULED' ? `Sends ${when(a.scheduledAt)}` : when(a.createdAt)}</span></div>
           <div className="mt-3 flex flex-wrap gap-3 border-t border-slate-100 pt-2 text-xs font-semibold">
@@ -252,7 +253,7 @@ function Campaigns({ communityId, data, run, api, busy, chanName, roleName }: P)
       </form>}
       list={!data.length ? <Empty text="No campaigns yet." /> : data.map((c) => (
         <div key={c.id} className="rounded-xl border border-slate-200 p-4">
-          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{c.name}<EventTag item={c} /></span><Badge s={c.status} err={c.errorDetails || c.failureReason || c.lastError} /></div>
+          <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{c.name}<EventTag item={c} /><LinksButton communityId={communityId} type="campaign" id={c.id} /></span><Badge s={c.status} err={c.errorDetails || c.failureReason || c.lastError} /></div>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
             <span>{target(c)}</span><span>{describeFreq(c)}</span>
             {['SCHEDULED', 'PAUSED'].includes(c.status) && <span>Next: {when(c.scheduledAt)}</span>}
@@ -321,7 +322,7 @@ function Reminders({ communityId, data, run, api, busy, chanName }: P) {
         <div key={r.id} className="rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-bold text-slate-900">{r.targetType === 'CHANNEL' ? `#${chanName?.(r.channelId) || 'channel'}` : <>@<MemberName id={r.targetUser} communityId={communityId} fallback={r.targetUserName} /></>}</span>
-            <span className="flex items-center gap-1"><EventTag item={r} /><Badge s={r.status} err={r.errorDetails || r.failureReason || r.lastError} /></span>
+            <span className="flex items-center gap-1"><EventTag item={r} /><LinksButton communityId={communityId} type="reminder" id={r.id} /><Badge s={r.status} err={r.errorDetails || r.failureReason || r.lastError} /></span>
           </div>
           <div className="mt-1 text-xs text-slate-500">{r.status === 'PENDING' ? `Sends ${when(r.triggerAt)}` : `Sent ${when(r.updatedAt)}`}{r.recurrence && r.recurrence !== 'ONCE' ? ` · repeats ${r.recurrence === 'DAILY' ? 'daily' : 'weekly'}` : ''}</div>
           <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm text-slate-600">{r.message}</p>
@@ -380,7 +381,7 @@ function Polls({ communityId, data, run, api, busy, chanName }: P) {
         const total = (p.results || []).reduce((n: number, r: any) => n + r.votes, 0);
         return (
           <div key={p.id} className="rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{p.question}<EventTag item={p} /></span><Badge s={p.status} err={p.errorDetails || p.failureReason || p.lastError} /></div>
+            <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-900">{p.question}<EventTag item={p} /><LinksButton communityId={communityId} type="poll" id={p.id} /></span><Badge s={p.status} err={p.errorDetails || p.failureReason || p.lastError} /></div>
             <div className="mt-1 text-xs text-slate-500">#{chanName?.(p.channelId) || 'channel'} · {p.status === 'ACTIVE' ? `Closes ${when(p.endsAt)}` : `${total} vote${total === 1 ? '' : 's'}`}</div>
             {p.results ? (
               <div className="mt-3 space-y-1.5">

@@ -1,4 +1,5 @@
 import { useLive } from '../../../lib/live.js';
+import { LinksButton } from '../../common/Linked.js';
 import { EventPick, takeEventFor, attachToEvent, EventTag } from '../../common/EventPick.js';
 import { EmojiField } from '../../common/EmojiField.js';
 import { useRemembered } from '../../common/useRemembered.js';
@@ -199,7 +200,7 @@ function GiveawaysTab({ api, res, communityId }: any) {
           <ul className="divide-y divide-slate-100">
             {list.slice(0, 30).map((g) => (
               <li key={g.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-                <div><div className="font-semibold text-slate-900">🎁 {g.prize}<EventTag item={g} /></div>
+                <div><div className="font-semibold text-slate-900">🎁 {g.prize}<EventTag item={g} /><LinksButton communityId={communityId} type="giveaway" id={g.id} /></div>
                   <div className="text-xs text-slate-500">{g.entrants.length} entries · {g.winners} winner(s) · {g.status === 'RUNNING' ? `ends ${fmtDate(new Date(g.endsAt).toISOString())}` : g.status.toLowerCase()}{g.winnerIds?.length ? ` · won by ${g.winnerIds.length}` : ''}</div></div>
                 <div className="flex gap-3 text-xs font-semibold">
                   {g.status === 'RUNNING' && <><button className="text-indigo-600 hover:underline" onClick={() => act(g.id, 'end')}>End now</button><button className="text-rose-600 hover:underline" onClick={() => act(g.id, 'cancel')}>Cancel</button></>}

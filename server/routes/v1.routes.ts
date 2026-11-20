@@ -1,3 +1,4 @@
+import { listLinks, linkOptions, createLink, deleteLink } from '../controllers/links.controller.js';
 import { Router } from 'express';
 import { config } from '../config/env.js';
 import { searchController } from '../controllers/search.controller.js';
@@ -909,6 +910,10 @@ router.post('/events/:eventId/attendance/mark', requirePermission('community.man
 router.post('/events/:eventId/check-in', checkIn);
 router.post('/events/:eventId/links', requirePermission('community.manage'), linkToEvent);
 router.post('/events/:eventId/attach', requirePermission('community.manage'), attachToEvent);
+router.get('/links', requirePermission('community.view'), listLinks);
+router.get('/links/options', requirePermission('community.view'), linkOptions);
+router.post('/links', requirePermission('community.manage'), createLink);
+router.delete('/links/:linkId', requirePermission('community.manage'), deleteLink);
 router.get('/events/:eventId/linked', requirePermission('community.view'), linkedForEvent);
 
 // Schedules module
