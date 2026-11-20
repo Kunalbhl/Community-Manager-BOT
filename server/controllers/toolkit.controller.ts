@@ -47,7 +47,17 @@ async function guildResources(communityId: string) {
     .filter((r: any) => r.id !== guild.id && !r.managed)
     .sort((a: any, b: any) => b.position - a.position)
     .map((r: any) => ({ id: r.id, name: r.name, color: r.hexColor }));
-  const chans = Array.from(guild.channels.cache.values()) as any[];
+  // Use Discord's live channel list, not only the bot's cache: stale entries (old or deleted channels) are dropped so pickers match the server.
+  let chans = Array.from(guild.channels.cache.values()) as any[];
+  try {
+    const live = await Promise.race([guild.channels.fetch(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))]) as any;
+    const fresh = Array.from(live.values()).filter(Boolean) as any[];
+    if (fresh.length) {
+      const ids = new Set(fresh.map((c: any) => c.id));
+      for (const c of chans) if (!ids.has(c.id)) guild.channels.cache.delete(c.id);
+      chans = fresh;
+    }
+  } catch { /* keep the cached list */ }
   return {
     connected: true,
     roles,
