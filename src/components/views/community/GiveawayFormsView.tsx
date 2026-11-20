@@ -94,6 +94,8 @@ export function GiveawayFormsView({ communityId }: { communityId: string }) {
   const [forms, setForms] = useState<any[] | null>(null);
   const [edit, setEdit] = useState<any | null>(null);
   const [view, setView] = useState<{ form: any; entries: any[] } | null>(null);
+  const [sheet, setSheet] = useState<{ configured: boolean; connected: boolean; email: string } | null>(null);
+  useEffect(() => { call('/giveaway-forms/sheets/status').then(setSheet).catch(() => undefined); }, [call]);
   const [draw, setDraw] = useState<any | null>(null);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
@@ -140,7 +142,12 @@ export function GiveawayFormsView({ communityId }: { communityId: string }) {
         <label className="flex items-center gap-2"><input type="checkbox" checked={edit.requireGuildMember} onChange={(e) => setEdit({ ...edit, requireGuildMember: e.target.checked, allowGoogle: e.target.checked ? false : edit.allowGoogle })} />Only people in this Discord server (Discord sign-in)</label>
       </div>
       <div><span className={label}>Post the winners in this channel</span><div className="mt-1"><ChannelSelect communityId={communityId} value={edit.resultChannelId || ''} onChange={(v: string) => setEdit({ ...edit, resultChannelId: v })} placeholder="Result channel" /></div></div>
-      <label className={label}>Google Sheet link (optional, entries are copied there once Sheet sync is connected)<input className={input} value={edit.sheetUrl} onChange={(e) => setEdit({ ...edit, sheetUrl: e.target.value })} placeholder="https://docs.google.com/spreadsheets/d/…" /></label>
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+        <div className="font-semibold text-slate-900">Google Sheet copy</div>
+        {sheet?.connected ? <p className="mt-1">Connected as <b>{sheet.email}</b>. Make sure that Google account can edit the Sheet you paste below. <button className="ml-1 underline" onClick={() => call('/giveaway-forms/sheets/disconnect', 'POST').then(() => setSheet({ ...sheet, connected: false, email: '' }))}>Disconnect</button></p>
+          : <p className="mt-1">Let the bot write to your Sheet with your Google permission. <button className={`${ghost} ml-1`} disabled={!sheet?.configured} onClick={() => call('/giveaway-forms/sheets/connect-url').then((j) => { window.location.href = j.url; }).catch((e) => setMsg(e.message))}>Connect Google</button>{sheet && !sheet.configured && <span className="ml-2 text-xs text-rose-600">Google sign-in is not set up on the server.</span>}</p>}
+      </div>
+      <label className={label}>Google Sheet link (entries and winners are copied there)<input className={input} value={edit.sheetUrl} onChange={(e) => setEdit({ ...edit, sheetUrl: e.target.value })} placeholder="https://docs.google.com/spreadsheets/d/…" /></label>
       {msg && <p className="text-sm text-rose-600">{msg}</p>}
       <div className="flex gap-2"><button className={primary} disabled={busy || !edit.title.trim()} onClick={save}>Save</button><button className={ghost} onClick={() => { setEdit(null); setMsg(''); }}>Cancel</button></div>
     </div>
@@ -192,6 +199,7 @@ export function GiveawayFormsView({ communityId }: { communityId: string }) {
             <a className={ghost} href={f.url} target="_blank" rel="noreferrer"><ExternalLink className="h-3.5 w-3.5" />Open page</a>
             <button className={ghost} onClick={() => call(`/giveaway-forms/${f.id}/entries`).then((j) => setView({ form: j.form, entries: j.entries })).catch((e) => setMsg(e.message))}><Users className="h-3.5 w-3.5" />See entries</button>
             <button className={ghost} onClick={() => setEdit({ ...f, opensAt: toLocal(f.opensAt), closesAt: toLocal(f.closesAt), sheetUrl: f.sheetUrl || '' })}>Edit</button>
+            {f.sheetUrl && <button className={ghost} disabled={busy} onClick={() => run(() => call(`/giveaway-forms/${f.id}/sheets/sync`, 'POST').then((r) => { setMsg(`Sheet updated: ${r.entries} entries, ${r.winners} winners. ${r.url}`); }))}><RefreshCw className="h-3.5 w-3.5" />Sync to Sheet</button>}
             <button className={ghost} onClick={() => setDraw(f)}><Trophy className="h-3.5 w-3.5" />Prizes & draw</button>
             <button className={ghost} disabled={busy} onClick={() => window.confirm('Delete this form? Only possible when it has no entries.') && run(() => call(`/giveaway-forms/${f.id}`, 'DELETE'), 'Deleted.')}><Trash2 className="h-3.5 w-3.5" />Delete</button>
           </div>

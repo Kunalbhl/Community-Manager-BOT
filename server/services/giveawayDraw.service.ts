@@ -56,6 +56,7 @@ export const giveawayDraw = {
     }
     const remaining = (await prizesOf(communityId, formId)).filter((p) => !p.drawnAt).length;
     if (!remaining) await giveawayFormsRepository.update(formId, { status: 'DRAWN' } as any);
+    this.syncSheet(communityId, formId);
     return this.report(communityId, formId);
   },
 
@@ -72,6 +73,7 @@ export const giveawayDraw = {
     const r = entries.find((e) => e.id === repl)!;
     await giveawayEntriesRepository.update(repl, { won: [...r.won, prizeId] } as any);
     await giveawayPrizesRepository.update(prizeId, { winners: p.winners.map((w) => (w === entryId ? repl : w)) } as any);
+    this.syncSheet(communityId, p.formId);
     return this.report(communityId, p.formId);
   },
 
@@ -80,6 +82,11 @@ export const giveawayDraw = {
     if (!e || e.communityId !== communityId) throw new Error('Entry not found.');
     if (status === 'DISQUALIFIED' && e.won.length) throw new Error('This person already won. Use Replace winner on the prize.');
     await giveawayEntriesRepository.update(entryId, { status } as any);
+  },
+
+  /** Keep the Google Sheet (winners highlighted, Winners tab) in step. Best effort. */
+  syncSheet(communityId: string, formId: string) {
+    giveawayFormsRepository.getById(formId).then((f) => (f?.sheetUrl ? import('./giveawaySheets.service.js').then((m) => m.giveawaySheets.syncAll(communityId, formId)) : undefined)).catch((e) => logger.warn(`[GiveawayForms] sheet sync failed: ${e?.message}`));
   },
 
   async report(communityId: string, formId: string) {

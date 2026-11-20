@@ -927,6 +927,10 @@ router.post('/giveaway-forms/prizes/:prizeId/replace', requirePermission('commun
 router.post('/giveaway-forms/entries/:entryId/status', requirePermission('community.manage'), GwForms.entryStatus);
 router.get('/giveaway-forms/:formId/report', requirePermission('community.view'), GwForms.formReport);
 router.post('/giveaway-forms/:formId/announce', requirePermission('community.manage'), GwForms.announceResult);
+router.get('/giveaway-forms/sheets/status', requirePermission('community.view'), GwForms.sheetStatus);
+router.get('/giveaway-forms/sheets/connect-url', requirePermission('community.manage'), GwForms.sheetConnect);
+router.post('/giveaway-forms/sheets/disconnect', requirePermission('community.manage'), GwForms.sheetDisconnect);
+router.post('/giveaway-forms/:formId/sheets/sync', requirePermission('community.manage'), GwForms.sheetSync);
 router.get('/giveaway-forms/google/callback', GwForms.signInCallback);
 router.get('/public/giveaway/:slug', GwForms.publicInfo);
 router.get('/public/giveaway/:slug/login/:provider', GwForms.publicLogin);

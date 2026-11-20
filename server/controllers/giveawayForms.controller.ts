@@ -43,6 +43,7 @@ export async function publicLogin(req: Request, res: Response) {
 export async function signInCallback(req: Request, res: Response) {
   try {
     if (req.query.error) return res.redirect('/');
+    if (String(req.query.state || '').startsWith('gws_')) { const { giveawaySheets } = await import('../services/giveawaySheets.service.js'); return res.redirect(await giveawaySheets.callback(String(req.query.code || ''), String(req.query.state))); }
     const r = await giveawayForms.callback(String(req.query.code || ''), String(req.query.state || ''));
     if (r.token) res.cookie(GW_COOKIE, r.token, { httpOnly: true, secure: true, sameSite: 'lax', maxAge: 24 * 3600_000, path: '/' });
     res.redirect(r.to);
@@ -77,3 +78,10 @@ export const entryStatus = wrap(async (req, res) => {
 });
 export const formReport = wrap(async (req, res) => { res.json({ success: true, report: await giveawayDraw.report(cid(req), req.params.formId) }); });
 export const announceResult = wrap(async (req, res) => { res.json({ success: true, ...(await giveawayDraw.announce(cid(req), req.params.formId)) }); });
+
+/* ---------------- Google Sheet connection (staff) ---------------- */
+import { giveawaySheets } from '../services/giveawaySheets.service.js';
+export const sheetStatus = wrap(async (req, res) => { res.json({ success: true, ...(await giveawaySheets.status(cid(req))) }); });
+export const sheetConnect = wrap(async (req, res) => { res.json({ success: true, url: giveawaySheets.connectUrl(cid(req), String((req.user as any)?.id || ''), String((req.user as any)?.role || '')) }); });
+export const sheetDisconnect = wrap(async (req, res) => { await giveawaySheets.disconnect(cid(req)); res.json({ success: true }); });
+export const sheetSync = wrap(async (req, res) => { res.json({ success: true, ...(await giveawaySheets.syncAll(cid(req), req.params.formId)) }); });
