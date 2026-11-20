@@ -130,6 +130,8 @@ const LEGACY: Record<string, [string, string?, string?]> = {
   'community': ['members', 'welcome'], 'community-config': ['members', 'welcome'], 'welcome-onboarding': ['members', 'welcome'], 'members': ['members', 'directory'],
   'announcements': ['engagement', 'messages', 'once'], 'campaigns': ['engagement', 'messages', 'repeat'], 'reminders': ['engagement', 'messages', 'remind'], 'polls': ['engagement', 'polls'], 'templates': ['engagement', 'templates'],
   'events': ['engagement', 'events'], 'events-automation': ['engagement', 'events'],
+  'engagement:announcements': ['engagement', 'messages', 'once'], 'engagement:campaigns': ['engagement', 'messages', 'repeat'], 'engagement:reminders': ['engagement', 'messages', 'remind'],
+  'moderation:warning-rules': ['moderation', 'warnings', 'rules'],
   'warnings': ['moderation', 'warnings'], 'blacklist': ['moderation', 'blacklist'],
   'team-access': ['settings', 'team'], 'integrations': ['settings', 'integrations'], 'google-calendar': ['settings', 'integrations'], 'spreadsheet': ['recruitment', 'discord'],
   'notifications': ['settings', 'notifications'], 'pricing-trust': ['settings', 'plan'],
