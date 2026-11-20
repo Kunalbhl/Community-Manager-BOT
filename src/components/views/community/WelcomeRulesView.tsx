@@ -15,6 +15,11 @@ const WELCOME_VARS = [
   { token: 'recruiterCode', label: 'Recruiter code', sample: 'KTECH-07' },
 ];
 
+/** Variables the goodbye messages understand. */
+const LEAVE_VARS = WELCOME_VARS.filter((v) => ['memberName', 'communityName', 'memberCount'].includes(v.token));
+const LEAVE_DEFAULT = '👋 {{memberName}} has left {{communityName}}. We wish them well!';
+const LEAVE_DM_DEFAULT = 'Hi {{memberName}}, we are sorry to see you leave {{communityName}}. 💙\n\nThank you for being part of the community. You are always welcome back, and your feedback helps us improve.';
+
 const Toggle = ({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) => (
   <button type="button" role="switch" aria-checked={on} aria-label={label} onClick={() => onChange(!on)}
     className={`relative h-6 w-11 shrink-0 rounded-full transition ${on ? 'bg-indigo-600' : 'bg-slate-300'}`}>
@@ -60,7 +65,7 @@ export function WelcomeRulesView({ communityId }: { communityId: string }) {
   if (!cfg) return <div className="h-64 animate-pulse rounded-2xl bg-slate-200/60" />;
   return (
     <div className="space-y-6">
-      <Card title="Welcome new members" desc="Runs when an approved applicant joins your server. Use variables and mentions; the preview shows what they will see."
+      <Card title="Welcome and goodbye" desc="Welcome runs when an approved applicant joins; goodbye runs when someone leaves. Use variables and mentions; the preview shows what they will see."
         right={<button onClick={save} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700"><Save className="h-4 w-4" />Save</button>}>
         {msg && <p className={`mb-3 flex items-center gap-2 text-sm font-semibold ${msg.ok ? 'text-emerald-700' : 'text-rose-700'}`}>{msg.ok && <CheckCircle2 className="h-4 w-4" />}{msg.text}</p>}
         <div className="space-y-3">
@@ -72,6 +77,15 @@ export function WelcomeRulesView({ communityId }: { communityId: string }) {
           </Row>
           <Row title="Send a private welcome (DM)" hint="Only the new member sees it. Good for first steps and useful links." on={!!cfg.enablePersonalDm} onToggle={(v) => set({ enablePersonalDm: v })}>
             <TemplateField label="Message" value={cfg.personalWelcomeMessage || ''} onChange={(v) => set({ personalWelcomeMessage: v })} vars={WELCOME_VARS} braces="double" rows={3} />
+          </Row>
+          <Row title="Say goodbye in a channel when someone leaves" hint="A short note so the server notices. People removed by a moderator (kick or ban) and bots are skipped." on={!!cfg.enableLeaveMessage} onToggle={(v) => set({ enableLeaveMessage: v, ...(v && !cfg.leaveMessage ? { leaveMessage: LEAVE_DEFAULT } : {}) })}>
+            <label className="block text-sm font-semibold text-slate-700">Channel <span className="font-normal text-slate-500">· leave empty to use the welcome channel</span>
+              <div className="mt-1"><ChannelSelect communityId={communityId} value={cfg.leaveChannelId || ''} onChange={(id) => set({ leaveChannelId: id })} /></div>
+            </label>
+            <TemplateField label="Message" value={cfg.leaveMessage ?? LEAVE_DEFAULT} onChange={(v) => set({ leaveMessage: v })} vars={LEAVE_VARS} braces="double" rows={2} />
+          </Row>
+          <Row title="Send a private goodbye (DM)" hint="Only the person who left sees it. Discord can block DMs once someone no longer shares a server with the bot, so this is best effort." on={!!cfg.enableLeaveDm} onToggle={(v) => set({ enableLeaveDm: v, ...(v && !cfg.leaveDm ? { leaveDm: LEAVE_DM_DEFAULT } : {}) })}>
+            <TemplateField label="Message" value={cfg.leaveDm ?? LEAVE_DM_DEFAULT} onChange={(v) => set({ leaveDm: v })} vars={LEAVE_VARS} braces="double" rows={4} />
           </Row>
           <Row title="Give a role when they join" hint="For example a Member role, so they can see the server." on={!!cfg.enableAutoRoleAssignment} onToggle={(v) => set({ enableAutoRoleAssignment: v })}>
             <label className="block text-sm font-semibold text-slate-700">Role

@@ -1453,6 +1453,14 @@ export interface WelcomeOnboardingConfig {
   enablePersonalDm: boolean;
   enableServerWelcome: boolean;
   enableAutoRoleAssignment: boolean;
+  /** Goodbye: a short note in a channel when someone leaves (off until an admin turns it on). */
+  enableLeaveMessage?: boolean;
+  /** Channel for the goodbye note; the welcome channel is used when this is empty. */
+  leaveChannelId?: string;
+  leaveMessage?: string;
+  /** Goodbye: a private message to the person who left (best effort, Discord may block it). */
+  enableLeaveDm?: boolean;
+  leaveDm?: string;
   interviewMode: InterviewMode;
   rulesAcknowledgementEnabled?: boolean;
   communityRulesText?: string;

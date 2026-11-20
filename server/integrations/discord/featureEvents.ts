@@ -86,6 +86,10 @@ export function attachFeatureHandlers(client: Client) {
     const { inviteRewards } = await import('../../services/rewards/inviteRewards.service.js');
     await inviteRewards.onMemberJoined(await communityOf(member.guild.id), member.id);
   }));
+  client.on(Events.GuildMemberRemove, (member: any) => safe('leave message', async () => {
+    const { leaveMessages } = await import('../../services/leaveMessages.service.js');
+    await leaveMessages.onMemberLeft(await communityOf(member.guild.id), member);
+  }));
   client.on(Events.GuildMemberRemove, (member: any) => safe('log leave', async () => {
     const c = await communityOf(member.guild.id);
     const roles = member.roles?.cache ? Array.from(member.roles.cache.values()).filter((r: any) => r.id !== member.guild.id).map((r: any) => `<@&${r.id}>`).join(' ') : '';
