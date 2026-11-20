@@ -59,3 +59,21 @@ export async function publicSubmit(req: Request, res: Response) {
   } catch (e) { fail(res, e); }
 }
 export async function publicLogout(req: Request, res: Response) { res.clearCookie(GW_COOKIE, { path: '/' }); ok(res, { signedOut: true }); }
+
+/* ---------------- prizes and draws (staff) ---------------- */
+import { giveawayDraw } from '../services/giveawayDraw.service.js';
+export const listPrizes = wrap(async (req, res) => { res.json({ success: true, prizes: await giveawayDraw.prizes(cid(req), req.params.formId) }); });
+export const savePrize = wrap(async (req, res) => { res.json({ success: true, prize: await giveawayDraw.savePrize(cid(req), req.params.formId, req.body || {}, req.params.prizeId) }); });
+export const deletePrize = wrap(async (req, res) => { await giveawayDraw.deletePrize(cid(req), req.params.prizeId); res.json({ success: true }); });
+export const drawPrizes = wrap(async (req, res) => {
+  const ids = Array.isArray(req.body?.prizeIds) ? req.body.prizeIds.map(String).slice(0, 100) : [];
+  res.json({ success: true, report: await giveawayDraw.draw(cid(req), req.params.formId, ids, (req.user as any)?.id) });
+});
+export const replaceWinner = wrap(async (req, res) => { res.json({ success: true, report: await giveawayDraw.replaceWinner(cid(req), req.params.prizeId, String(req.body?.entryId || ''), !!req.body?.disqualify) }); });
+export const entryStatus = wrap(async (req, res) => {
+  const s = String(req.body?.status || '');
+  if (!['VALID', 'DISQUALIFIED'].includes(s)) throw new BadRequestError('Unknown status.');
+  await giveawayDraw.setEntryStatus(cid(req), req.params.entryId, s as any); res.json({ success: true });
+});
+export const formReport = wrap(async (req, res) => { res.json({ success: true, report: await giveawayDraw.report(cid(req), req.params.formId) }); });
+export const announceResult = wrap(async (req, res) => { res.json({ success: true, ...(await giveawayDraw.announce(cid(req), req.params.formId)) }); });

@@ -918,6 +918,15 @@ router.post('/giveaway-forms/:formId/status', requirePermission('community.manag
 router.delete('/giveaway-forms/:formId', requirePermission('community.manage'), GwForms.deleteForm);
 router.get('/giveaway-forms/:formId/entries', requirePermission('community.view'), GwForms.formEntries);
 router.get('/giveaway-forms/:formId/entries.csv', requirePermission('community.view'), GwForms.formCsv);
+router.get('/giveaway-forms/:formId/prizes', requirePermission('community.view'), GwForms.listPrizes);
+router.post('/giveaway-forms/:formId/prizes', requirePermission('community.manage'), GwForms.savePrize);
+router.put('/giveaway-forms/:formId/prizes/:prizeId', requirePermission('community.manage'), GwForms.savePrize);
+router.delete('/giveaway-forms/:formId/prizes/:prizeId', requirePermission('community.manage'), GwForms.deletePrize);
+router.post('/giveaway-forms/:formId/draw', requirePermission('community.manage'), GwForms.drawPrizes);
+router.post('/giveaway-forms/prizes/:prizeId/replace', requirePermission('community.manage'), GwForms.replaceWinner);
+router.post('/giveaway-forms/entries/:entryId/status', requirePermission('community.manage'), GwForms.entryStatus);
+router.get('/giveaway-forms/:formId/report', requirePermission('community.view'), GwForms.formReport);
+router.post('/giveaway-forms/:formId/announce', requirePermission('community.manage'), GwForms.announceResult);
 router.get('/giveaway-forms/google/callback', GwForms.signInCallback);
 router.get('/public/giveaway/:slug', GwForms.publicInfo);
 router.get('/public/giveaway/:slug/login/:provider', GwForms.publicLogin);
