@@ -251,10 +251,10 @@ export const CATALOG: { icon: any; title: string; items: string[] }[] = [
   { icon: ClipboardList, title: 'Recruitment', items: ['Custom application forms', '/apply inside Discord', 'Review queue', 'Approve or reject in one click', 'Escalate and flag', 'Reviewer notes', 'Applicant status checks', 'Requirement checks', 'Blacklist screening', 'Applicant portal', 'Role rules on approval', 'Private application chat per applicant', 'Consent to your rules before the interview', 'Rules quiz with a pass mark (score seen by staff only)', 'Automatic or manual screening and interview', 'Secure Setup: newcomers see nothing until approved', 'Recruitment log channel', 'Live Google Sheets record, staff-only /sheet link'] },
   { icon: Radar, title: 'Recruiters & referrals', items: ['Personal recruiter codes', 'Referral tracking', 'Recruiter benefits', 'Recruiter leaderboard', 'Recruiter portal', 'Recruiter performance records', 'Shareable portal links'] },
   { icon: Mic, title: 'Interviews', items: ['Interview scheduling', 'DM reminders 60 and 10 min before', 'Interview sessions inside Discord', 'Recorded answers and outcomes', 'Interview notes', 'Private review room per application', 'Temporary interview voice rooms', 'Escalation by reviewer rank', 'Private staff thread per application', 'AI interview summary for staff', 'Optional Google Calendar sync'] },
-  { icon: PartyPopper, title: 'Onboarding', items: ['Roles given on approval', 'Welcome messages', 'Welcome DMs', 'Server rules command', 'Guided setup wizard', 'Setup checklist for admins', 'One-time welcome that thanks whoever added the bot', 'Automatic channel setup (reuses what you have)', 'Server rules imported from your Discord channel'] },
-  { icon: Users, title: 'Members', items: ['Member directory sync', 'Member 360 timeline', 'Lifecycle stages', 'Member status lookups', 'Cohorts', 'Search across everything'] },
-  { icon: ShieldCheck, title: 'Moderation & safety', items: ['Points-based warning system', 'Automatic timeout, kick or ban', 'Warnings and cases', 'Blacklists', 'Auto-moderation rules', 'Escalation queue', 'Staff audit trail', 'Security audit log'] },
-  { icon: CalendarDays, title: 'Events & engagement', items: ['Events with sign-ups', 'Register / Can’t go buttons right in Discord', 'Members-only, everyone or private events', 'Event reminders', 'Announcements', 'Polls', 'Engagement campaigns', 'Re-engagement campaigns', 'Rewards and recognition'] },
+  { icon: PartyPopper, title: 'Onboarding', items: ['Goodbye note when someone leaves', 'Private goodbye DM (best effort)', 'Auto-creates missing channels and roles', 'Reuses channels you already have', 'Roles given on approval', 'Welcome messages', 'Welcome DMs', 'Server rules command', 'Guided setup wizard', 'Setup checklist for admins', 'One-time welcome that thanks whoever added the bot', 'Automatic channel setup (reuses what you have)', 'Server rules imported from your Discord channel'] },
+  { icon: Users, title: 'Members', items: ['Live server stats counter channels', 'Join and leave growth reports', 'Invite rewards and /myrewards', 'Dashboard updates live, no refresh', 'Member directory sync', 'Member 360 timeline', 'Lifecycle stages', 'Member status lookups', 'Cohorts', 'Search across everything'] },
+  { icon: ShieldCheck, title: 'Moderation & safety', items: ['/warn and /warnings in Discord', 'Points-based warning system', 'Automatic timeout, kick or ban', 'Warnings and cases', 'Blacklists', 'Auto-moderation rules', 'Escalation queue', 'Staff audit trail', 'Security audit log'] },
+  { icon: CalendarDays, title: 'Events & engagement', items: ['Messages now, later or repeating', 'Reminders to a member or channel', 'Saved message templates', 'Rich message composer', 'Events with sign-ups', 'Register / Can’t go buttons right in Discord', 'Members-only, everyone or private events', 'Event reminders', 'Announcements', 'Polls', 'Engagement campaigns', 'Re-engagement campaigns', 'Rewards and recognition'] },
   { icon: Workflow, title: 'Automation', items: ['Workflow triggers', 'Scheduled jobs', 'New-application DMs', 'Daily reviewer digests', 'Follow-ups and nudges', 'Notification routing'] },
   { icon: BarChart3, title: 'Insights & AI', items: ['Application funnel', 'Drop-off analysis', 'Retention by cohort', 'Recruiter quality scores', 'Exportable reports', 'Community Brain suggestions', 'Lifecycle intelligence'] },
   { icon: Ticket, title: 'Tickets', items: ['Ticket panel with types', '/ticket command', 'Private ticket channels', 'Staff teams per type', 'Claim and close', 'Transcripts and log channel'] },
@@ -264,7 +264,24 @@ export const CATALOG: { icon: any; title: string; items: string[] }[] = [
   { icon: Layers, title: 'Team & platform', items: ['Staff roles and permissions', 'Several Discord roles per staff role', 'Role changes sync to Discord', 'Light, dark or system theme', 'Multi-server workspaces', 'Per-user notification settings', 'Discord diagnostics', 'SocialCord: The Social Media Alert Bot', 'Support command', '24/7 hosting with failover'] },
 ];
 
-const ROADMAP = ['Multi-language', 'Scheduled messages', 'Server backups', 'Import settings from other bots'];
+export const COMMANDS: [string, string][] = [
+  ['/community-manager setup', 'Guided setup that creates what is missing'],
+  ['/community-manager portal', 'Open the dashboard'],
+  ['/community-manager status', 'See what is set up and what is pending'],
+  ['/apply', 'Apply to join'], ['/application', 'Check your application'],
+  ['/approve · /reject · /escalate', 'Review applications'],
+  ['/interview', 'Schedule and run interviews'],
+  ['/mycode · /recruiter-code · /referral', 'Recruiter codes and referrals'],
+  ['/myrewards · /reward', 'Invite and recruiter rewards'],
+  ['/warn · /warnings', 'Warn a member and see their record'],
+  ['/blacklist · /blacklist-check', 'Keep people out and check them'],
+  ['/ticket · /support', 'Open a private ticket'],
+  ['/rank · /leaderboard', 'Levels and XP'],
+  ['/birthday · /giveaway', 'Birthdays and giveaways'],
+  ['/rules · /help', 'Server rules and help'],
+];
+
+const ROADMAP = ['Multi-language', 'Server backups', 'Import settings from other bots'];
 
 const ROLES = [
   { name: 'Owner', color: '#FF5C8A', text: 'Full control of the server, its settings and who is on staff.' },
@@ -497,6 +514,15 @@ function Catalog() {
               ))}
             </ul>
           </div>
+        </div>
+        <div className="mt-14 rounded-3xl border border-[var(--site-line)] bg-[var(--site-night)] p-8">
+          <h3 className="text-xl font-bold">Slash commands</h3>
+          <p className="mt-1 text-[15px] text-[var(--site-muted)]">Everything below works in Discord today. Type / and pick one.</p>
+          <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+            {COMMANDS.map(([c, d]) => (
+              <li key={c} className="rounded-xl border border-[var(--site-line)] bg-[var(--site-panel)]/50 px-5 py-3"><code className="font-semibold text-[var(--site-signal)]">{c}</code><span className="block text-[15px] text-[var(--site-muted)]">{d}</span></li>
+            ))}
+          </ul>
         </div>
         <div className="mt-14 rounded-3xl border border-dashed border-[var(--site-line)] p-8">
           <div className="flex flex-wrap items-center gap-3">
