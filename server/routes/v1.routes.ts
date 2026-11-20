@@ -210,6 +210,7 @@ import {
 } from '../controllers/platform.controller.js';
 import { recruiterRecordsController } from '../controllers/recruiterRecords.controller.js';
 import { getPublicContact, postPublicContact } from '../controllers/publicContact.controller.js';
+import * as GwForms from '../controllers/giveawayForms.controller.js';
 import * as WebApply from '../controllers/webApply.controller.js';
 import * as Team from '../controllers/team.controller.js';
 import { setupGuideHandler } from '../controllers/setupGuide.controller.js';
@@ -910,6 +911,18 @@ router.post('/events/:eventId/attendance/mark', requirePermission('community.man
 router.post('/events/:eventId/check-in', checkIn);
 router.post('/events/:eventId/links', requirePermission('community.manage'), linkToEvent);
 router.post('/events/:eventId/attach', requirePermission('community.manage'), attachToEvent);
+router.get('/giveaway-forms', requirePermission('community.view'), GwForms.listForms);
+router.post('/giveaway-forms', requirePermission('community.manage'), GwForms.saveForm);
+router.put('/giveaway-forms/:formId', requirePermission('community.manage'), GwForms.saveForm);
+router.post('/giveaway-forms/:formId/status', requirePermission('community.manage'), GwForms.setFormStatus);
+router.delete('/giveaway-forms/:formId', requirePermission('community.manage'), GwForms.deleteForm);
+router.get('/giveaway-forms/:formId/entries', requirePermission('community.view'), GwForms.formEntries);
+router.get('/giveaway-forms/:formId/entries.csv', requirePermission('community.view'), GwForms.formCsv);
+router.get('/giveaway-forms/google/callback', GwForms.signInCallback);
+router.get('/public/giveaway/:slug', GwForms.publicInfo);
+router.get('/public/giveaway/:slug/login/:provider', GwForms.publicLogin);
+router.post('/public/giveaway/:slug/submit', GwForms.publicSubmit);
+router.post('/public/giveaway/:slug/logout', GwForms.publicLogout);
 router.get('/links', requirePermission('community.view'), listLinks);
 router.get('/links/options', requirePermission('community.view'), linkOptions);
 router.post('/links', requirePermission('community.manage'), createLink);

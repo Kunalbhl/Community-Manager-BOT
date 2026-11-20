@@ -166,6 +166,11 @@ export async function authCallback(req: Request, res: Response, next: NextFuncti
     const { joinCallback } = await import('./webApply.controller.js');
     return joinCallback(req, res);
   }
+  // Giveaway form visitors (Enter with Discord) share this callback too; their state starts with "gw_".
+  if (typeof req.query.state === 'string' && req.query.state.startsWith('gw_')) {
+    const { signInCallback } = await import('./giveawayForms.controller.js');
+    return signInCallback(req, res);
+  }
   const traceId = `trace_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const startTime = Date.now();
 
