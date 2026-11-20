@@ -1,7 +1,4 @@
-import { BlacklistView } from '../views/community/BlacklistView.js';
-import { RewardsView } from '../views/community/RewardsView.js';
-import React, { useEffect, useState } from 'react';
-import { WarningsPanel } from '../views/community/WarningsPanel.js';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import {
   ClipboardList, Inbox, Mic, MessageSquareText, DoorOpen, Gift, Settings as SettingsIcon, Activity,
   HandHeart, BadgeCheck, MousePointerClick, UserCheck, TrendingUp, Cake, Users,
@@ -9,21 +6,26 @@ import {
   ShieldAlert, Scale, Ticket, ScrollText, Ban, Layers, Star,
   Server, UserCog, Plug, Bell, CreditCard, Lock,
 } from 'lucide-react';
-import { ApplicationsView } from '../views/community/ApplicationsView.js';
-import { ServerToolsView } from '../views/community/ServerToolsView.js';
-import { CommunityFeaturesView } from '../views/community/CommunityFeaturesView.js';
-import { CommunitySettingsView } from '../views/community/CommunitySettingsView.js';
-import { EngagementView } from '../views/community/EngagementView.js';
-import { EventsView } from '../views/community/EventsView.js';
-import { TeamAccessView } from '../views/community/TeamAccessView.js';
-import { ConnectionCenterView } from '../views/community/ConnectionCenterView.js';
-import { WelcomeRulesView } from '../views/community/WelcomeRulesView.js';
-import { ServerSettingsView } from '../views/community/ServerSettingsView.js';
-import { RecruiterCodesManager } from '../views/community/RecruiterCodesManager.js';
-import { RecruitmentSettingsView } from '../views/community/RecruitmentSettingsView.js';
-import { MemberListView } from '../views/community/MemberListView.js';
 
 export interface ModuleCtx { communityId: string; currentRole: any; canEdit: boolean }
+// Each screen loads only when opened, so the dashboard starts fast.
+const BlacklistView = lazy(() => import('../views/community/BlacklistView.js').then((m) => ({ default: m.BlacklistView })));
+const RewardsView = lazy(() => import('../views/community/RewardsView.js').then((m) => ({ default: m.RewardsView })));
+const WarningsPanel = lazy(() => import('../views/community/WarningsPanel.js').then((m) => ({ default: m.WarningsPanel })));
+const ApplicationsView = lazy(() => import('../views/community/ApplicationsView.js').then((m) => ({ default: m.ApplicationsView })));
+const ServerToolsView = lazy(() => import('../views/community/ServerToolsView.js').then((m) => ({ default: m.ServerToolsView })));
+const CommunityFeaturesView = lazy(() => import('../views/community/CommunityFeaturesView.js').then((m) => ({ default: m.CommunityFeaturesView })));
+const CommunitySettingsView = lazy(() => import('../views/community/CommunitySettingsView.js').then((m) => ({ default: m.CommunitySettingsView })));
+const EngagementView = lazy(() => import('../views/community/EngagementView.js').then((m) => ({ default: m.EngagementView })));
+const EventsView = lazy(() => import('../views/community/EventsView.js').then((m) => ({ default: m.EventsView })));
+const TeamAccessView = lazy(() => import('../views/community/TeamAccessView.js').then((m) => ({ default: m.TeamAccessView })));
+const ConnectionCenterView = lazy(() => import('../views/community/ConnectionCenterView.js').then((m) => ({ default: m.ConnectionCenterView })));
+const WelcomeRulesView = lazy(() => import('../views/community/WelcomeRulesView.js').then((m) => ({ default: m.WelcomeRulesView })));
+const ServerSettingsView = lazy(() => import('../views/community/ServerSettingsView.js').then((m) => ({ default: m.ServerSettingsView })));
+const RecruiterCodesManager = lazy(() => import('../views/community/RecruiterCodesManager.js').then((m) => ({ default: m.RecruiterCodesManager })));
+const RecruitmentSettingsView = lazy(() => import('../views/community/RecruitmentSettingsView.js').then((m) => ({ default: m.RecruitmentSettingsView })));
+const MemberListView = lazy(() => import('../views/community/MemberListView.js').then((m) => ({ default: m.MemberListView })));
+
 interface TabDef { id: string; label: string; icon: any; hint: string; render: (c: ModuleCtx) => React.ReactNode }
 export interface ModuleDef { id: string; title: string; desc: string; tabs: TabDef[] }
 
@@ -48,7 +50,7 @@ function Switcher({ id, options }: { id: string; options: { id: string; label: s
           </button>
         ))}
       </div>
-      <div key={cur.id}>{cur.render()}</div>
+      <div key={cur.id}><Suspense fallback={<div className="p-8 text-sm text-slate-500">Loading…</div>}>{cur.render()}</Suspense></div>
     </div>
   );
 }
@@ -198,7 +200,7 @@ export function ModuleView({ module, ctx }: { module: ModuleDef; ctx: ModuleCtx 
         ))}
       </div>
       <p className="text-sm text-slate-500">{current.hint}</p>
-      <div key={`${module.id}:${current.id}`}>{current.render(ctx)}</div>
+      <div key={`${module.id}:${current.id}`}><Suspense fallback={<div className="p-8 text-sm text-slate-500">Loading…</div>}>{current.render(ctx)}</Suspense></div>
     </div>
   );
 }

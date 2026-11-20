@@ -148,7 +148,13 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    // Hashed build files never change, so browsers can keep them; index.html is always re-checked.
+    app.use(express.static(distPath, {
+      setHeaders: (res, file) => {
+        if (/[\\/]assets[\\/]/.test(file)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        else if (file.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+      },
+    }));
     app.get('*', (req: Request, res: Response) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
