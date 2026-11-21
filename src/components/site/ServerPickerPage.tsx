@@ -105,7 +105,7 @@ export function ServerPickerPage() {
           <div className="mt-10 rounded-2xl border border-[var(--site-rose)]/50 bg-[var(--site-panel)] p-7">
             <h2 className="text-2xl font-bold">Your servers did not load</h2>
             <p className="mt-2 text-[var(--site-muted)]">{error} Try again; if it keeps happening, log out and back in.</p>
-            <button onClick={load} className="cm-btn-ghost mt-5"><RefreshCw className="h-4 w-4" aria-hidden /> Try again</button>
+            <button onClick={() => load()} className="cm-btn-ghost mt-5"><RefreshCw className="h-4 w-4" aria-hidden /> Try again</button>
           </div>
         )}
 
@@ -124,7 +124,7 @@ export function ServerPickerPage() {
             <ul className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3 min-[1900px]:grid-cols-4 min-[2500px]:grid-cols-5">
               {servers.map((s) => <ServerCard key={s.guildId} server={s} onOpen={open} />)}
             </ul>
-            <button onClick={load} className="mt-5 inline-flex items-center gap-2 text-[15px] text-[var(--site-muted)] hover:text-[var(--site-text)]">
+            <button onClick={() => load()} className="mt-5 inline-flex items-center gap-2 text-[15px] text-[var(--site-muted)] hover:text-[var(--site-text)]">
               <RefreshCw className="h-4 w-4" aria-hidden /> Refresh list (after adding the bot)
             </button>
           </>
