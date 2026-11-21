@@ -64,6 +64,9 @@ export const AUTHORITATIVE_DISCORD_PERMISSIONS = {
   ViewAuditLog: 128n,
   SendPolls: 562949953421312n,
   ChangeNickname: 67108864n,
+  ManageEvents: 8589934592n,
+  CreateEvents: 17592186044416n,
+  UseVAD: 33554432n,
 };
 
 export function buildAuthoritativeInstallPermissions(): string {
