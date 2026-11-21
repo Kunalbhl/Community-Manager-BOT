@@ -13,7 +13,7 @@ import {
 /* Types + API                                                         */
 /* ------------------------------------------------------------------ */
 export interface Opt { id: string; name: string; color?: string }
-export interface Resources { connected: boolean; hiddenCount?: number; roles: Opt[]; textChannels: Opt[]; categories: Opt[] }
+export interface Resources { connected: boolean; hiddenCount?: number; botIsAdmin?: boolean; fullAccessUrl?: string; roles: Opt[]; textChannels: Opt[]; categories: Opt[] }
 export type Tab = 'recruit' | 'tickets' | 'warnings' | 'roles' | 'rooms' | 'bulk';
 
 export function useApi(communityId: string) {
@@ -77,7 +77,8 @@ export function ServerToolsView({ communityId, only }: { communityId: string; on
       )}
       {res && !!res.hiddenCount && (
         <div className="rounded-xl border border-sky-300 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-          <b>{res.hiddenCount} private channel{res.hiddenCount === 1 ? '' : 's'} can’t be seen by the bot.</b> Since 16 Nov 2026 Discord hides private channels from bots, so they are left out of these lists. To include them, give Community Manager <b>View Channel</b> on those channels (or the <b>Administrator</b> permission on its role). Nothing is changed or removed.
+          <b>{res.hiddenCount} private channel{res.hiddenCount === 1 ? '' : 's'} can’t be seen by the bot.</b> Since 16 Nov 2026 Discord hides private channels from bots, so they are left out of these lists. A server admin can fix this in one click: give Community Manager <b>Administrator</b> (it never gives anything to @everyone), or <b>View Channel</b> on those channels. Nothing is changed or removed.
+          {res.fullAccessUrl && <div className="mt-2 flex flex-wrap items-center gap-2"><a className={btn} href={res.fullAccessUrl} target="_blank" rel="noreferrer">Give full access (server admin)</a><button type="button" className={ghost} onClick={() => navigator.clipboard?.writeText(res.fullAccessUrl || '')}>Copy link for my admin</button></div>}
         </div>
       )}
       {!only && <div>

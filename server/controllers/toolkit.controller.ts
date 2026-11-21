@@ -2,6 +2,7 @@
  * Dashboard API for the server toolkit: tickets, warning policy, recruitment role rules,
  * review rooms (temporary voice + escalation) and bulk tools.
  */
+import { config } from '../config/env.js';
 import { Request, Response } from 'express';
 import { isObfuscated } from '../integrations/discord/channelAccess.js';
 import { getToolkit, saveToolkit, guildFor, isSnowflake, ToolkitConfig } from '../services/toolkit/toolkitConfig.js';
@@ -50,20 +51,25 @@ async function guildResources(communityId: string) {
     .map((r: any) => ({ id: r.id, name: r.name, color: r.hexColor }));
   // Use Discord's live channel list, not only the bot's cache: stale entries (old or deleted channels) are dropped so pickers match the server.
   let chans = Array.from(guild.channels.cache.values()) as any[];
+  const hiddenCount = chans.filter((c) => isObfuscated(c)).length; // channels Discord hides from the bot (it lacks View Channel there)
   try {
     const live = await Promise.race([guild.channels.fetch(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000))]) as any;
     const fresh = Array.from(live.values()).filter(Boolean) as any[];
     if (fresh.length) {
       const ids = new Set(fresh.map((c: any) => c.id));
-      for (const c of chans) if (!ids.has(c.id)) guild.channels.cache.delete(c.id);
+      for (const c of chans) if (!ids.has(c.id) && !isObfuscated(c)) guild.channels.cache.delete(c.id);
       chans = fresh;
     }
   } catch { /* keep the cached list */ }
-  const hiddenCount = chans.filter((c) => isObfuscated(c)).length;
   chans = chans.filter((c) => !isObfuscated(c));
+  const clientId = config.DISCORD_CLIENT_ID || config.DISCORD_APPLICATION_ID;
+  const isAdmin = Boolean(guild.members?.me?.permissions?.has?.('Administrator'));
   return {
     connected: true,
     hiddenCount,
+    botIsAdmin: isAdmin,
+    // One click for a server admin: re-authorizes the bot in this server with Administrator so Discord shows it every channel.
+    fullAccessUrl: clientId && !isAdmin ? `https://discord.com/oauth2/authorize?client_id=${clientId}&scope=${encodeURIComponent('bot applications.commands')}&permissions=8&guild_id=${guild.id}&disable_guild_select=true` : '',
     roles,
     textChannels: chans.filter((c) => c.type === 0 || c.type === 5).sort((a, b) => a.rawPosition - b.rawPosition).map((c) => ({ id: c.id, name: c.name })),
     categories: chans.filter((c) => c.type === 4).sort((a, b) => a.rawPosition - b.rawPosition).map((c) => ({ id: c.id, name: c.name })),
