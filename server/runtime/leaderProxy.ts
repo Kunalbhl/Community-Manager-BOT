@@ -13,10 +13,25 @@ import https from 'https';
 import { URL } from 'url';
 import { logger } from '../logging/logger.js';
 import { getLeadershipStatus } from './leadership.js';
+import { discordService } from '../integrations/discord/discord.service.js';
 
 const PROXY_MARK = 'x-cm-proxied';
 const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade', 'host']);
 let upstreamDownUntil = 0;
+
+/**
+ * While the leader cannot be reached, a standby that is NOT connected to Discord must not answer data requests itself:
+ * it would report "Bot not added", empty channel lists and missing roles as if they were true. It says "restarting" instead,
+ * and the dashboard retries. A standby that has a live Discord connection (or became leader) can still answer.
+ */
+function unavailableOrLocal(req: Request, res: Response, next: NextFunction) {
+  const path = req.originalUrl.split('?')[0];
+  const needsDiscord = req.method !== 'GET' || /\/(discord|communities|toolkit|giveaway-forms|links|servers|guilds)\b/.test(path);
+  if (needsDiscord && !discordService.isConnected()) {
+    return res.status(503).set('Retry-After', '5').json({ success: false, code: 'LEADER_UNAVAILABLE', message: 'The bot is reconnecting. Please retry in a few seconds.' });
+  }
+  return next();
+}
 
 export function leaderProxy() {
   const target = (process.env.LEADER_API_URL || '').trim().replace(/\/$/, '');
@@ -28,7 +43,8 @@ export function leaderProxy() {
 
   return (req: Request, res: Response, next: NextFunction) => {
     const status = getLeadershipStatus();
-    if (status.isLeader || req.headers[PROXY_MARK] || Date.now() < upstreamDownUntil) return next();
+    if (status.isLeader || req.headers[PROXY_MARK]) return next();
+    if (Date.now() < upstreamDownUntil) return unavailableOrLocal(req, res, next);
 
     const headers: Record<string, any> = {};
     for (const [k, v] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(k.toLowerCase())) headers[k] = v;
@@ -60,9 +76,9 @@ export function leaderProxy() {
     const fail = (err: Error) => {
       if (failed) return;
       failed = true;
-      upstreamDownUntil = Date.now() + 30000;
-      logger.warn(`[LeaderProxy] Leader unreachable (${err.message}); serving locally for 30s.`);
-      if (!res.headersSent && !(req as any).__bodyConsumed) return next();
+      upstreamDownUntil = Date.now() + 10000;
+      logger.warn(`[LeaderProxy] Leader unreachable (${err.message}); retrying in 10s.`);
+      if (!res.headersSent && !(req as any).__bodyConsumed) return unavailableOrLocal(req, res, next);
       if (!res.headersSent) res.status(503).json({ success: false, code: 'LEADER_UNAVAILABLE', message: 'The bot is restarting. Please retry in a moment.' });
       else res.end();
     };

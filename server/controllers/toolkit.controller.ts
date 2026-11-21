@@ -3,6 +3,7 @@
  * review rooms (temporary voice + escalation) and bulk tools.
  */
 import { Request, Response } from 'express';
+import { isObfuscated } from '../integrations/discord/channelAccess.js';
 import { getToolkit, saveToolkit, guildFor, isSnowflake, ToolkitConfig } from '../services/toolkit/toolkitConfig.js';
 import { buildCode } from '../../shared/utils/nameWords.js';
 import { ticketService } from '../services/toolkit/tickets.service.js';
@@ -58,8 +59,11 @@ async function guildResources(communityId: string) {
       chans = fresh;
     }
   } catch { /* keep the cached list */ }
+  const hiddenCount = chans.filter((c) => isObfuscated(c)).length;
+  chans = chans.filter((c) => !isObfuscated(c));
   return {
     connected: true,
+    hiddenCount,
     roles,
     textChannels: chans.filter((c) => c.type === 0 || c.type === 5).sort((a, b) => a.rawPosition - b.rawPosition).map((c) => ({ id: c.id, name: c.name })),
     categories: chans.filter((c) => c.type === 4).sort((a, b) => a.rawPosition - b.rawPosition).map((c) => ({ id: c.id, name: c.name })),

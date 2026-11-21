@@ -114,6 +114,11 @@ export async function getUserGuilds(req: Request, res: Response, next: NextFunct
       throw err;
     }
 
+    // Without a live Discord connection nobody can tell where the bot is: say so, never report "Bot not added" for everyone.
+    if (!discordService.isConnected() && !(config.APP_RUNTIME_MODE === 'DEVELOPMENT_SIMULATION' && process.env.DEV_SIMULATION_ENABLED !== 'false')) {
+      res.status(503).set('Retry-After', '5').json({ success: false, error: { code: 'LEADER_UNAVAILABLE', message: 'The bot is reconnecting. Please retry in a few seconds.' }, requestId: req.id });
+      return;
+    }
     const adminGuilds = discordAuthService.filterAdminGuilds(guilds);
     const allComms = await communitiesRepository.list();
 

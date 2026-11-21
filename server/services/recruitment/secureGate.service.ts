@@ -9,6 +9,7 @@
  *   - the previous permissions are saved, and Undo restores them exactly
  * Recruitment cannot start until the owner confirms Apply to Join is off and the scan shows no leaks.
  */
+import { isObfuscated } from '../../integrations/discord/channelAccess.js';
 import { PermissionFlagsBits, ChannelType } from 'discord.js';
 import { logger } from '../../logging/logger.js';
 import { FirestoreRepository } from '../../repositories/firestore.repository.js';
@@ -55,7 +56,7 @@ async function saveGate(communityId: string, patch: Partial<GateDoc>): Promise<G
 function newcomerVisible(guild: any) {
   const everyone = guild.roles.everyone;
   return Array.from(guild.channels.cache.values())
-    .filter((c: any) => VISIBLE_TYPES.has(c.type) && c.type !== ChannelType.GuildCategory)
+    .filter((c: any) => VISIBLE_TYPES.has(c.type) && c.type !== ChannelType.GuildCategory && !isObfuscated(c))
     .filter((c: any) => c.permissionsFor(everyone)?.has(PermissionFlagsBits.ViewChannel))
     .sort((a: any, b: any) => a.rawPosition - b.rawPosition)
     .map((c: any) => ({ id: c.id, name: c.name, type: c.type, parent: c.parent?.name || null }));
@@ -114,7 +115,7 @@ export const secureGate = {
     if (!applicantRole) applicantRole = guild.roles.cache.find((r: any) => r.name === 'Applicant') || (await guild.roles.create({ name: 'Applicant', reason: 'Community Manager Secure Setup', permissions: [] }));
 
     // Snapshot every channel's permissions first (Undo restores these exactly).
-    const snapshot = Array.from(guild.channels.cache.values()).filter((c: any) => c.permissionOverwrites).map((c: any) => ({
+    const snapshot = Array.from(guild.channels.cache.values()).filter((c: any) => c.permissionOverwrites && !isObfuscated(c)).map((c: any) => ({
       channelId: c.id,
       overwrites: Array.from(c.permissionOverwrites.cache.values()).map((o: any) => ({ id: o.id, type: o.type, allow: o.allow.bitfield.toString(), deny: o.deny.bitfield.toString() })),
     }));
@@ -368,7 +369,7 @@ export const secureGate = {
     let restored = 0;
     for (const s of gate.snapshot) {
       const c: any = guild.channels.cache.get(s.channelId);
-      if (!c?.permissionOverwrites) continue;
+      if (!c?.permissionOverwrites || isObfuscated(c)) continue; // never restore from data Discord hides
       await c.permissionOverwrites.set(s.overwrites.map((o) => ({ id: o.id, type: o.type, allow: BigInt(o.allow), deny: BigInt(o.deny) })), 'Secure Setup undone').catch(() => undefined);
       restored++;
     }

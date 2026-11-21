@@ -13,7 +13,7 @@ import {
 /* Types + API                                                         */
 /* ------------------------------------------------------------------ */
 export interface Opt { id: string; name: string; color?: string }
-export interface Resources { connected: boolean; roles: Opt[]; textChannels: Opt[]; categories: Opt[] }
+export interface Resources { connected: boolean; hiddenCount?: number; roles: Opt[]; textChannels: Opt[]; categories: Opt[] }
 export type Tab = 'recruit' | 'tickets' | 'warnings' | 'roles' | 'rooms' | 'bulk';
 
 export function useApi(communityId: string) {
@@ -73,6 +73,11 @@ export function ServerToolsView({ communityId, only }: { communityId: string; on
         <div className="flex items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <span>Couldn’t load your Discord roles and channels right now, so names may show as numbers. Your settings are safe.</span>
           <button className={ghost} onClick={() => load()}>Retry</button>
+        </div>
+      )}
+      {res && !!res.hiddenCount && (
+        <div className="rounded-xl border border-sky-300 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          <b>{res.hiddenCount} private channel{res.hiddenCount === 1 ? '' : 's'} can’t be seen by the bot.</b> Since 16 Nov 2026 Discord hides private channels from bots, so they are left out of these lists. To include them, give Community Manager <b>View Channel</b> on those channels (or the <b>Administrator</b> permission on its role). Nothing is changed or removed.
         </div>
       )}
       {!only && <div>

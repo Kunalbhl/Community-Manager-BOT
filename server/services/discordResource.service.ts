@@ -1,4 +1,5 @@
 import { discordService } from '../integrations/discord/discord.service.js';
+import { isObfuscated } from '../integrations/discord/channelAccess.js';
 import { logger } from '../logging/logger.js';
 import {
   DiscordGuildResource,
@@ -281,6 +282,7 @@ export class DiscordResourceService {
         fetchedChannels = Array.from(guild.channels.cache.values()).filter(Boolean);
       }
 
+      fetchedChannels = fetchedChannels.filter((c: any) => !isObfuscated(c));
       const parentMap = new Map<string, string>();
       for (const c of fetchedChannels) {
         if (c.type === 4 || c.type === 'GUILD_CATEGORY' || c.type === 'CATEGORY') {

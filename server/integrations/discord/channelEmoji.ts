@@ -2,6 +2,7 @@
  * Every channel and category gets a matching emoji that no other channel in the server uses,
  * so the channel list stays easy to scan. Names that already have an emoji are never changed.
  */
+import { isObfuscated } from './channelAccess.js';
 import { ChannelType, PermissionFlagsBits as P } from 'discord.js';
 
 const EMOJI_RE = /\p{Extended_Pictographic}/u;
@@ -87,7 +88,7 @@ export async function tidyChannelNames(guild: any, skipIds: string[] = [], max =
   const me = guild.members.me;
   const used = usedEmojis(guild);
   const types = new Set([ChannelType.GuildCategory, ChannelType.GuildText, ChannelType.GuildVoice, ChannelType.GuildAnnouncement, ChannelType.GuildForum, ChannelType.GuildStageVoice]);
-  const todo = Array.from(guild.channels.cache.values()).filter((c: any) => types.has(c.type) && !hasEmoji(c.name) && !skipIds.includes(c.id))
+  const todo = Array.from(guild.channels.cache.values()).filter((c: any) => types.has(c.type) && !isObfuscated(c) && !hasEmoji(c.name) && !skipIds.includes(c.id))
     .sort((a: any, b: any) => a.rawPosition - b.rawPosition) as any[];
   const renamed: string[] = [];
   let skipped = 0;

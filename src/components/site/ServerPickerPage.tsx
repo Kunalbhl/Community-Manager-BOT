@@ -25,11 +25,12 @@ export function ServerPickerPage() {
   const [servers, setServers] = useState<ServerEntry[]>([]);
   const [error, setError] = useState('');
 
-  const load = async () => {
+  const load = async (attempt = 0) => {
     setState('loading');
     try {
       const res = await fetch('/api/v1/discord/guilds/list', { credentials: 'include' });
       if (res.status === 401) return setState('signed-out');
+      if (res.status === 503 && attempt < 4) { setTimeout(() => load(attempt + 1), 3000); return; } // the bot is reconnecting
       const json = await res.json();
       if (!json.success) throw new Error(json.error?.message || json.message || 'Could not load your servers.');
       const list: ServerEntry[] = json.data || [];
