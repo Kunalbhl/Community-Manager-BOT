@@ -112,6 +112,7 @@ const STEPS: Step[] = [
       const { getGate } = await import('../../services/recruitment/secureGate.service.js');
       const g = await getGate(communityId);
       const has = (x?: string) => Boolean(x && guild.roles.cache.has(x));
+      const std = has(g.applicantRoleId) && guild.roles.cache.get(g.applicantRoleId)?.name === 'Applicant';
       return {
         embeds: [base('Applicant and Member roles', [
           '**Applicant:** given to new people while they apply. They only see the public channels (welcome, rules, apply).',
@@ -125,7 +126,7 @@ const STEPS: Step[] = [
         components: [
           row(new RoleSelectMenuBuilder().setCustomId(id('roles', 'applicant')).setPlaceholder('Applicant role (newcomers)').setMinValues(1).setMaxValues(1).setDefaultRoles(...(has(g.applicantRoleId) ? [g.applicantRoleId!] : []))),
           row(new RoleSelectMenuBuilder().setCustomId(id('roles', 'member')).setPlaceholder('Member role (approved)').setMinValues(1).setMaxValues(1).setDefaultRoles(...(has(g.memberRoleId) ? [g.memberRoleId!] : []))),
-          row(createBtn('roles', 'Create missing roles').setDisabled(has(g.applicantRoleId) && has(g.memberRoleId))),
+          row(createBtn('roles', std ? 'Create missing roles' : 'Use standard Applicant role').setDisabled(std && has(g.memberRoleId))),
         ],
       };
     },
