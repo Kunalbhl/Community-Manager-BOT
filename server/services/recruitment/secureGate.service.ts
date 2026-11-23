@@ -99,7 +99,7 @@ export const secureGate = {
     const me = guild.members.me;
     if (!me?.permissions.has(PermissionFlagsBits.ManageRoles) || !me?.permissions.has(PermissionFlagsBits.ManageChannels)) throw new Error('Give the bot Manage Roles and Manage Channels first.');
     // The joining (apply) channel is for the Applicant role only, so it is never made public to everyone.
-    const joinIds = new Set<string>([(await getGate(communityId)).applyChannelId, (await getToolkit(communityId)).recruitment.panelChannelId].filter(Boolean) as string[]);
+    const joinIds = new Set<string>([((await getGate(communityId)) as any).applyChannelId, ((await getToolkit(communityId)).recruitment as any).panelChannelId].filter(Boolean) as string[]);
     const publicIds = params.publicChannelIds.filter((id) => isSnowflake(id) && guild.channels.cache.has(id) && !joinIds.has(id));
     if (!publicIds.length) throw new Error('Choose at least one public channel (for example welcome or apply).');
     // Discord Onboarding channels must stay readable by everyone; keep them public instead of failing.

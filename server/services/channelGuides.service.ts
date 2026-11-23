@@ -6,6 +6,7 @@ import { logger } from '../logging/logger.js';
 import { getToolkit } from './toolkit/toolkitConfig.js';
 import { getFeatures } from './features/featuresConfig.js';
 import { welcomeOnboardingService } from './welcomeOnboarding.service.js';
+import { upsertBotEmbed } from './botMessages.js';
 import { GUIDES, GUIDE_FOOTER, type Guide } from './channelGuideText.js';
 
 export { GUIDES, GUIDE_FOOTER };
@@ -14,12 +15,7 @@ async function post(channel: any, g: Guide, botId: string): Promise<'posted' | '
   if (!channel?.send) return 'skipped';
   const embed = { title: g.title, description: g.body, color: 0x7c8cff, footer: { text: GUIDE_FOOTER } };
   try {
-    const list: any[] = Array.from(((await channel.messages.fetchPinned().catch(() => new Map())) as Map<string, any>).values());
-    const mine = list.find((m: any) => m.author?.id === botId && m.embeds?.[0]?.footer?.text === GUIDE_FOOTER);
-    if (mine) { await mine.edit({ embeds: [embed] }); return 'updated'; }
-    const msg = await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
-    await msg.pin().catch(() => undefined);
-    return 'posted';
+    return await upsertBotEmbed(channel, botId, embed, (m: any) => m.embeds?.[0]?.footer?.text === GUIDE_FOOTER, { pin: true });
   } catch (e: any) {
     logger.warn(`[ChannelGuides] ${channel?.id}: ${e?.message}`);
     return 'skipped';
