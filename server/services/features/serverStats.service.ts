@@ -8,6 +8,7 @@ import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import { FirestoreRepository } from '../../repositories/firestore.repository.js';
 import { logger } from '../../logging/logger.js';
 import { guildFor, isSnowflake } from '../toolkit/toolkitConfig.js';
+import { getAllMembers } from '../../integrations/discord/memberFetch.js';
 
 export type StatKind =
   | 'members' | 'humans' | 'bots' | 'online' | 'role' | 'roleOnline'
@@ -66,7 +67,7 @@ async function ensureMembers(guild: any) {
   const last = memberFetchAt.get(guild.id) || 0;
   if (Date.now() - last < 10 * 60_000 && guild.members.cache.size >= (guild.memberCount || 0) - 2) return;
   memberFetchAt.set(guild.id, Date.now());
-  await guild.members.fetch().catch(() => undefined);
+  await getAllMembers(guild).catch(() => undefined);
 }
 
 async function valueOf(guild: any, c: Pick<StatCounter, 'kind' | 'roleId' | 'goal'>): Promise<number> {

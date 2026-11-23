@@ -16,6 +16,7 @@ import { FirestoreRepository } from '../../repositories/firestore.repository.js'
 import { auditService } from '../audit.service.js';
 import { logger } from '../../logging/logger.js';
 import { guildFor, isSnowflake } from './toolkitConfig.js';
+import { getAllMembers } from '../../integrations/discord/memberFetch.js';
 
 export type BulkAction = 'ADD_ROLE' | 'REMOVE_ROLE' | 'DM_MEMBERS' | 'CHANNEL_MESSAGE' | 'NICKNAME_RESET' | 'PURGE_MESSAGES' | 'KICK_MEMBERS';
 
@@ -49,7 +50,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const MAX_DMS = 1000;
 
 async function audienceMembers(guild: any, a: BulkAudience): Promise<any[]> {
-  const all = Array.from((await guild.members.fetch()).values()) as any[];
+  const all = Array.from((await getAllMembers(guild)).values()) as any[];
   const now = Date.now();
   return all.filter((m) => {
     if (!a.includeBots && m.user?.bot) return false;
@@ -93,6 +94,23 @@ export const bulkTools = {
   },
 
   cancel(jobId: string) { cancelled.add(jobId); },
+
+  /** Run the same action again (new job, same settings). Only for runs that failed, were cancelled, or had failures. */
+  async retry(communityId: string, jobId: string, actorId: string): Promise<BulkJobDoc> {
+    const old = await bulkJobsRepository.getById(jobId);
+    if (!old || old.communityId !== communityId) throw new Error('Run not found.');
+    if (old.status === 'RUNNING' || old.status === 'QUEUED') throw new Error('This run is still going.');
+    if (old.status === 'DONE' && !old.failed) throw new Error('This run finished without problems.');
+    return this.start(communityId, actorId, old.action, old.params, old.audience);
+  },
+
+  /** Remove a finished run from the history (a run that is still going must be cancelled first). */
+  async remove(communityId: string, jobId: string) {
+    const old = await bulkJobsRepository.getById(jobId);
+    if (!old || old.communityId !== communityId) throw new Error('Run not found.');
+    if (old.status === 'RUNNING' || old.status === 'QUEUED') throw new Error('Cancel this run first.');
+    await bulkJobsRepository.delete(jobId);
+  },
 
   async run(jobId: string) {
     const job = await bulkJobsRepository.getById(jobId);

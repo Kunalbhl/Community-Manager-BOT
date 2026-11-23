@@ -12,6 +12,7 @@ import { warningPolicy } from '../services/toolkit/warningPolicy.service.js';
 import { bulkTools, BulkAction } from '../services/toolkit/bulk.service.js';
 import { reviewRooms } from '../services/toolkit/reviewRooms.service.js';
 import { auditService } from '../services/audit.service.js';
+import { getAllMembers } from '../integrations/discord/memberFetch.js';
 
 const actor = (req: Request) => String((req as any).user?.userId || 'unknown');
 const fail = (res: Response, err: any, code = 400) => res.status(code).json({ success: false, error: { message: err?.message || String(err) } });
@@ -275,6 +276,16 @@ export async function bulkStartHandler(req: Request, res: Response) {
 export async function bulkListHandler(req: Request, res: Response) {
   try { ok(res, await bulkTools.list(req.params.communityId)); }
   catch (err) { fail(res, err, 500); }
+}
+
+export async function bulkRetryHandler(req: Request, res: Response) {
+  try { ok(res, await bulkTools.retry(req.params.communityId, req.params.jobId, actor(req))); }
+  catch (err) { fail(res, err); }
+}
+
+export async function bulkDeleteHandler(req: Request, res: Response) {
+  try { await bulkTools.remove(req.params.communityId, req.params.jobId); ok(res, { deleted: true }); }
+  catch (err) { fail(res, err); }
 }
 
 export async function bulkCancelHandler(req: Request, res: Response) {
@@ -919,7 +930,7 @@ export async function membersListHandler(req: Request, res: Response) {
   try {
     const guild: any = await guildFor(req.params.communityId);
     if (!guild) throw new Error('The bot is not connected to this server.');
-    if (guild.members.cache.size < guild.memberCount) await guild.members.fetch().catch(() => undefined);
+    await getAllMembers(guild).catch(() => undefined);
     const q = str(req.query.q, 50).toLowerCase();
     const role = String(req.query.role || '');
     const kind = String(req.query.kind || 'humans');

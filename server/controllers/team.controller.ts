@@ -14,6 +14,7 @@ import { communityMemberAccessRepository, rolesRepository } from '../repositorie
 import { settingsService } from '../services/settings.service.js';
 import { guildFor, isSnowflake } from '../services/toolkit/toolkitConfig.js';
 import { auditService } from '../services/audit.service.js';
+import { getAllMembers } from '../integrations/discord/memberFetch.js';
 
 export const TEAM_ROLES = ['CONTROLLER', 'INTERVIEWER', 'RECRUITER'] as const;
 const LINKABLE = ['OWNER', 'CONTROLLER', 'INTERVIEWER', 'RECRUITER'] as const;
@@ -79,7 +80,7 @@ export async function getTeamHandler(req: Request, res: Response) {
     };
     if (guild) {
       add(guild.ownerId, 'OWNER', 'Server owner');
-      await guild.members.fetch().catch(() => undefined);
+      await getAllMembers(guild).catch(() => undefined);
       for (const m of guild.members.cache.values() as any) {
         if (m.user.bot) continue;
         if (m.permissions.has(PermissionFlagsBits.Administrator) && m.id !== guild.ownerId) add(m.id, 'OWNER', 'Discord Administrator');

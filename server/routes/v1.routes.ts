@@ -489,6 +489,8 @@ router.post(`${tk}/bulk/preview`, requireTenantAccess(), requirePermission('comm
 router.post(`${tk}/bulk`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkStartHandler);
 router.get(`${tk}/bulk`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkListHandler);
 router.post(`${tk}/bulk/:jobId/cancel`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkCancelHandler);
+router.post(`${tk}/bulk/:jobId/retry`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkRetryHandler);
+router.delete(`${tk}/bulk/:jobId`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkDeleteHandler);
 router.get('/communities/:communityId/integrations/socialcord', requireTenantAccess(), getSocialCordStatus);
 router.put('/communities/:communityId/integrations/socialcord', requireTenantAccess(), requirePermission('settings.manage'), setSocialCordEnabled);
 router.get('/communities/:communityId/discord-settings', getCommunityDiscordSettings);

@@ -18,6 +18,7 @@ import { Announcement, Campaign, Reminder, Poll, MessageTemplate } from '../../s
 import { idempotencyService } from './idempotency.service.js';
 import { failedOperationService } from './failedOperation.service.js';
 import { observabilityService } from './observability/observability.service.js';
+import { getAllMembers } from '../integrations/discord/memberFetch.js';
 
 // Centralised rate limit helper
 export class EngagementRateLimiter {
@@ -338,7 +339,7 @@ async function campaignRecipients(c: any): Promise<string[]> {
     const guild: any = discordService.getGuild(community?.discordGuildId || community?.guildId);
     if (guild) {
       if (c.targetAudience === 'MEMBERS' && Array.isArray(c.memberIds)) return c.memberIds;
-      const members = await guild.members.fetch();
+      const members = await getAllMembers(guild);
       return Array.from(members.values())
         .filter((m: any) => !m.user.bot && (c.targetAudience !== 'ROLE' || m.roles.cache.has(c.roleId)))
         .map((m: any) => m.id);
