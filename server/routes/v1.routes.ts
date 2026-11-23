@@ -485,6 +485,7 @@ router.post(`${tk}/sheets/resync`, requireTenantAccess(), requirePermission('set
 router.post(`${tk}/recruitment/panel`, requireTenantAccess(), requirePermission('settings.manage'), Toolkit.postApplyPanelHandler);
 router.get('/communities/:communityId/discord/member-search', requireTenantAccess(), requirePermission('community.view'), Toolkit.searchMembersHandler);
 router.get(`${tk}/review-rooms`, requireTenantAccess(), requirePermission('applications.view'), Toolkit.listReviewRoomsHandler);
+router.post(`${tk}/provision`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.provisionFeatureHandler);
 router.post(`${tk}/bulk/preview`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkPreviewHandler);
 router.post(`${tk}/bulk`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkStartHandler);
 router.get(`${tk}/bulk`, requireTenantAccess(), requirePermission('community.manage'), Toolkit.bulkListHandler);

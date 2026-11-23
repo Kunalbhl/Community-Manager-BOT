@@ -72,6 +72,7 @@ export function WelcomeRulesView({ communityId }: { communityId: string }) {
           <Row title="Post a welcome in a channel" hint="Everyone sees it, so the server can greet the new member." on={!!cfg.enableServerWelcome} onToggle={(v) => set({ enableServerWelcome: v })}>
             <label className="block text-sm font-semibold text-slate-700">Channel <span className="font-normal text-slate-500">· where the welcome is posted, usually #welcome or #general</span>
               <div className="mt-1"><ChannelSelect communityId={communityId} value={cfg.welcomeChannelId || ''} onChange={(id) => set({ welcomeChannelId: id, welcomeChannelNameSnapshot: res?.textChannels?.find((c: any) => c.id === id)?.name })} /></div>
+              {!cfg.welcomeChannelId && <div className="mt-2 text-xs text-slate-600">No channel yet. <button type="button" className="font-bold text-indigo-700 underline" onClick={async () => { try { const r = await toolkitApi('/provision', 'POST', { kind: 'welcome' }); setMsg({ ok: !r.errors?.length, text: r.errors?.length ? r.errors[0] : 'Welcome channel ready. Reloading…' }); if (!r.errors?.length) load(); } catch (e: any) { setMsg({ ok: false, text: e.message }); } }}>Create it for me</button> (reuses an existing welcome channel first; needs Manage Channels)</div>}
             </label>
             <TemplateField label="Message" value={cfg.serverWelcomeMessage || ''} onChange={(v) => set({ serverWelcomeMessage: v })} vars={WELCOME_VARS} braces="double" rows={3} />
           </Row>

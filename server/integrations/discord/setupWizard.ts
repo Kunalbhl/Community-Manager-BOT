@@ -187,7 +187,13 @@ const STEPS: Step[] = [
       const v = (interaction.values || [])[0];
       if (action === 'review') { await saveToolkit(communityId, { recruitment: { ...r, reviewChannelId: v || undefined } }); return v ? await accessNote(guild, v, 'show new applications') : 'Review channel cleared.'; }
       if (action === 'panelch') { await saveToolkit(communityId, { recruitment: { ...r, panelChannelId: v || undefined, ...(v && v !== r.panelChannelId ? { panelMessageId: undefined, panelPostedAt: undefined } : {}) } as any }); return v ? 'Saved. Press **Post Apply panel** when you are ready.' : 'Cleared.'; }
-      if (action === 'toggle') { await saveToolkit(communityId, { recruitment: { ...r, applyEnabled: !r.applyEnabled } }); return r.applyEnabled ? 'Applications paused.' : 'Applications open.'; }
+      if (action === 'toggle') {
+        await saveToolkit(communityId, { recruitment: { ...r, applyEnabled: !r.applyEnabled } });
+        if (r.applyEnabled) return 'Applications paused.';
+        const { provisionForFeature } = await import('./setupProvision.js');
+        const p = await provisionForFeature(communityId, 'recruitment').catch(() => null);
+        return `Applications open.${p?.made.length ? ` Created: ${p.made.join(', ')}.` : ''}${p?.errors.length ? ` ⚠️ ${p.errors[0]}` : ''}`;
+      }
       if (action === 'post') {
         const channel = r.panelChannelId ? await guild.channels.fetch(r.panelChannelId).catch(() => null) : null;
         if (!channel) return '⚠️ Pick the Apply panel channel first.';

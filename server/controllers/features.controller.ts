@@ -72,6 +72,8 @@ export async function saveFeatureSectionHandler(req: Request, res: Response) {
       return fail(res, 'Unknown section', 404);
     }
     const saved = await saveFeatures(communityId, patch);
+    // Switching Server logs on without a channel creates our own Community Manager log channel.
+    if (section === 'logs' && saved.logs.enabled && !saved.logs.channelId) await import('../integrations/discord/setupProvision.js').then(({ provisionForFeature }) => provisionForFeature(communityId, 'logs')).catch(() => undefined);
     await auditService.log({ communityId, actorUserId: actor(req), actorRole: 'CONTROLLER', action: 'FEATURE_SETTINGS_UPDATED' as any, targetType: 'features', targetId: section }).catch(() => undefined);
     ok(res, saved);
   } catch (err) { fail(res, err); }
