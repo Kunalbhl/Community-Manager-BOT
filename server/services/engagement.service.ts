@@ -9,6 +9,7 @@ import {
   auditLogsRepository,
   discordDeliveriesRepository,
 } from '../repositories/index.js';
+import { allMembers } from '../integrations/discord/memberFetch.js';
 import { discordService } from '../integrations/discord/discord.service.js';
 import { EntitlementService } from './entitlement.service.js';
 import { auditService } from './audit.service.js';
@@ -338,7 +339,7 @@ async function campaignRecipients(c: any): Promise<string[]> {
     const guild: any = discordService.getGuild(community?.discordGuildId || community?.guildId);
     if (guild) {
       if (c.targetAudience === 'MEMBERS' && Array.isArray(c.memberIds)) return c.memberIds;
-      const members = await guild.members.fetch();
+      const members = await allMembers(guild);
       return Array.from(members.values())
         .filter((m: any) => !m.user.bot && (c.targetAudience !== 'ROLE' || m.roles.cache.has(c.roleId)))
         .map((m: any) => m.id);
