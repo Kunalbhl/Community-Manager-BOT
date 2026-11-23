@@ -68,7 +68,8 @@ export const PATTERNS = {
     /^(welcome and rule|welcome and goodbye|welcome goodbye|arrival|greeting|new member|new arrival|hello)$/,
     /\bwelcome\b/, /\b(join|joined|joining)\b/, /\b(arrival|greeting)\b/],
   reviewerRole: [/^reviewer$/, /^(application|app) reviewer$/, /^recruiter$/, /\breviewer\b/],
-  applicantRole: [/^applicant$/, /^(pending|unverified|new member|newcomer|guest)$/, /\bapplicant\b/],
+  // Standard: the newcomer role is always exactly "Applicant" (never a look-alike such as Guest or Pending).
+  applicantRole: [/^applicant$/],
   memberRole: [/^member$/, /^(verified|approved|verified member|community member)$/, /^member\b/],
 };
 
@@ -142,6 +143,34 @@ async function role(guild: any, name: string, color: number, made: Created, key?
   return r;
 }
 
+
+/** Old look-alike names that earlier setups reused as the newcomer role; these are renamed to the standard name. */
+const LOOKALIKE_APPLICANT = /^(pending|unverified|new member|newcomer|guest|new joiner)$/;
+export const APPLICANT_ROLE_NAME = 'Applicant';
+
+/**
+ * The one standard newcomer role: named exactly "Applicant", no permissions, below the bot.
+ * A saved look-alike (e.g. "NEW MEMBER") is renamed in place so its holders keep it; anything else is left alone
+ * and a fresh Applicant role is made.
+ */
+export async function standardApplicant(guild: any, savedId: string | undefined, made: Created) {
+  const top = guild.members.me?.roles?.highest?.position ?? 0;
+  const usable = (r: any) => r && !r.managed && r.id !== guild.id && r.position < top && !r.permissions.has(P.Administrator);
+  const cur = liveRole(guild, savedId) ? guild.roles.cache.get(savedId) : null;
+  if (cur && words(cur.name) === 'applicant') return cur;
+  if (cur && usable(cur) && LOOKALIKE_APPLICANT.test(words(cur.name))) {
+    const was = cur.name;
+    await cur.setName(APPLICANT_ROLE_NAME, 'Community Manager setup: standard Applicant role');
+    made.push(`<@&${cur.id}> (renamed from "${was}" to the standard Applicant role)`);
+    return cur;
+  }
+  const exact = Array.from(guild.roles.cache.values()).find((r: any) => words(r.name) === 'applicant' && usable(r));
+  if (exact) return exact;
+  const r = await guild.roles.create({ name: APPLICANT_ROLE_NAME, color: 0xf5a524, permissions: [], reason: 'Community Manager setup: standard Applicant role' });
+  made.push(`<@&${r.id}> (no permissions)`);
+  return r;
+}
+
 export const create = {
   /** Reviewer role, if no reviewer role is chosen. */
   async staff(guild: any, communityId: string, made: Created = []) {
@@ -159,7 +188,7 @@ export const create = {
   async roles(guild: any, communityId: string, made: Created = []) {
     const { getGate, secureGate } = await import('../../services/recruitment/secureGate.service.js');
     const g = await getGate(communityId);
-    const applicant = liveRole(guild, g.applicantRoleId) ? guild.roles.cache.get(g.applicantRoleId) : await role(guild, 'Applicant', 0xf5a524, made, 'applicantRole');
+    const applicant = await standardApplicant(guild, g.applicantRoleId, made);
     const member = liveRole(guild, g.memberRoleId) && g.memberRoleId !== applicant.id ? guild.roles.cache.get(g.memberRoleId) : await role(guild, 'Member', 0x3ddc97, made, 'memberRole', [applicant.id]);
     await secureGate.setRoles(communityId, { applicantRoleId: applicant.id, memberRoleId: member.id, approvedExtraRoleIds: g.approvedExtraRoleIds || [] });
     return made;
