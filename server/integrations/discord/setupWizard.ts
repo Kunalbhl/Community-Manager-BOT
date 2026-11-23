@@ -22,6 +22,7 @@ import { getFeatures, saveFeatures } from '../../services/features/featuresConfi
 import { welcomeOnboardingService } from '../../services/welcomeOnboarding.service.js';
 import { explainAccess, ensureSelfPerms } from './selfAccess.js';
 import { create, createdNote } from './setupProvision.js';
+import { upsertBotEmbed } from '../../services/botMessages.js';
 import { postChannelGuides } from '../../services/channelGuides.service.js';
 
 const BRAND = 0x7c8cff;
@@ -510,7 +511,7 @@ async function confirmSetup(communityId: string, guild: any, interaction: any) {
   let posted = 0;
   for (const cid of targets) {
     const c = await guild.channels.fetch(cid).catch(() => null);
-    if (c?.send && (await c.send({ embeds: [embed], allowedMentions: { parse: [] } }).catch(() => null))) posted++;
+    if (c?.send && (await upsertBotEmbed(c, guild.members.me?.id, embed.toJSON(), (m: any) => m.embeds?.[0]?.title === '✅ Community Manager setup completed', { scan: 100 }).catch(() => null))) posted++;
   }
   const guides = await postChannelGuides(communityId, guild);
   return `✅ Setup confirmed${posted ? ` and logged in ${targets.map((x) => `<#${x}>`).join(' ')}` : ''}.${guides.posted + guides.updated ? ` Channel guides ${guides.posted ? `posted in ${guides.posted}` : ''}${guides.posted && guides.updated ? ' and ' : ''}${guides.updated ? `refreshed in ${guides.updated}` : ''} channel${guides.posted + guides.updated > 1 ? 's' : ''}.` : ''}${pend.length ? ` ${pend.length} item${pend.length > 1 ? 's' : ''} still pending in the dashboard.` : ''}`;

@@ -8,6 +8,8 @@ import { ChannelType, PermissionFlagsBits } from 'discord.js';
 import { logger } from '../logging/logger.js';
 import { getToolkit, saveToolkit, guildFor } from './toolkit/toolkitConfig.js';
 import { getFeatures, saveFeatures } from './features/featuresConfig.js';
+import { upsertBotEmbed } from './botMessages.js';
+import { GUIDE_FOOTER } from './channelGuideText.js';
 
 // Real moderation powers only. Manage Messages alone is not enough: music/DJ and bot roles often have it.
 const STAFF_PERMS = [PermissionFlagsBits.Administrator, PermissionFlagsBits.ManageGuild, PermissionFlagsBits.KickMembers, PermissionFlagsBits.BanMembers, PermissionFlagsBits.ModerateMembers];
@@ -28,8 +30,8 @@ export async function postIntro(ch: any, key: string) {
   const intro = INTROS[key];
   if (!intro || !ch?.send) return;
   try {
-    const msg = await ch.send({ embeds: [{ title: intro.title, description: intro.body, color: 0x7c8cff, footer: { text: 'Community Manager · you can rename or move this channel any time' } }] });
-    await msg.pin().catch(() => undefined);
+    // Same marker as the channel guides, so the guide later edits this message instead of adding a second one.
+    await upsertBotEmbed(ch, ch.guild?.members?.me?.id, { title: intro.title, description: intro.body, color: 0x7c8cff, footer: { text: GUIDE_FOOTER } }, (m: any) => m.embeds?.[0]?.footer?.text === GUIDE_FOOTER, { pin: true });
   } catch { /* the channel still works without the intro */ }
 }
 
