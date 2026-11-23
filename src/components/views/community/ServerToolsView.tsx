@@ -1061,14 +1061,26 @@ const RULE_SUGGESTIONS = [
 export function RulesCard({ api, res }: { api: any; res: Resources }) {
   const [rules, setRules] = useState<any[]>([]);
   const [text, setText] = useState('');
-  const [importIds, setImportIds] = useState<string[]>([]);
   const [msg, setMsg] = useState('');
   const load = useCallback(() => api('/recruitment/rules').then(setRules).catch((e: any) => setMsg(e.message)), [api]);
   useEffect(() => { load(); }, [load]);
   const [src, setSrc] = useState<any>(null);
   const [srcMsg, setSrcMsg] = useState('');
   useEffect(() => { api('/recruitment/rules/source').then(setSrc).catch(() => undefined); }, [api]);
-  const saveSrc = (patch: any) => { const next = { ...src, ...patch }; setSrc(next); setSrcMsg('Saving…'); api('/recruitment/rules/source', 'PUT', { source: next.source, channelIds: next.channelIds }).then((r: any) => { setSrc(r); setSrcMsg('✓ Saved'); }).catch((e: any) => setSrcMsg(e.message)); };
+  // Picking a rules channel saves it and copies its rules into the list straight away (no separate import step).
+  const saveSrc = (patch: any) => {
+    const next = { ...src, ...patch }; setSrc(next); setSrcMsg('Saving…');
+    api('/recruitment/rules/source', 'PUT', { source: next.source, channelIds: next.channelIds })
+      .then(async (r: any) => {
+        setSrc(r);
+        const ids: string[] = (r.channelIds?.length ? r.channelIds : r.welcomeChannelIds) || [];
+        if (r.source === 'CHANNELS' && ids.length && patch.channelIds) {
+          setSrcMsg('Saved. Fetching the rules…');
+          const imp = await api('/recruitment/rules/import', 'POST', { channelIds: ids });
+          setSrcMsg(`✓ Saved · ${imp.added ? `${imp.added} rule${imp.added === 1 ? '' : 's'} fetched from #${imp.channel}` : 'rules are up to date'}`); load();
+        } else setSrcMsg('✓ Saved');
+      }).catch((e: any) => setSrcMsg(e.message));
+  };
   const chName = (id: string) => res.textChannels.find((c: any) => c.id === id)?.name || 'channel';
   const add = async () => {
     const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -1118,23 +1130,11 @@ export function RulesCard({ api, res }: { api: any; res: Resources }) {
             </div>
           </div>
         )}
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div>
-            <div className="text-sm font-semibold text-slate-700">Copy from a Discord channel</div>
-            <p className="mt-1 text-xs text-slate-500">Leave empty to use the server’s official rules channel.</p>
-            <div className="mt-2 flex gap-2">
-              <div className="min-w-0 flex-1"><Pick options={res.textChannels.filter((c: any) => !importIds.includes(c.id))} value="" onChange={(id: string) => id && setImportIds([...importIds, id])} placeholder={importIds.length ? 'Add another channel' : 'Server rules channel'} /></div>
-              <button type="button" className={ghost} onClick={async () => { setMsg('Importing…'); try { const r = await api('/recruitment/rules/import', 'POST', { channelIds: importIds }); setMsg(`Added ${r.added} rule${r.added === 1 ? '' : 's'} from #${r.channel}.${r.added === 0 ? ' (They were already in your list.)' : ''}`); load(); } catch (e: any) { setMsg(e.message); } }}>Import</button>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">{importIds.map((id) => <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">#{res.textChannels.find((c: any) => c.id === id)?.name || 'channel'}<button type="button" aria-label="Remove" onClick={() => setImportIds(importIds.filter((x) => x !== id))}>×</button></span>)}
-            </div>
-          </div>
-          <div>
-            <div className="text-sm font-semibold text-slate-700">Or type them</div>
-            <p className="mt-1 text-xs text-slate-500">One rule per line.</p>
-            <textarea rows={3} className={`${input} mt-2`} value={text} onChange={(e) => setText(e.target.value)} placeholder={'Be respectful to everyone\nNo advertising without permission'} />
-            <button type="button" className={`${ghost} mt-2`} disabled={!text.trim()} onClick={add}><Plus className="h-4 w-4" /> Add rules</button>
-          </div>
+        <div>
+          <div className="text-sm font-semibold text-slate-700">Add your own rules</div>
+          <p className="mt-1 text-xs text-slate-500">One rule per line. These sit alongside any rules fetched from your channels.</p>
+          <textarea rows={3} className={`${input} mt-2`} value={text} onChange={(e) => setText(e.target.value)} placeholder={'Be respectful to everyone\nNo advertising without permission'} />
+          <button type="button" className={`${ghost} mt-2`} disabled={!text.trim()} onClick={add}><Plus className="h-4 w-4" /> Add rules</button>
         </div>
         {msg && <p className="mt-3 text-sm text-slate-600">{msg}</p>}
       </Card>
