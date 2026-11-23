@@ -384,7 +384,10 @@ export const secureGate = {
     if (!s.connected) throw new Error('The bot is not connected to this server right now.');
     if (!s.gate.memberRoleId) throw new Error('Run the lock step first.');
     if (s.leaks.length) throw new Error(`These channels are still visible to newcomers: ${s.leaks.map((l: any) => `#${l.name}`).join(', ')}. Lock them or mark them public.`);
-    return saveGate(communityId, { verified: true, nativeApplyOffConfirmed: true, verifiedAt: new Date().toISOString(), verifiedBy: actorId, lastCheck: { at: new Date().toISOString(), leaks: [] } });
+    const saved = await saveGate(communityId, { verified: true, nativeApplyOffConfirmed: true, verifiedAt: new Date().toISOString(), verifiedBy: actorId, lastCheck: { at: new Date().toISOString(), leaks: [] } });
+    // Setup is confirmed: tell people what each channel is for (never blocks the confirmation).
+    guildFor(communityId).then(async (guild: any) => { if (guild) await (await import('../channelGuides.service.js')).postChannelGuides(communityId, guild); }).catch(() => undefined);
+    return saved;
   },
 
   async isVerified(communityId: string) {
