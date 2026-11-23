@@ -4,6 +4,7 @@
  * roles by DM, or to chosen members by DM.
  */
 import { FirestoreRepository } from '../../repositories/firestore.repository.js';
+import { allMembers } from '../../integrations/discord/memberFetch.js';
 import { guildFor, isSnowflake, communityForGuild } from '../toolkit/toolkitConfig.js';
 import { logger } from '../../logging/logger.js';
 
@@ -76,7 +77,7 @@ export const growthReports = {
     const since = Date.now() - days * DAY;
     const flow = (await flowRepository.list({ where: [{ field: 'communityId', operator: '==', value: communityId }] }).catch(() => [] as any[]))
       .filter((f: any) => Date.parse(f.at) >= since && !f.bot);
-    await guild.members.fetch().catch(() => undefined);
+    await allMembers(guild).catch(() => undefined);
     // Joins: tracked joins, or (before tracking started) members whose join date is in the period.
     const trackedJoins = new Set(flow.filter((f: any) => f.type === 'JOIN').map((f: any) => f.userId));
     const stillHereRecent = guild.members.cache.filter((m: any) => !m.user.bot && (m.joinedTimestamp || 0) >= since);

@@ -8,6 +8,7 @@
  * with a one-click reset to the template. The Platform Owner (bot creator) always has everything.
  */
 import { Request, Response } from 'express';
+import { allMembers } from '../integrations/discord/memberFetch.js';
 import { PermissionFlagsBits } from 'discord.js';
 import { DEFAULT_ROLE_PERMISSIONS, ALL_COMMUNITY_PERMISSIONS } from '../../shared/types/rbac.js';
 import { communityMemberAccessRepository, rolesRepository } from '../repositories/index.js';
@@ -79,7 +80,7 @@ export async function getTeamHandler(req: Request, res: Response) {
     };
     if (guild) {
       add(guild.ownerId, 'OWNER', 'Server owner');
-      await guild.members.fetch().catch(() => undefined);
+      await allMembers(guild).catch(() => undefined);
       for (const m of guild.members.cache.values() as any) {
         if (m.user.bot) continue;
         if (m.permissions.has(PermissionFlagsBits.Administrator) && m.id !== guild.ownerId) add(m.id, 'OWNER', 'Discord Administrator');

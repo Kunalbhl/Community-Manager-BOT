@@ -13,6 +13,7 @@
  * bots excluded by default.
  */
 import { FirestoreRepository } from '../../repositories/firestore.repository.js';
+import { allMembers } from '../../integrations/discord/memberFetch.js';
 import { auditService } from '../audit.service.js';
 import { logger } from '../../logging/logger.js';
 import { guildFor, isSnowflake } from './toolkitConfig.js';
@@ -49,7 +50,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const MAX_DMS = 1000;
 
 async function audienceMembers(guild: any, a: BulkAudience): Promise<any[]> {
-  const all = Array.from((await guild.members.fetch()).values()) as any[];
+  const all = Array.from((await allMembers(guild)).values()) as any[];
   const now = Date.now();
   return all.filter((m) => {
     if (!a.includeBots && m.user?.bot) return false;

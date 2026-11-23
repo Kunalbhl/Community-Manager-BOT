@@ -3,6 +3,7 @@
  * review rooms (temporary voice + escalation) and bulk tools.
  */
 import { config } from '../config/env.js';
+import { allMembers } from '../integrations/discord/memberFetch.js';
 import { Request, Response } from 'express';
 import { isObfuscated } from '../integrations/discord/channelAccess.js';
 import { getToolkit, saveToolkit, guildFor, isSnowflake, ToolkitConfig } from '../services/toolkit/toolkitConfig.js';
@@ -919,7 +920,7 @@ export async function membersListHandler(req: Request, res: Response) {
   try {
     const guild: any = await guildFor(req.params.communityId);
     if (!guild) throw new Error('The bot is not connected to this server.');
-    if (guild.members.cache.size < guild.memberCount) await guild.members.fetch().catch(() => undefined);
+    await allMembers(guild).catch(() => undefined);
     const q = str(req.query.q, 50).toLowerCase();
     const role = String(req.query.role || '');
     const kind = String(req.query.kind || 'humans');

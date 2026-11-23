@@ -10,6 +10,7 @@
  * Recruitment cannot start until the owner confirms Apply to Join is off and the scan shows no leaks.
  */
 import { isObfuscated } from '../../integrations/discord/channelAccess.js';
+import { allMembers } from '../../integrations/discord/memberFetch.js';
 import { PermissionFlagsBits, ChannelType } from 'discord.js';
 import { logger } from '../../logging/logger.js';
 import { FirestoreRepository } from '../../repositories/firestore.repository.js';
@@ -131,7 +132,7 @@ export const secureGate = {
     void (async () => {
       try {
         // 1. Every current human member gets the Member role (nobody loses access).
-        const members = await guild.members.fetch();
+        const members = await allMembers(guild);
         const todo = Array.from(members.values()).filter((m: any) => !m.user.bot && !m.roles.cache.has(memberRole.id));
         let done = 0;
         for (const m of todo as any[]) {
@@ -194,7 +195,7 @@ export const secureGate = {
     const guild: any = await guildFor(communityId);
     if (!guild) throw new Error('The bot is not connected to this server right now.');
     const g = await getGate(communityId);
-    const members = await guild.members.fetch();
+    const members = await allMembers(guild);
     const humans = Array.from(members.values()).filter((m: any) => !m.user.bot) as any[];
     const roleInfo = (id?: string) => {
       const r = id ? guild.roles.cache.get(id) : null;
@@ -255,7 +256,7 @@ export const secureGate = {
       report.staffChannelsHidden.push(c.name);
     }
     // 3. People: existing members get Member and lose Applicant; plain newcomers keep Applicant.
-    const all = await guild.members.fetch();
+    const all = await allMembers(guild);
     for (const m of Array.from(all.values()) as any[]) {
       if (m.user.bot || !m.roles.cache.has(applicant.id)) continue;
       const others = m.roles.cache.filter((r: any) => r.id !== guild.id && r.id !== applicant.id);
