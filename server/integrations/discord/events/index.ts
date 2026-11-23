@@ -48,6 +48,17 @@ export function attachGatewayEventHandlers(client: Client): void {
       }
     })().catch(() => undefined);
 
+    // Servers the bot was already in get their own Community Manager log channel once (existing channels and settings are left alone).
+    void (async () => {
+      const { ensureCommunityLog } = await import('../setupProvision.js');
+      const { communityForGuild } = await import('../../../services/toolkit/toolkitConfig.js');
+      for (const guild of readyClient.guilds.cache.values()) {
+        try { const r = await ensureCommunityLog(await communityForGuild(guild.id), guild); if (r.created) logger.info(`[DiscordGateway] Created Community Manager log channel in ${guild.name}`); }
+        catch (err) { logger.warn(`[DiscordGateway] Log channel notice for ${guild.id}: ${(err as Error).message}`); }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    })().catch(() => undefined);
+
     // Auto-register slash commands
     try {
       await registerSlashCommands();
