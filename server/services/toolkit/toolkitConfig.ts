@@ -62,6 +62,8 @@ export interface ToolkitConfig {
   roleRules: { enabled: boolean; rules: RoleRule[] };
   reviewRooms: { enabled: boolean; categoryId?: string; applicantCanSee: boolean; tiers: ReviewTier[]; deleteAfterHours: number; specialMemberIds?: string[] };
   recruitment: RecruitmentDiscordConfig;
+  /** 2 = features start switched off. Older saved configs (no value) keep the settings they were working with. */
+  defaultsVersion?: number;
   updatedAt: string;
 }
 
@@ -128,7 +130,7 @@ export function defaultToolkit(communityId: string): ToolkitConfig {
     id: communityId,
     communityId,
     tickets: {
-      enabled: true,
+      enabled: false,
       staffRoleIds: [],
       counter: 0,
       types: [
@@ -140,7 +142,7 @@ export function defaultToolkit(communityId: string): ToolkitConfig {
       ],
     },
     warnings: {
-      enabled: true,
+      enabled: false,
       expiryDays: 30,
       dmMember: true,
       reasons: [
@@ -158,21 +160,25 @@ export function defaultToolkit(communityId: string): ToolkitConfig {
         { points: 10, action: 'BAN' },
       ],
     },
-    roleRules: { enabled: true, rules: [] },
-    reviewRooms: { enabled: true, applicantCanSee: true, tiers: [{ name: 'Recruiters', roleIds: [] }, { name: 'Senior staff', roleIds: [] }, { name: 'Leadership', roleIds: [] }], deleteAfterHours: 24 },
+    roleRules: { enabled: false, rules: [] },
+    reviewRooms: { enabled: false, applicantCanSee: true, tiers: [{ name: 'Recruiters', roleIds: [] }, { name: 'Senior staff', roleIds: [] }, { name: 'Leadership', roleIds: [] }], deleteAfterHours: 24 },
     recruitment: {
-      applyEnabled: true, askRecruiterCode: true, notifyRecruiter: true, pingRoleIds: [], reviewerRoleIds: [], dmOnReceived: true, messages: { ...DEFAULT_RECRUITMENT_MESSAGES },
+      applyEnabled: false, askRecruiterCode: true, notifyRecruiter: true, pingRoleIds: [], reviewerRoleIds: [], dmOnReceived: true, messages: { ...DEFAULT_RECRUITMENT_MESSAGES },
       screening: { mode: 'AUTO', onFail: 'GUIDE_AND_CONTINUE', questions: [], consentText: 'Before we continue, please read our rules and guide below carefully. Press **I have read and agree** when you are done.' },
       interview: { mode: 'MANUAL' },
     },
+    defaultsVersion: 2,
     updatedAt: new Date().toISOString(),
   };
 }
 
 export async function getToolkit(communityId: string): Promise<ToolkitConfig> {
   const saved = await toolkitRepository.getById(communityId).catch(() => null);
-  const d = defaultToolkit(communityId);
-  if (!saved) return d;
+  const fresh = defaultToolkit(communityId);
+  if (!saved) return fresh;
+  // Configs saved before features started switched off keep behaving exactly as they did: the old on-by-default
+  // values apply to anything they never changed, and recruitment counts as on only if it was actually set up.
+  const d = (saved as any).defaultsVersion >= 2 ? fresh : legacyDefaults(fresh, saved);
   return {
     ...d,
     ...saved,
@@ -184,9 +190,34 @@ export async function getToolkit(communityId: string): Promise<ToolkitConfig> {
   };
 }
 
+function legacyDefaults(d: ToolkitConfig, saved: any): ToolkitConfig {
+  const r = saved.recruitment || {};
+  const setUp = Boolean(r.panelChannelId || r.reviewChannelId || r.panelPostedAt);
+  return {
+    ...d,
+    tickets: { ...d.tickets, enabled: true },
+    warnings: { ...d.warnings, enabled: true },
+    roleRules: { ...d.roleRules, enabled: true },
+    reviewRooms: { ...d.reviewRooms, enabled: true },
+    recruitment: { ...d.recruitment, applyEnabled: setUp },
+  };
+}
+
+/** One-time pass at startup: write the settings older servers were running with, so the new defaults never change them. */
+export async function freezeLegacyToolkits(): Promise<number> {
+  const all = await toolkitRepository.list({ limit: 5000 } as any).catch(() => [] as ToolkitConfig[]);
+  let n = 0;
+  for (const doc of all) {
+    if ((doc as any).defaultsVersion >= 2) continue;
+    await saveToolkit(doc.id, {}).catch(() => undefined); // saveToolkit stamps defaultsVersion 2 with the merged (legacy) values
+    n++;
+  }
+  return n;
+}
+
 export async function saveToolkit(communityId: string, patch: Partial<ToolkitConfig>): Promise<ToolkitConfig> {
   const current = await getToolkit(communityId);
-  const next: ToolkitConfig = { ...current, ...patch, id: communityId, communityId, updatedAt: new Date().toISOString() };
+  const next: ToolkitConfig = { ...current, ...patch, id: communityId, communityId, defaultsVersion: 2, updatedAt: new Date().toISOString() };
   const exists = await toolkitRepository.getById(communityId).catch(() => null);
   if (exists) await toolkitRepository.update(communityId, next as any);
   else await toolkitRepository.create(communityId, next);

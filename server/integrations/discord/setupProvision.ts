@@ -198,6 +198,40 @@ export async function standardApplicant(guild: any, savedId: string | undefined,
   return r;
 }
 
+export type FeatureKind = 'recruitment' | 'logs' | 'welcome';
+
+/** Which features are switched on for a server (channels are only ever created for these). */
+export async function enabledFeatures(communityId: string) {
+  const [t, f, w] = await Promise.all([getToolkit(communityId), getFeatures(communityId, true), welcomeOnboardingService.getWelcomeConfig(communityId)]);
+  return { recruitment: Boolean(t.recruitment.applyEnabled), logs: Boolean(f.logs.enabled), welcome: Boolean(w.enableServerWelcome) };
+}
+
+const NEEDS: Record<FeatureKind, { perms: bigint[]; label: string }> = {
+  recruitment: { perms: [P.ManageChannels, P.ManageRoles], label: 'Manage Channels and Manage Roles' },
+  logs: { perms: [P.ManageChannels], label: 'Manage Channels' },
+  welcome: { perms: [P.ManageChannels], label: 'Manage Channels' },
+};
+
+/**
+ * Create what one feature needs (reusing channels and roles that already exist, creating only what is missing).
+ * Used when the feature is switched on and by the "Create it for me" buttons.
+ */
+export async function provisionForFeature(communityId: string, kind: FeatureKind): Promise<{ made: Created; errors: string[] }> {
+  const { guildFor } = await import('../../services/toolkit/toolkitConfig.js');
+  const guild: any = await guildFor(communityId);
+  const made: Created = [];
+  const errors: string[] = [];
+  if (!guild) return { made, errors: ['The bot is not connected to this server right now.'] };
+  const need = NEEDS[kind];
+  const missing = need.perms.filter((x) => !guild.members.me?.permissions.has(x));
+  if (missing.length) return { made, errors: [`The Community Manager role needs ${need.label} (or Administrator) to create this. Give it that in Server Settings → Roles, then try again.`] };
+  const steps = kind === 'recruitment' ? ['staff', 'roles', 'apps'] : [kind];
+  for (const k of steps) {
+    try { await (create as any)[k](guild, communityId, made); } catch (e: any) { errors.push(`${k}: ${e?.message || e}`); }
+  }
+  return { made, errors };
+}
+
 export const create = {
   /** Reviewer role, if no reviewer role is chosen. */
   async staff(guild: any, communityId: string, made: Created = []) {
@@ -236,26 +270,28 @@ export const create = {
     const w = await welcomeOnboardingService.getWelcomeConfig(communityId);
     if (!live(guild, w.welcomeChannelId)) {
       const c = await publicChannel(guild, '👋・welcome', 'Welcome to the server!', made, 'welcome', communityId);
-      await welcomeOnboardingService.updateWelcomeConfig(communityId, { welcomeChannelId: c.id, welcomeChannelNameSnapshot: c.name, enableServerWelcome: true });
+      await welcomeOnboardingService.updateWelcomeConfig(communityId, { welcomeChannelId: c.id, welcomeChannelNameSnapshot: c.name });
     }
     return made;
   },
 
   async logs(guild: any, communityId: string, made: Created = []) {
     const f = await getFeatures(communityId, true);
-    if (!(f.logs.enabled && live(guild, f.logs.channelId))) {
+    if (!live(guild, f.logs.channelId)) {
       // Our own channel inside the Community Manager category; other log channels in the server are left alone.
       const c = await staffChannel(guild, communityId, LOG_CHANNEL_NAME, 'Community Manager log: joins, leaves, edits, deletions, role changes and warnings.', 'serverLog', made);
-      await saveFeatures(communityId, { logs: { ...f.logs, channelId: c.id, enabled: true } });
+      await saveFeatures(communityId, { logs: { ...f.logs, channelId: c.id } });
     }
     return made;
   },
 
-  /** Everything at once, in a safe order (reviewers first so the category includes them). */
+  /** Everything for the features that are switched on, in a safe order (reviewers first so the category includes them). */
   async all(guild: any, communityId: string) {
     const made: Created = [];
     const errors: string[] = [];
-    for (const k of ['staff', 'roles', 'apps', 'welcome', 'logs'] as const) {
+    const on = await enabledFeatures(communityId);
+    const steps = ([...(on.recruitment ? ['staff', 'roles', 'apps'] : []), ...(on.welcome ? ['welcome'] : []), ...(on.logs ? ['logs'] : [])]) as ('staff' | 'roles' | 'apps' | 'welcome' | 'logs')[];
+    for (const k of steps) {
       try { await (create as any)[k](guild, communityId, made); } catch (e: any) { errors.push(`${k}: ${e?.message || e}`); }
     }
     try { await renameApplyChannels(guild, communityId); } catch { /* optional */ }
@@ -284,6 +320,10 @@ export async function ensureCommunityLog(communityId: string, guildArg?: any): P
   if (!(await communitiesRepository.getById(communityId).catch(() => null))) return { created: false, skipped: 'server is not linked to a community' };
   const me = guild.members.me;
   if (!me?.permissions.has(P.ManageChannels)) return { created: false, skipped: 'bot lacks Manage Channels' };
+  // Only for servers that switched Server logs on and have no working log channel yet.
+  const f0 = await getFeatures(communityId, true);
+  if (!f0.logs.enabled) return { created: false, skipped: 'server logs are off' };
+  if (live(guild, f0.logs.channelId)) return { created: false, channelId: f0.logs.channelId, skipped: 'a log channel is already set' };
   const t0: any = await getToolkit(communityId);
   const mark = async (extra: any) => { const t = await getToolkit(communityId); await saveToolkit(communityId, { recruitment: { ...t.recruitment, communityLogEnsuredAt: new Date().toISOString(), ...extra } as any }); };
 
@@ -312,45 +352,20 @@ export async function ensureCommunityLog(communityId: string, guildArg?: any): P
     channel = await make(withStaff).catch(() => make(base)); // retry with only the bot if a role could not be added
     await postIntro(channel, 'serverLog');
   }
-  // Use it as the log channel only where no log channel is set yet.
   const f = await getFeatures(communityId, true);
-  if (!(f.logs.enabled && live(guild, f.logs.channelId))) await saveFeatures(communityId, { logs: { ...f.logs, channelId: channel.id, enabled: true } });
+  await saveFeatures(communityId, { logs: { ...f.logs, channelId: channel.id } });
   await mark({ communityLogChannelId: channel.id });
   return { created: !existing, channelId: channel.id };
 }
 
 /**
- * Runs once when the bot joins a server: reuse what exists (similar names count), create only
+ * Runs when the bot joins a server. It no longer creates anything: features start switched off.
  * what is missing, then post a short summary in the server log so the owner sees what happened.
  */
 export async function autoProvisionOnJoin(communityId: string) {
-  const { guildFor } = await import('../../services/toolkit/toolkitConfig.js');
-  const guild: any = await guildFor(communityId);
-  if (!guild) return;
-  const me = guild.members.me;
-  if (!me?.permissions.has(P.ManageChannels) || !me?.permissions.has(P.ManageRoles)) return; // nothing safe to do; setup will explain
-  const t0 = await getToolkit(communityId);
-  if ((t0.recruitment as any).autoProvisionedAt) return;
-  try {
-    const { workspace } = await import('../../services/serverWorkspace.service.js');
-    await workspace.provision(communityId).catch(() => undefined); // finds existing staff roles + staff channels first
-  } catch { /* continue with the rest */ }
-  const { made, errors } = await create.all(guild, communityId);
-  await ensureCommunityLog(communityId, guild).catch((e: any) => errors.push(`log channel: ${e?.message || e}`));
+  // Nothing is created automatically any more: every feature starts switched off, and its channels and roles are
+  // created when the feature is switched on (or from its "Create it for me" button). Just remember the bot has joined.
   const t = await getToolkit(communityId);
+  if ((t.recruitment as any).autoProvisionedAt) return;
   await saveToolkit(communityId, { recruitment: { ...t.recruitment, autoProvisionedAt: new Date().toISOString() } as any });
-  const f = await getFeatures(communityId, true);
-  const logId = f.logs.channelId || (t.recruitment as any).logChannelId;
-  const logCh: any = logId ? await guild.channels.fetch(logId).catch(() => null) : null;
-  await logCh?.send({
-    embeds: [{
-      color: 0x7c8cff, title: '⚙️ Community Manager is set up',
-      description: [
-        made.length ? `**Created**\n${made.map((x) => `• ${x}`).join('\n')}` : 'Everything needed already existed, so I reused it.',
-        errors.length ? `\n**Could not do**\n${errors.map((x) => `• ${x}`).join('\n')}` : '',
-        '\nRun `/community-manager setup` to review, change anything and confirm.',
-      ].join('\n').slice(0, 4000),
-    }],
-    allowedMentions: { parse: [] },
-  }).catch(() => undefined);
 }

@@ -48,7 +48,10 @@ export function attachGatewayEventHandlers(client: Client): void {
       }
     })().catch(() => undefined);
 
-    // Servers the bot was already in get their own Community Manager log channel once (existing channels and settings are left alone).
+    // Older servers keep exactly the settings they were running with while features start switched off for new ones.
+    void import('../../../services/toolkit/toolkitConfig.js').then(({ freezeLegacyToolkits }) => freezeLegacyToolkits()).then((n) => { if (n) logger.info(`[DiscordGateway] Kept the current settings of ${n} existing server(s)`); }).catch(() => undefined);
+
+    // Servers that switched Server logs on but have no working log channel get their own Community Manager log channel once (existing channels and settings are left alone).
     void (async () => {
       const { ensureCommunityLog } = await import('../setupProvision.js');
       const { communityForGuild } = await import('../../../services/toolkit/toolkitConfig.js');

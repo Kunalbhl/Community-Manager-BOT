@@ -72,9 +72,9 @@ export class WelcomeOnboardingService {
       communityId,
       personalWelcomeMessage: DEFAULT_PERSONAL_WELCOME,
       serverWelcomeMessage: DEFAULT_SERVER_WELCOME,
-      enablePersonalDm: true,
-      enableServerWelcome: true,
-      enableAutoRoleAssignment: true,
+      enablePersonalDm: false,
+      enableServerWelcome: false,
+      enableAutoRoleAssignment: false,
       interviewMode: 'NO_INTERVIEW',
       createdAt: now,
       updatedAt: now,
@@ -99,6 +99,11 @@ export class WelcomeOnboardingService {
       ...updates,
       updatedAt: now,
     });
+
+    // Switching the server welcome on without a channel creates the welcome channel (reusing an existing one first).
+    if (updates.enableServerWelcome === true && !updated.welcomeChannelId) {
+      import('../integrations/discord/setupProvision.js').then(({ provisionForFeature }) => provisionForFeature(communityId, 'welcome')).catch(() => undefined);
+    }
 
     if (actorUserId && actorRole) {
       await auditService.record({

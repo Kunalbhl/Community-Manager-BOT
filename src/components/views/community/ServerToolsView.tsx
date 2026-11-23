@@ -849,6 +849,13 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms, commun
               <Toggle on={c.askRecruiterCode} onChange={(v) => setC({ ...c, askRecruiterCode: v })} label="Ask for a recruiter code" />
               <Toggle on={c.dmOnReceived} onChange={(v) => setC({ ...c, dmOnReceived: v })} label="DM applicant when received" />
             </div>
+            {(!c.reviewChannelId || !c.logChannelId) && (
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
+                <p className="font-semibold">Missing a channel? Let the bot create it.</p>
+                <p className="mt-0.5 text-xs">It reuses a channel that already exists, otherwise it creates the Applications, Recruitment log and Apply to join channels under the Community Manager category with the right permissions. Needs the bot to have <b>Manage Channels</b> and <b>Manage Roles</b>.</p>
+                <button type="button" className="mt-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-700" onClick={async () => { setMsg(''); try { const r: any = await api('/provision', 'POST', { kind: 'recruitment' }); setMsg(r.errors?.length ? r.errors[0] : `Done. ${r.made?.length ? 'Created: ' + r.made.join(', ') + '.' : 'Everything already exists.'} Reload to see the new channels.`); } catch (e: any) { setMsg(e.message); } }}>Create it for me</button>
+              </div>
+            )}
             <label className="block text-sm font-medium text-slate-700">Staff review channel<div className="mt-1"><Pick options={res.textChannels} value={c.reviewChannelId} onChange={(v) => setC({ ...c, reviewChannelId: v })} placeholder="Choose a staff-only channel" /></div></label>
             <div className="text-sm font-medium text-slate-700">Ping these roles for each new application<div className="mt-1"><MultiPick options={res.roles} value={c.pingRoleIds} onChange={(v) => setC({ ...c, pingRoleIds: v })} placeholder="Add a role" prefix="@" /></div></div>
             <div className="text-sm font-medium text-slate-700">Roles allowed to Approve / Reject in Discord<div className="mt-1"><MultiPick options={res.roles} value={c.reviewerRoleIds} onChange={(v) => setC({ ...c, reviewerRoleIds: v })} placeholder="Add a role" prefix="@" /></div><p className="mt-1 text-xs font-normal text-slate-500">Members with Manage Server can always decide.</p></div>

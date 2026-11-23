@@ -172,9 +172,24 @@ export async function saveToolkitSectionHandler(req: Request, res: Response) {
     }
 
     const saved = await saveToolkit(communityId, patch);
+    // Switching recruitment on creates what it needs (applications, recruitment log, apply-to-join, roles): only what is missing.
+    let provisioned: any;
+    if (section === 'recruitment' && !current.recruitment.applyEnabled && saved.recruitment.applyEnabled) provisioned = await import('../integrations/discord/setupProvision.js').then(({ provisionForFeature }) => provisionForFeature(communityId, 'recruitment')).catch(() => undefined);
     if (section === 'recruitment') await import('../services/recruitment/discordRecruitment.service.js').then(({ discordRecruitment }) => discordRecruitment.refreshPanel(communityId)).catch(() => undefined);
     await auditService.log({ communityId, actorUserId: actor(req), actorRole: 'CONTROLLER', action: 'TOOLKIT_SETTINGS_UPDATED' as any, targetType: 'toolkit', targetId: section }).catch(() => undefined);
-    ok(res, saved);
+    ok(res, provisioned ? { ...saved, provisioned } : saved);
+  } catch (err) { fail(res, err); }
+}
+
+/** "Create it for me": makes the channels/roles one feature needs (reusing what exists) and tells the dashboard what happened. */
+export async function provisionFeatureHandler(req: Request, res: Response) {
+  try {
+    const kind = String(req.body?.kind || '');
+    if (!['recruitment', 'logs', 'welcome'].includes(kind)) throw new Error('Unknown feature.');
+    const { provisionForFeature } = await import('../integrations/discord/setupProvision.js');
+    const r = await provisionForFeature(req.params.communityId, kind as any);
+    await auditService.log({ communityId: req.params.communityId, actorUserId: actor(req), actorRole: 'CONTROLLER', action: 'TOOLKIT_SETTINGS_UPDATED' as any, targetType: 'toolkit', targetId: `provision:${kind}` }).catch(() => undefined);
+    ok(res, r);
   } catch (err) { fail(res, err); }
 }
 
@@ -921,7 +936,8 @@ export async function recruitmentBasicsHandler(req: Request, res: Response) {
     if (b.askRecruiterCode !== undefined) rec.askRecruiterCode = Boolean(b.askRecruiterCode);
     if (b.codeRequired !== undefined) rec.codeRequired = Boolean(b.codeRequired);
     await saveToolkit(req.params.communityId, { recruitment: rec });
-    ok(res, { applyEnabled: rec.applyEnabled, askRecruiterCode: rec.askRecruiterCode, codeRequired: !!rec.codeRequired });
+    const provisioned = !t.recruitment.applyEnabled && rec.applyEnabled ? await import('../integrations/discord/setupProvision.js').then(({ provisionForFeature }) => provisionForFeature(req.params.communityId, 'recruitment')).catch(() => undefined) : undefined;
+    ok(res, { applyEnabled: rec.applyEnabled, askRecruiterCode: rec.askRecruiterCode, codeRequired: !!rec.codeRequired, provisioned });
   } catch (err) { fail(res, err); }
 }
 
