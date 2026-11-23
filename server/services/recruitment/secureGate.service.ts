@@ -13,7 +13,7 @@ import { isObfuscated } from '../../integrations/discord/channelAccess.js';
 import { PermissionFlagsBits, ChannelType } from 'discord.js';
 import { logger } from '../../logging/logger.js';
 import { FirestoreRepository } from '../../repositories/firestore.repository.js';
-import { guildFor, isSnowflake } from '../toolkit/toolkitConfig.js';
+import { guildFor, isSnowflake, getToolkit } from '../toolkit/toolkitConfig.js';
 
 export interface GateDoc {
   id: string; // communityId
@@ -98,7 +98,9 @@ export const secureGate = {
     if (!guild) throw new Error('The bot is not connected to this server right now.');
     const me = guild.members.me;
     if (!me?.permissions.has(PermissionFlagsBits.ManageRoles) || !me?.permissions.has(PermissionFlagsBits.ManageChannels)) throw new Error('Give the bot Manage Roles and Manage Channels first.');
-    const publicIds = params.publicChannelIds.filter((id) => isSnowflake(id) && guild.channels.cache.has(id));
+    // The joining (apply) channel is for the Applicant role only, so it is never made public to everyone.
+    const joinIds = new Set<string>([(await getGate(communityId)).applyChannelId, (await getToolkit(communityId)).recruitment.panelChannelId].filter(Boolean) as string[]);
+    const publicIds = params.publicChannelIds.filter((id) => isSnowflake(id) && guild.channels.cache.has(id) && !joinIds.has(id));
     if (!publicIds.length) throw new Error('Choose at least one public channel (for example welcome or apply).');
     // Discord Onboarding channels must stay readable by everyone; keep them public instead of failing.
     const onboarding: any = await (guild as any).fetchOnboarding?.().catch(() => null);
@@ -161,6 +163,14 @@ export const secureGate = {
             if (memberCanSee !== false) await c.permissionOverwrites.edit(memberRole, { ViewChannel: true }, { reason: 'Secure Setup: members keep access' }).catch(note(`#${c.name} (member)`));
           }
           if (i % 10 === 0) await saveGate(communityId, { job: { status: 'RUNNING', step: 'Locking channels', done: i, total: channels.length, at: new Date().toISOString() } });
+        }
+        // Joining channel: Applicant sees it, everyone else (Members included) does not.
+        for (const id of joinIds) {
+          const jc: any = guild.channels.cache.get(id);
+          if (!jc?.permissionOverwrites) continue;
+          await jc.permissionOverwrites.edit(everyone, { ViewChannel: false }, { reason: 'Secure Setup: joining channel is Applicant only' }).catch(note(`#${jc.name}`));
+          await jc.permissionOverwrites.edit(applicantRole.id, { ViewChannel: true, ReadMessageHistory: true }, { reason: 'Secure Setup: Applicant sees the joining channel' }).catch(note(`#${jc.name} (applicant)`));
+          await jc.permissionOverwrites.edit(memberRole.id, { ViewChannel: false }, { reason: 'Secure Setup: Members do not need the joining channel' }).catch(note(`#${jc.name} (member)`));
         }
         // Public channels inside a now-hidden category: make sure they stay visible.
         for (const id of publicIds) await (guild.channels.cache.get(id) as any)?.permissionOverwrites.edit(everyone, { ViewChannel: true }).catch(() => undefined);

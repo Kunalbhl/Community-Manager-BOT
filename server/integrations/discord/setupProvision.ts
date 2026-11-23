@@ -17,6 +17,8 @@ import { tidyChannelNames, uniqueName } from './channelEmoji.js';
 
 /** Default name for the public apply channel (Discord shows it as #📝・apply-to-join). */
 export const APPLY_CHANNEL = 'apply-to-join';
+/** Our own log channel, always created inside the Community Manager category. */
+export const LOG_CHANNEL_NAME = '📋・community-manager-log';
 
 const unique = uniqueName;
 
@@ -123,15 +125,40 @@ async function staffChannel(guild: any, communityId: string, name: string, topic
   return c;
 }
 
-async function publicChannel(guild: any, name: string, topic: string, made: Created, key?: keyof typeof PATTERNS) {
+async function publicChannel(guild: any, name: string, topic: string, made: Created, key?: keyof typeof PATTERNS, communityId?: string) {
   const existing = (key && (findChannel(guild, key, { private: false }) || (key === 'welcome' ? findChannel(guild, key) : undefined))) || guild.channels.cache.find((c: any) => c.type === ChannelType.GuildText && c.name === name && !c.parent?.name?.includes('𝗖𝗢𝗠𝗠𝗨𝗡𝗜𝗧𝗬'));
   if (existing) return existing;
-  // Only overwrite: the bot itself. @everyone is left exactly as the server's defaults.
+  // New public channels live in our category. The category is staff-only, so everyone is explicitly let in (read only).
+  const parent = communityId ? await category(guild, communityId, made) : undefined;
   const c = await guild.channels.create({
-    name: unique(guild, name), type: ChannelType.GuildText, topic, reason: 'Community Manager setup',
-    permissionOverwrites: [{ id: guild.members.me.id, allow: [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory] }],
+    name: unique(guild, name), type: ChannelType.GuildText, topic, reason: 'Community Manager setup', ...(parent ? { parent: parent.id } : {}),
+    permissionOverwrites: [
+      { id: guild.members.me.id, allow: [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory] },
+      ...(parent ? [{ id: guild.roles.everyone.id, allow: [P.ViewChannel, P.ReadMessageHistory], deny: [P.SendMessages] }] : []),
+    ],
   });
   made.push(`<#${c.id}>`);
+  return c;
+}
+
+/**
+ * The joining channel: visible to the Applicant role only (nobody else, not even @everyone or Members).
+ * It is the one channel we create outside the Community Manager category, because its audience is different.
+ */
+async function applyChannel(guild: any, applicantRoleId: string | undefined, memberRoleId: string | undefined, made: Created) {
+  const existing = findChannel(guild, 'apply') || guild.channels.cache.find((c: any) => c.type === ChannelType.GuildText && c.name.includes(APPLY_CHANNEL));
+  if (existing) return existing;
+  const overwrites: any[] = [
+    { id: guild.roles.everyone.id, deny: [P.ViewChannel] },
+    { id: guild.members.me.id, allow: [P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory] },
+  ];
+  if (applicantRoleId) overwrites.push({ id: applicantRoleId, allow: [P.ViewChannel, P.ReadMessageHistory], deny: [P.SendMessages, P.AddReactions, P.CreatePublicThreads] });
+  if (memberRoleId && memberRoleId !== applicantRoleId) overwrites.push({ id: memberRoleId, deny: [P.ViewChannel] });
+  const c = await guild.channels.create({
+    name: unique(guild, `📝・${APPLY_CHANNEL}`), type: ChannelType.GuildText, reason: 'Community Manager setup: joining channel, Applicant role only',
+    topic: 'Press Apply to join. Only new people waiting for approval can see this channel.', permissionOverwrites: overwrites,
+  });
+  made.push(`<#${c.id}> (Applicant role only)`);
   return c;
 }
 
@@ -200,7 +227,7 @@ export const create = {
     const patch: any = {};
     if (!live(guild, r.reviewChannelId)) patch.reviewChannelId = (await staffChannel(guild, communityId, '📥・applications', 'New applications with Approve / Reject. Staff only.', 'applications', made, 'review', [r.logChannelId].filter(Boolean))).id;
     if (!live(guild, r.logChannelId)) patch.logChannelId = (await staffChannel(guild, communityId, '📋・recruitment-log', 'Every application, screening result, decision and recruiter credit.', 'recruitmentLog', made, 'recruitmentLog', [patch.reviewChannelId || r.reviewChannelId].filter(Boolean))).id;
-    if (!live(guild, r.panelChannelId)) { patch.panelChannelId = (await publicChannel(guild, `📝・${APPLY_CHANNEL}`, 'Press Apply to join. Your answers go privately to the staff.', made, 'apply')).id; patch.panelMessageId = undefined; patch.panelPostedAt = undefined; }
+    if (!live(guild, r.panelChannelId)) { const gate: any = await (await import('../../services/recruitment/secureGate.service.js')).getGate(communityId); patch.panelChannelId = (await applyChannel(guild, gate.applicantRoleId, gate.memberRoleId, made)).id; patch.panelMessageId = undefined; patch.panelPostedAt = undefined; }
     if (Object.keys(patch).length) { const t = await getToolkit(communityId); await saveToolkit(communityId, { recruitment: { ...t.recruitment, ...patch } }); }
     return made;
   },
@@ -208,7 +235,7 @@ export const create = {
   async welcome(guild: any, communityId: string, made: Created = []) {
     const w = await welcomeOnboardingService.getWelcomeConfig(communityId);
     if (!live(guild, w.welcomeChannelId)) {
-      const c = await publicChannel(guild, '👋・welcome', 'Welcome to the server!', made, 'welcome');
+      const c = await publicChannel(guild, '👋・welcome', 'Welcome to the server!', made, 'welcome', communityId);
       await welcomeOnboardingService.updateWelcomeConfig(communityId, { welcomeChannelId: c.id, welcomeChannelNameSnapshot: c.name, enableServerWelcome: true });
     }
     return made;
@@ -217,8 +244,8 @@ export const create = {
   async logs(guild: any, communityId: string, made: Created = []) {
     const f = await getFeatures(communityId, true);
     if (!(f.logs.enabled && live(guild, f.logs.channelId))) {
-      const t = (await getToolkit(communityId)).recruitment as any;
-      const c = await staffChannel(guild, communityId, '🧾・server-log', 'Joins, leaves, edits, deletions, role changes and warnings.', 'serverLog', made, 'serverLog', [t.reviewChannelId, t.logChannelId].filter(Boolean));
+      // Our own channel inside the Community Manager category; other log channels in the server are left alone.
+      const c = await staffChannel(guild, communityId, LOG_CHANNEL_NAME, 'Community Manager log: joins, leaves, edits, deletions, role changes and warnings.', 'serverLog', made);
       await saveFeatures(communityId, { logs: { ...f.logs, channelId: c.id, enabled: true } });
     }
     return made;
