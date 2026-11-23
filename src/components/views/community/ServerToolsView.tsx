@@ -854,13 +854,14 @@ function RecruitTab({ api, cfg, rooms, res, onSave, onSaveRooms, goRooms, commun
             <div className="text-sm font-medium text-slate-700">Roles allowed to Approve / Reject in Discord<div className="mt-1"><MultiPick options={res.roles} value={c.reviewerRoleIds} onChange={(v) => setC({ ...c, reviewerRoleIds: v })} placeholder="Add a role" prefix="@" /></div><p className="mt-1 text-xs font-normal text-slate-500">Members with Manage Server can always decide.</p></div>
             <label className="block text-sm font-medium text-slate-700">Recruitment log channel (every application, score, decision and recruiter credit)<div className="mt-1"><Pick options={res.textChannels} value={c.logChannelId} onChange={(v) => setC({ ...c, logChannelId: v })} placeholder="Choose a staff channel" /></div></label>
             <Toggle on={c.notifyRecruiter !== false} onChange={(v) => setC({ ...c, notifyRecruiter: v })} label="DM the recruiter when their code is used and when it is decided" />
-            <label className="block text-sm font-medium text-slate-700">Welcome announcement channel (optional)<div className="mt-1"><Pick options={res.textChannels} value={c.announceChannelId} onChange={(v) => setC({ ...c, announceChannelId: v })} placeholder="Don’t announce" /></div></label>
+            <label className="block text-sm font-medium text-slate-700">Approval announcement channel (optional)<div className="mt-1"><Pick options={res.textChannels} value={c.announceChannelId} onChange={(v) => setC({ ...c, announceChannelId: v })} placeholder="Don’t announce" /></div>
+              <p className="mt-1 text-xs font-normal text-slate-500">Where the bot welcomes someone once their application is approved. The welcome for every new member who joins is separate: set it in Members → Welcome &amp; rules.</p></label>
           </div>
         </Card>
 
         <Card title="Your messages" desc="Click a variable to insert it. The preview shows exactly what applicants receive.">
           <div className="space-y-4">
-            {[['received', 'Application received (DM)'], ['approved', 'Approved (DM)'], ['rejected', 'Rejected (DM)'], ['announce', 'Welcome announcement']].map(([k, l]) => (
+            {[['received', 'Application received (DM)'], ['approved', 'Approved (DM)'], ['rejected', 'Rejected (DM)'], ['announce', 'Approval announcement (public)']].map(([k, l]) => (
               <TemplateField key={k} label={l} value={c.messages[k]} onChange={(v) => setM(k, v)} vars={RECRUIT_VARS.filter((v) => k === 'rejected' || v.token !== 'reason')} />
             ))}
           </div>
@@ -1108,7 +1109,7 @@ export function RulesCard({ api, res }: { api: any; res: Resources }) {
                   {(src.channelIds.length ? src.channelIds : src.welcomeChannelIds).map((id: string) => <span key={id} className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">#{chName(id)}{src.channelIds.length > 0 && <button type="button" aria-label="Remove" onClick={() => saveSrc({ channelIds: src.channelIds.filter((x: string) => x !== id) })}>×</button>}</span>)}
                   {!src.channelIds.length && !src.welcomeChannelIds.length && <span className="text-xs text-amber-700">No rules channel picked yet. Add one below.</span>}
                 </div>
-                {!src.channelIds.length && src.welcomeChannelIds.length > 0 && <p className="mt-1 text-xs text-slate-500">Using the rules channels from Members → Welcome &amp; rules. Add channels here to use different ones for applicants.</p>}
+                {!src.channelIds.length && src.welcomeChannelIds.length > 0 && <p className="mt-1 text-xs text-slate-500">Using the rules channels from Members → Welcome &amp; rules, so there is one place to manage them. Add channels here only if applicants should read different ones.</p>}
                 <div className="mt-2 max-w-sm"><Pick options={res.textChannels.filter((c: any) => !src.channelIds.includes(c.id))} value="" onChange={(id: string) => id && saveSrc({ channelIds: [...src.channelIds, id] })} placeholder="Add a rules channel" /></div>
               </div>
             )}
