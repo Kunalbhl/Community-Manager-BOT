@@ -95,6 +95,23 @@ export const bulkTools = {
 
   cancel(jobId: string) { cancelled.add(jobId); },
 
+  /** Run the same action again (new job, same settings). Only for runs that failed, were cancelled, or had failures. */
+  async retry(communityId: string, jobId: string, actorId: string): Promise<BulkJobDoc> {
+    const old = await bulkJobsRepository.getById(jobId);
+    if (!old || old.communityId !== communityId) throw new Error('Run not found.');
+    if (old.status === 'RUNNING' || old.status === 'QUEUED') throw new Error('This run is still going.');
+    if (old.status === 'DONE' && !old.failed) throw new Error('This run finished without problems.');
+    return this.start(communityId, actorId, old.action, old.params, old.audience);
+  },
+
+  /** Remove a finished run from the history (a run that is still going must be cancelled first). */
+  async remove(communityId: string, jobId: string) {
+    const old = await bulkJobsRepository.getById(jobId);
+    if (!old || old.communityId !== communityId) throw new Error('Run not found.');
+    if (old.status === 'RUNNING' || old.status === 'QUEUED') throw new Error('Cancel this run first.');
+    await bulkJobsRepository.delete(jobId);
+  },
+
   async run(jobId: string) {
     const job = await bulkJobsRepository.getById(jobId);
     if (!job) return;

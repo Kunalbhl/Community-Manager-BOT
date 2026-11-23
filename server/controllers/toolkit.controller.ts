@@ -278,6 +278,16 @@ export async function bulkListHandler(req: Request, res: Response) {
   catch (err) { fail(res, err, 500); }
 }
 
+export async function bulkRetryHandler(req: Request, res: Response) {
+  try { ok(res, await bulkTools.retry(req.params.communityId, req.params.jobId, actor(req))); }
+  catch (err) { fail(res, err); }
+}
+
+export async function bulkDeleteHandler(req: Request, res: Response) {
+  try { await bulkTools.remove(req.params.communityId, req.params.jobId); ok(res, { deleted: true }); }
+  catch (err) { fail(res, err); }
+}
+
 export async function bulkCancelHandler(req: Request, res: Response) {
   try { bulkTools.cancel(req.params.jobId); ok(res, { cancelled: true }); }
   catch (err) { fail(res, err); }

@@ -657,6 +657,12 @@ function BulkTab({ api, res, communityId }: { api: any; res: Resources; communit
                   <div className="mt-1 flex justify-between text-xs text-slate-500"><span>{j.done} done{j.failed ? ` · ${j.failed} failed` : ''} of {j.total}</span><span>{fmtDate(j.createdAt)}</span></div>
                   {(j.status === 'RUNNING' || j.status === 'QUEUED') && <button className="mt-2 text-xs font-semibold text-rose-600 hover:underline" onClick={() => api(`/bulk/${j.id}/cancel`, 'POST').then(loadJobs)}>Cancel</button>}
                   {!!j.errors?.length && <p className="mt-2 text-xs text-rose-600">{j.errors[0]}</p>}
+                  {j.status !== 'RUNNING' && j.status !== 'QUEUED' && (
+                    <div className="mt-2 flex gap-3 text-xs font-semibold">
+                      {(j.status !== 'DONE' || j.failed > 0) && <button className="text-indigo-600 hover:underline" onClick={() => api(`/bulk/${j.id}/retry`, 'POST').then(loadJobs).catch((e: any) => setMsg(e.message))}>Retry</button>}
+                      <button className="text-slate-500 hover:text-rose-600 hover:underline" onClick={() => api(`/bulk/${j.id}`, 'DELETE').then(loadJobs).catch((e: any) => setMsg(e.message))}>Delete</button>
+                    </div>
+                  )}
                 </li>
               );
             })}
