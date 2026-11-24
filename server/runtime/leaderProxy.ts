@@ -17,7 +17,7 @@ import { discordService } from '../integrations/discord/discord.service.js';
 
 const PROXY_MARK = 'x-cm-proxied';
 const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade', 'host']);
-let upstreamDownUntil = 0;
+const RETRYABLE = new Set(['ECONNRESET', 'EPIPE', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND']);
 
 /**
  * While the leader cannot be reached, a standby that is NOT connected to Discord must not answer data requests itself:
@@ -26,9 +26,9 @@ let upstreamDownUntil = 0;
  */
 function unavailableOrLocal(req: Request, res: Response, next: NextFunction) {
   const path = req.originalUrl.split('?')[0];
-  const needsDiscord = req.method !== 'GET' || /\/(discord|communities|toolkit|giveaway-forms|links|servers|guilds)\b/.test(path);
+  const needsDiscord = req.method !== 'GET' || /\/(discord|communities|toolkit|giveaway-forms|links|servers|guilds)\b/.test(path) || /\/health\/external\b/.test(path);
   if (needsDiscord && !discordService.isConnected()) {
-    return res.status(503).set('Retry-After', '5').json({ success: false, code: 'LEADER_UNAVAILABLE', message: 'The bot is reconnecting. Please retry in a few seconds.' });
+    return res.status(503).set('Retry-After', '2').json({ success: false, code: 'LEADER_UNAVAILABLE', retrySafe: true, message: 'The bot is reconnecting. Please retry in a few seconds.' });
   }
   return next();
 }
@@ -38,13 +38,14 @@ export function leaderProxy() {
   if (!target) return (_req: Request, _res: Response, next: NextFunction) => next();
   const base = new URL(target);
   const client = base.protocol === 'https:' ? https : http;
-  const agent = new client.Agent({ keepAlive: true, maxSockets: 32 });
+  const agent = new client.Agent({ keepAlive: true, keepAliveMsecs: 5000, maxSockets: 32, maxFreeSockets: 4 });
+  // Retries use a brand-new connection, never a kept-alive one that the other side may have closed.
+  const freshAgent = new client.Agent({ keepAlive: false, maxSockets: 32 });
   logger.info(`[LeaderProxy] Standby API requests will be forwarded to ${base.origin}`);
 
   return (req: Request, res: Response, next: NextFunction) => {
     const status = getLeadershipStatus();
     if (status.isLeader || req.headers[PROXY_MARK]) return next();
-    if (Date.now() < upstreamDownUntil) return unavailableOrLocal(req, res, next);
 
     const headers: Record<string, any> = {};
     for (const [k, v] of Object.entries(req.headers)) if (!HOP_BY_HOP.has(k.toLowerCase())) headers[k] = v;
@@ -53,38 +54,53 @@ export function leaderProxy() {
     headers['x-forwarded-proto'] = (req.headers['x-forwarded-proto'] as string) || req.protocol;
     headers['x-forwarded-for'] = req.ip;
 
-    const proxyReq = client.request(
-      {
-        protocol: base.protocol,
-        hostname: base.hostname,
-        port: base.port || (base.protocol === 'https:' ? 443 : 80),
-        method: req.method,
-        path: req.originalUrl,
-        headers,
-        agent,
-        timeout: 25000,
-      },
-      (proxyRes) => {
-        const outHeaders: Record<string, any> = {};
-        for (const [k, v] of Object.entries(proxyRes.headers)) if (!HOP_BY_HOP.has(k.toLowerCase())) outHeaders[k] = v;
-        res.writeHead(proxyRes.statusCode || 502, outHeaders);
-        proxyRes.pipe(res);
-      },
-    );
+    const idempotent = req.method === 'GET' || req.method === 'HEAD';
+    const maxAttempts = idempotent ? 3 : 1;
+    let bodyConsumed = false;
+    req.on('data', () => { bodyConsumed = true; });
 
-    let failed = false;
-    const fail = (err: Error) => {
-      if (failed) return;
-      failed = true;
-      upstreamDownUntil = Date.now() + 10000;
-      logger.warn(`[LeaderProxy] Leader unreachable (${err.message}); retrying in 10s.`);
-      if (!res.headersSent && !(req as any).__bodyConsumed) return unavailableOrLocal(req, res, next);
-      if (!res.headersSent) res.status(503).json({ success: false, code: 'LEADER_UNAVAILABLE', message: 'The bot is restarting. Please retry in a moment.' });
-      else res.end();
+    const giveUp = (err: Error) => {
+      logger.warn(`[LeaderProxy] Leader unreachable after ${maxAttempts} attempt(s) (${err.message}); ${req.method} ${req.originalUrl.split('?')[0]}`);
+      if (res.headersSent) return void res.end();
+      // Never answer from this standby: it is not the bot, so its answer ("disconnected", "no channels") would be false.
+      if (!bodyConsumed) return unavailableOrLocal(req, res, next);
+      return void res.status(503).set('Retry-After', '2').json({ success: false, code: 'LEADER_UNAVAILABLE', retrySafe: false, message: 'The bot is restarting. Please retry in a moment.' });
     };
-    proxyReq.on('timeout', () => proxyReq.destroy(new Error('timeout')));
-    proxyReq.on('error', fail);
-    req.on('data', () => { (req as any).__bodyConsumed = true; });
-    req.pipe(proxyReq);
+
+    const attempt = (n: number) => {
+      let failed = false;
+      const proxyReq = client.request(
+        {
+          protocol: base.protocol,
+          hostname: base.hostname,
+          port: base.port || (base.protocol === 'https:' ? 443 : 80),
+          method: req.method,
+          path: req.originalUrl,
+          headers,
+          agent: n === 0 ? agent : freshAgent,
+          timeout: 25000,
+        },
+        (proxyRes) => {
+          const outHeaders: Record<string, any> = {};
+          for (const [k, v] of Object.entries(proxyRes.headers)) if (!HOP_BY_HOP.has(k.toLowerCase())) outHeaders[k] = v;
+          res.writeHead(proxyRes.statusCode || 502, outHeaders);
+          proxyRes.pipe(res);
+        },
+      );
+      const fail = (err: NodeJS.ErrnoException) => {
+        if (failed) return;
+        failed = true;
+        const code = err.code || err.message;
+        if (idempotent && !res.headersSent && n + 1 < maxAttempts && RETRYABLE.has(String(code))) {
+          logger.info(`[LeaderProxy] ${code} talking to the leader; retrying on a fresh connection (${n + 1}/${maxAttempts - 1}).`);
+          return void setTimeout(() => attempt(n + 1), 150 * (n + 1));
+        }
+        giveUp(err);
+      };
+      proxyReq.on('timeout', () => proxyReq.destroy(new Error('timeout')));
+      proxyReq.on('error', fail);
+      if (idempotent) proxyReq.end(); else req.pipe(proxyReq);
+    };
+    attempt(0);
   };
 }

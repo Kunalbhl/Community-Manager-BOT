@@ -94,28 +94,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isPlatformMode = portalMode === 'PLATFORM_ADMIN';
   const authContext = { userId: 'current_user', role: currentRole };
 
-  const [botStatus, setBotStatus] = React.useState<'ONLINE' | 'OFFLINE'>('ONLINE');
+  // OFFLINE is shown only after several checks in a row fail (about a minute), so a one-second reconnect never looks like an outage.
+  const [botStatus, setBotStatus] = React.useState<'ONLINE' | 'RECONNECTING' | 'OFFLINE'>('ONLINE');
   const [latency, setLatency] = React.useState<number | null>(45);
 
   React.useEffect(() => {
     let active = true;
+    let bad = 0;
     const checkStatus = async () => {
+      let online = false;
+      let ping: number | null = null;
       try {
         const res = await fetch('/api/v1/health/external');
-        if (!res.ok) throw new Error('Failed to fetch health');
-        const json = await res.json();
-        if (active && json.success && json.dependencies?.discordGateway) {
-          const gw = json.dependencies.discordGateway;
-          const isOnline = gw.state === 'READY' || gw.state === 'CONNECTED' || gw.state === 'UP';
-          setBotStatus(isOnline ? 'ONLINE' : 'OFFLINE');
-          setLatency(gw.pingMs && gw.pingMs > 0 ? gw.pingMs : (isOnline ? 38 : null));
+        if (res.ok) {
+          const json = await res.json();
+          const gw = json.success ? json.dependencies?.discordGateway : null;
+          if (gw) {
+            online = gw.state === 'READY' || gw.state === 'CONNECTED' || gw.state === 'UP';
+            ping = gw.pingMs && gw.pingMs > 0 ? gw.pingMs : (online ? 38 : null);
+          }
         }
-      } catch (err) {
-        if (active) {
-          setBotStatus('OFFLINE');
-          setLatency(null);
-        }
-      }
+      } catch { /* counted below */ }
+      if (!active) return;
+      if (online) { bad = 0; setBotStatus('ONLINE'); setLatency(ping); return; }
+      bad += 1;
+      setBotStatus(bad >= 4 ? 'OFFLINE' : 'RECONNECTING');
+      if (bad >= 4) setLatency(null);
     };
 
     checkStatus();
@@ -307,10 +311,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="border-t border-slate-800 p-4 space-y-1.5">
           <div className="flex items-center justify-between text-[11px] text-slate-400">
             <span className="flex items-center gap-1.5">
-              <span className={`h-2 w-2 rounded-full ${botStatus === 'ONLINE' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500 animate-pulse'}`} />
+              <span className={`h-2 w-2 rounded-full ${botStatus === 'ONLINE' ? 'bg-emerald-500 animate-pulse' : botStatus === 'RECONNECTING' ? 'bg-amber-400 animate-pulse' : 'bg-rose-500 animate-pulse'}`} />
               Bot Status ({selectedCommunity ? 'This Guild' : 'Gateway'})
             </span>
-            <span className={`font-mono text-[10px] font-bold tracking-wider ${botStatus === 'ONLINE' ? 'text-emerald-400' : 'text-rose-400'}`}>
+            <span className={`font-mono text-[10px] font-bold tracking-wider ${botStatus === 'ONLINE' ? 'text-emerald-400' : botStatus === 'RECONNECTING' ? 'text-amber-300' : 'text-rose-400'}`}>
               {botStatus}
             </span>
           </div>
