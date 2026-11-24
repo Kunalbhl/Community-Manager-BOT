@@ -57,12 +57,25 @@ const row = <T extends ActionRowBuilder<any>>(...c: any[]) => new ActionRowBuild
 const STEPS: Step[] = [
   {
     key: 'intro', title: 'Welcome', emoji: '👋',
-    async handle({ communityId, guild }, action) {
+    async handle({ communityId, guild, interaction }, action) {
+      if (action === 'features') {
+        const { listModules, setModule } = await import('../../services/modules.service.js');
+        const want = new Set<string>(interaction.values || []);
+        const notes: string[] = [];
+        for (const m of await listModules(communityId)) {
+          if (m.enabled === want.has(m.key)) continue;
+          const r = await setModule(communityId, m.key, want.has(m.key)).catch((e: any) => ({ made: [] as string[], errors: [String(e?.message || e)] }));
+          notes.push(`${m.label} ${want.has(m.key) ? 'on' : 'off'}${r.made.length ? ` (created ${r.made.join(', ')})` : ''}${r.errors.length ? ` ⚠️ ${r.errors[0]}` : ''}`);
+        }
+        return notes.length ? `✅ ${notes.join(' · ')}` : 'No change.';
+      }
       if (action !== 'create') return;
       const r = await create.all(guild, communityId);
       return createdNote(r.made, r.errors);
     },
-    async render() {
+    async render({ communityId }) {
+      const { listModules } = await import('../../services/modules.service.js');
+      const mods = await listModules(communityId);
       return {
         embeds: [base('Set up Community Manager', [
           'This takes about **3 minutes**. Each step saves as soon as you pick something, and you can skip any step.',
@@ -72,9 +85,13 @@ const STEPS: Step[] = [
           '',
           'Everything here also appears in the dashboard, so you can fine-tune it later.',
           '',
-          '**New server?** Press **Create everything missing** and I will make the private Community Manager category with its staff channels (applications, recruitment log, server log), a public #apply and #welcome channel, and the Reviewer, Applicant and Member roles. Anything you already set is kept.',
+          '**Everything starts off.** Pick the features you want below. Each one creates only the channels and roles it needs, and reuses any you already have. **Create everything missing** fills in what is missing for the features that are on.',
         ].join('\n'))],
-        components: [row(createBtn('intro', 'Create everything missing'))],
+        components: [
+          row(new StringSelectMenuBuilder().setCustomId(id('intro', 'features')).setPlaceholder('Choose the features to turn on').setMinValues(0).setMaxValues(mods.length)
+            .addOptions(mods.map((m) => ({ label: m.label, value: m.key, description: m.description.slice(0, 100), default: m.enabled })))),
+          row(createBtn('intro', 'Create everything missing')),
+        ],
       };
     },
   },
@@ -93,7 +110,7 @@ const STEPS: Step[] = [
         components: [
           row(new RoleSelectMenuBuilder().setCustomId(id('staff', 'reviewers')).setPlaceholder('Reviewer roles').setMinValues(0).setMaxValues(10).setDefaultRoles(...(r.reviewerRoleIds || []).slice(0, 10))),
           row(new RoleSelectMenuBuilder().setCustomId(id('staff', 'ping')).setPlaceholder('Roles to ping on new applications (optional)').setMinValues(0).setMaxValues(10).setDefaultRoles(...(r.pingRoleIds || []).slice(0, 10))),
-          row(createBtn('staff', 'Create a Reviewer role').setDisabled(Boolean(r.reviewerRoleIds?.length))),
+          row(createBtn('staff', r.applyEnabled ? 'Create a Reviewer role' : 'Turn on recruitment first').setDisabled(!r.applyEnabled || Boolean(r.reviewerRoleIds?.length))),
         ],
       };
     },
@@ -113,6 +130,7 @@ const STEPS: Step[] = [
     async render({ communityId, guild }) {
       const { getGate } = await import('../../services/recruitment/secureGate.service.js');
       const g = await getGate(communityId);
+      const recOn = Boolean((await getToolkit(communityId)).recruitment.applyEnabled);
       const has = (x?: string) => Boolean(x && guild.roles.cache.has(x));
       const std = has(g.applicantRoleId) && guild.roles.cache.get(g.applicantRoleId)?.name === 'Applicant';
       return {
@@ -128,7 +146,7 @@ const STEPS: Step[] = [
         components: [
           row(new RoleSelectMenuBuilder().setCustomId(id('roles', 'applicant')).setPlaceholder('Applicant role (newcomers)').setMinValues(1).setMaxValues(1).setDefaultRoles(...(has(g.applicantRoleId) ? [g.applicantRoleId!] : []))),
           row(new RoleSelectMenuBuilder().setCustomId(id('roles', 'member')).setPlaceholder('Member role (approved)').setMinValues(1).setMaxValues(1).setDefaultRoles(...(has(g.memberRoleId) ? [g.memberRoleId!] : []))),
-          row(createBtn('roles', std ? 'Create missing roles' : 'Use standard Applicant role').setDisabled(std && has(g.memberRoleId))),
+          row(createBtn('roles', !recOn ? 'Turn on recruitment first' : std ? 'Create missing roles' : 'Use standard Applicant role').setDisabled(!recOn || (std && has(g.memberRoleId)))),
         ],
       };
     },
@@ -175,7 +193,7 @@ const STEPS: Step[] = [
           row(
             new ButtonBuilder().setCustomId(id('apps', 'toggle')).setStyle(r.applyEnabled ? ButtonStyle.Secondary : ButtonStyle.Success).setLabel(r.applyEnabled ? 'Pause applications' : 'Open applications').setEmoji(r.applyEnabled ? '⏸️' : '▶️'),
             new ButtonBuilder().setCustomId(id('apps', 'post')).setStyle(ButtonStyle.Primary).setLabel(r.panelPostedAt ? 'Update Apply panel' : 'Post Apply panel').setEmoji('📌').setDisabled(!r.panelChannelId),
-            createBtn('apps', 'Create missing channels').setStyle(ButtonStyle.Secondary).setDisabled(Boolean(r.reviewChannelId && r.panelChannelId && r.logChannelId)),
+            createBtn('apps', r.applyEnabled ? 'Create missing channels' : 'Turn on recruitment first').setStyle(ButtonStyle.Secondary).setDisabled(!r.applyEnabled || Boolean(r.reviewChannelId && r.panelChannelId && r.logChannelId)),
           ),
         ],
       };
@@ -227,7 +245,7 @@ const STEPS: Step[] = [
             new ButtonBuilder().setCustomId(id('welcome', 'dm')).setStyle(w.enablePersonalDm ? ButtonStyle.Secondary : ButtonStyle.Success).setLabel(w.enablePersonalDm ? 'Turn off welcome DM' : 'Turn on welcome DM').setEmoji('✉️'),
             new ButtonBuilder().setCustomId(id('welcome', 'bye')).setStyle(w.enableLeaveMessage ? ButtonStyle.Secondary : ButtonStyle.Success).setLabel(w.enableLeaveMessage ? 'Turn off goodbye note' : 'Turn on goodbye note').setEmoji('👋'),
             new ButtonBuilder().setCustomId(id('welcome', 'byedm')).setStyle(w.enableLeaveDm ? ButtonStyle.Secondary : ButtonStyle.Success).setLabel(w.enableLeaveDm ? 'Turn off goodbye DM' : 'Turn on goodbye DM').setEmoji('💌'),
-            createBtn('welcome', 'Create #welcome').setStyle(ButtonStyle.Secondary).setDisabled(Boolean(w.welcomeChannelId)),
+            createBtn('welcome', w.enableServerWelcome ? 'Create #welcome' : 'Turn on welcome first').setStyle(ButtonStyle.Secondary).setDisabled(!w.enableServerWelcome || Boolean(w.welcomeChannelId)),
           ),
         ],
       };
@@ -282,7 +300,7 @@ const STEPS: Step[] = [
         ].join('\n'))],
         components: [
           row(new ChannelSelectMenuBuilder().setCustomId(id('logs', 'ch')).setPlaceholder('Log channel (staff only)').setChannelTypes(ChannelType.GuildText).setMinValues(0).setMaxValues(1).setDefaultChannels(...(f.logs.channelId ? [f.logs.channelId] : []))),
-          row(createBtn('logs', 'Create a private log channel').setDisabled(Boolean(f.logs.enabled && f.logs.channelId))),
+          row(createBtn('logs', f.logs.enabled ? 'Create a private log channel' : 'Turn on server logs first').setDisabled(!f.logs.enabled || Boolean(f.logs.channelId))),
         ],
       };
     },

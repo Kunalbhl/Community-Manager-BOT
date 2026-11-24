@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FeatureSwitches } from './FeatureSwitches';
 import { CheckCircle2, Circle, ChevronRight, RefreshCw, Server, Lock, ClipboardList, Mic, ShieldCheck, Ticket, PartyPopper, Plug } from 'lucide-react';
 
 const ICONS: Record<string, any> = { server: Server, secure: Lock, recruitment: ClipboardList, interviews: Mic, moderation: ShieldCheck, tickets: Ticket, community: PartyPopper, integrations: Plug };
@@ -75,6 +76,7 @@ export function SetupGuideView({ communityId, onNavigate }: { communityId: strin
 
   return (
     <div className="space-y-6" data-setup-guide>
+      <FeatureSwitches communityId={communityId} />
       <div className="relative overflow-hidden rounded-3xl bg-slate-900 p-7 text-white sm:p-9">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(40%_60%_at_15%_20%,rgba(124,140,255,.35),transparent_70%)]" />
         <div className="relative flex flex-wrap items-center justify-between gap-6">
