@@ -193,6 +193,18 @@ export async function provisionFeatureHandler(req: Request, res: Response) {
   } catch (err) { fail(res, err); }
 }
 
+export async function listModulesHandler(req: Request, res: Response) {
+  try { const { listModules } = await import('../services/modules.service.js'); ok(res, await listModules(req.params.communityId)); } catch (err) { fail(res, err); }
+}
+export async function setModuleHandler(req: Request, res: Response) {
+  try {
+    const { listModules, setModule } = await import('../services/modules.service.js');
+    const r = await setModule(req.params.communityId, req.params.key, Boolean(req.body?.enabled));
+    await auditService.log({ communityId: req.params.communityId, actorUserId: actor(req), actorRole: 'CONTROLLER', action: 'TOOLKIT_SETTINGS_UPDATED' as any, targetType: 'feature', targetId: `${req.params.key}:${req.body?.enabled ? 'on' : 'off'}` }).catch(() => undefined);
+    ok(res, { ...r, modules: await listModules(req.params.communityId) });
+  } catch (err) { fail(res, err); }
+}
+
 // ---------- tickets ----------
 export async function postTicketPanelHandler(req: Request, res: Response) {
   try {
