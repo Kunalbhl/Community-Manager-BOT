@@ -205,6 +205,16 @@ export async function setModuleHandler(req: Request, res: Response) {
   } catch (err) { fail(res, err); }
 }
 
+export async function cleanupChannelsHandler(req: Request, res: Response) {
+  try {
+    const { cleanupUnusedChannels } = await import('../services/channelCleanup.service.js');
+    const apply = req.body?.apply === true;
+    const r = await cleanupUnusedChannels(req.params.communityId, apply);
+    if (apply) await auditService.log({ communityId: req.params.communityId, actorUserId: actor(req), actorRole: 'CONTROLLER', action: 'TOOLKIT_SETTINGS_UPDATED' as any, targetType: 'channels', targetId: `cleanup:${r.items.filter((i) => i.removed).map((i) => i.name).join(',')}` }).catch(() => undefined);
+    ok(res, r);
+  } catch (err) { fail(res, err); }
+}
+
 // ---------- tickets ----------
 export async function postTicketPanelHandler(req: Request, res: Response) {
   try {
