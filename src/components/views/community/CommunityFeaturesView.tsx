@@ -28,7 +28,7 @@ function useApi(communityId: string) {
   return useCallback(async (path: string, method = 'GET', body?: unknown) => {
     const r = await fetch(`/api/v1/communities/${encodeURIComponent(communityId)}${path}`, { method, credentials: 'include', headers, body: body ? JSON.stringify(body) : undefined });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.success) throw new Error(j?.error?.message || 'Something went wrong.');
+    if (!r.ok || !j.success) throw new Error(j?.error?.message || j?.message || 'Something went wrong.');
     return j.data;
   }, [communityId]);
 }
