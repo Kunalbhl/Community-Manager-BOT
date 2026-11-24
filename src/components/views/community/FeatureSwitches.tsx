@@ -28,6 +28,19 @@ export function FeatureSwitches({ communityId }: { communityId: string }) {
     setBusy('');
   };
 
+  const [clean, setClean] = useState<{ items: { id: string; name: string; feature: string; removed?: boolean; error?: string }[]; skipped: string[] } | null>(null);
+  const cleanup = async (apply: boolean) => {
+    setBusy('cleanup'); setNote(null);
+    try {
+      const r = await fetch(`/api/v1/communities/${encodeURIComponent(communityId)}/cleanup-channels`, { method: 'POST', credentials: 'include', headers: h, body: JSON.stringify({ apply }) });
+      const j = await r.json();
+      if (!r.ok || !j.success) throw new Error(j?.error?.message || j?.message || 'Could not check the channels.');
+      setClean(j.data);
+      if (apply) setNote({ ok: true, text: `Removed ${j.data.items.filter((i: any) => i.removed).length} unused channel(s).` });
+    } catch (e: any) { setNote({ ok: false, text: e.message }); }
+    setBusy('');
+  };
+
   if (!mods) return <div className="h-24 animate-pulse rounded-2xl bg-slate-200/60" />;
   const groups = ['Core', 'Moderation', 'Community'];
   return (
@@ -51,6 +64,19 @@ export function FeatureSwitches({ communityId }: { communityId: string }) {
           </div>
         </div>
       ))}
+      <div className="mt-5 rounded-xl border border-slate-100 p-4">
+        <p className="text-sm font-semibold text-slate-900">Unused channels</p>
+        <p className="text-xs text-slate-500">Finds channels the bot created for a feature that is off and that nobody has used, so you can remove them. Channels people have written in are never touched.</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button type="button" disabled={busy === 'cleanup'} onClick={() => cleanup(false)} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200">Check for unused channels</button>
+          {clean && clean.items.some((i) => !i.removed) && <button type="button" disabled={busy === 'cleanup'} onClick={() => cleanup(true)} className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700">Remove {clean.items.filter((i) => !i.removed).length} channel(s)</button>}
+        </div>
+        {clean && <ul className="mt-2 space-y-1 text-xs text-slate-600">
+          {clean.items.map((i) => <li key={i.id}>{i.removed ? '🗑️ Removed' : i.error ? '⚠️' : '•'} #{i.name} <span className="text-slate-400">({i.feature}{i.error ? `: ${i.error}` : ''})</span></li>)}
+          {clean.skipped.map((x, n) => <li key={n} className="text-slate-400">Kept: {x}</li>)}
+          {!clean.items.length && !clean.skipped.length && <li>Nothing to remove.</li>}
+        </ul>}
+      </div>
     </section>
   );
 }
