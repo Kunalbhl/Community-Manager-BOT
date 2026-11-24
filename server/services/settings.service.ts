@@ -456,9 +456,9 @@ export class SettingsService {
       guildName: (community as any)?.discordGuildName || community?.name || 'Discord Guild',
       timezone: community?.timezone || configDoc?.timezone || 'UTC',
       locale: (community as any)?.locale || 'en-US',
-      dateTimeFormat: '12_HOUR',
+      dateTimeFormat: (configDoc as any)?.generalExtra?.dateTimeFormat === '24_HOUR' ? '24_HOUR' : '12_HOUR',
       description: configDoc?.description || (community as any)?.description || 'Community recruiting and engagement management.',
-      defaultLandingContext: 'OVERVIEW',
+      defaultLandingContext: (['OVERVIEW', 'APPLICATIONS', 'ENGAGEMENT', 'EVENTS'].includes((configDoc as any)?.generalExtra?.defaultLandingContext) ? (configDoc as any).generalExtra.defaultLandingContext : 'OVERVIEW'),
     };
 
     // 3. Build Community Custom Settings
@@ -467,11 +467,11 @@ export class SettingsService {
       welcomeGreeting: configDoc?.recruiterWelcomeGreeting || "Welcome to the community! We're thrilled to have you here.",
       welcomeChannelName: configDoc?.welcomeChannelName || '#general',
       welcomeChannelId: configDoc?.welcomeChannelId,
-      onboardingRulesLink: 'https://discord.com/guidelines',
-      codeOfConductLink: 'https://discord.com/terms',
+      onboardingRulesLink: (configDoc as any)?.communityExtra?.onboardingRulesLink ?? 'https://discord.com/guidelines',
+      codeOfConductLink: (configDoc as any)?.communityExtra?.codeOfConductLink ?? 'https://discord.com/terms',
       rulesChannelName: configDoc?.rulesChannelName || '#rules',
       rulesChannelId: configDoc?.rulesChannelId,
-      massMentionPolicy: 'DISABLED',
+      massMentionPolicy: (configDoc as any)?.communityExtra?.massMentionPolicy || 'DISABLED',
       dmNotificationsEnabled: configDoc?.dmNotificationsEnabled !== false,
       rules: configDoc?.rules || ['Be respectful', 'No spamming', 'Follow community guidelines'],
       guidelines: configDoc?.guidelines || ['Participate constructively', 'Support your fellow members'],
@@ -568,12 +568,12 @@ export class SettingsService {
       manualRecruiterCodesAllowed: configDoc?.manualRecruiterCodesAllowed !== false,
       recruiterPersonaEnabled: configDoc?.recruiterPersonaEnabled !== false,
       recruiterDisplayName: configDoc?.recruiterDisplayName || 'Community Recruiter',
-      recruiterWelcomeGreeting: configDoc?.recruiterWelcomeGreeting || "Hi! I'm {{recruiterName}}. I'll help guide you through the process.",
+      recruiterWelcomeGreeting: (configDoc as any)?.recruiterIntroMessage || "Hi! I'm {{recruiterName}}. I'll help guide you through the process.",
       recordEnabled: existingRecordConfig ? (existingRecordConfig as any).enabled !== false : true,
       recordChannelName: (existingRecordConfig as any)?.channelName || (existingRecordConfig as any)?.channelId || '#recruiter-records',
       recordChannelId: (existingRecordConfig as any)?.channelId,
       recordTemplate: (existingRecordConfig as any)?.messageTemplate || (existingRecordConfig as any)?.initialMessageTemplate || '🎉 **Recruitment Verified!** Recruiter {{recruiterMention}} invited {{applicantName}}!',
-      blacklistEnforcementEnabled: true,
+      blacklistEnforcementEnabled: (configDoc as any)?.blacklistEnforcementEnabled !== false,
       calendarRequirementEnabled: (configDoc as any)?.calendarRequirementEnabled === true,
     };
 
@@ -644,6 +644,15 @@ export class SettingsService {
       dmDeliveryFallback: true,
       summaryFrequency: 'INSTANT',
     };
+    // Apply what the owner saved (the defaults above are only the starting point).
+    const savedNotif = (configDoc as any)?.notificationSettings;
+    if (savedNotif) {
+      if (typeof savedNotif.dmDeliveryFallback === 'boolean') notifications.dmDeliveryFallback = savedNotif.dmDeliveryFallback;
+      if (['INSTANT', 'DAILY', 'WEEKLY'].includes(savedNotif.summaryFrequency)) notifications.summaryFrequency = savedNotif.summaryFrequency;
+      for (const [k, v] of Object.entries<any>(savedNotif.categories || {})) {
+        if (notifications.categories[k] && v) notifications.categories[k] = { ...notifications.categories[k], ...v, category: notifications.categories[k].category, name: notifications.categories[k].name, status: 'READY' };
+      }
+    }
 
     // 7. Build Plans & Usage Section
     const rawUsage = await UsageService.getUsageSnapshot(communityId).catch(() => ({}));
@@ -670,14 +679,14 @@ export class SettingsService {
 
     // 8. Build Security Settings
     const security: SecuritySettingsSection = {
-      massMentionPolicy: 'DISABLED',
-      moderationBaselineSeverity: 'MEDIUM',
-      moderationLogChannel: '#mod-logs',
-      blacklistEnforcement: true,
-      suspiciousActivityAlerts: true,
+      massMentionPolicy: (configDoc as any)?.securitySettings?.massMentionPolicy || 'DISABLED',
+      moderationBaselineSeverity: (configDoc as any)?.securitySettings?.moderationBaselineSeverity || 'MEDIUM',
+      moderationLogChannel: (configDoc as any)?.securitySettings?.moderationLogChannel ?? '#mod-logs',
+      blacklistEnforcement: (configDoc as any)?.securitySettings?.blacklistEnforcement !== false,
+      suspiciousActivityAlerts: (configDoc as any)?.securitySettings?.suspiciousActivityAlerts !== false,
       auditRetentionDays: 30,
       auditRetentionPolicyNotice: 'Platform security policy enforces a 30-day immutable audit trail for security compliance.',
-      securityNotificationsEnabled: true,
+      securityNotificationsEnabled: (configDoc as any)?.securitySettings?.securityNotificationsEnabled !== false,
     };
 
     // 9. Run Diagnostics
@@ -817,6 +826,50 @@ export class SettingsService {
         configPatch.screeningThreshold = payload.recruitment.screeningThreshold;
       if (payload.recruitment.calendarRequirementEnabled !== undefined)
         configPatch.calendarRequirementEnabled = payload.recruitment.calendarRequirementEnabled;
+    }
+
+    // Sections that only live in the configuration document: store them so they survive a reload.
+    if (payload.general && (payload.general.dateTimeFormat !== undefined || payload.general.defaultLandingContext !== undefined)) {
+      configPatch.generalExtra = {
+        dateTimeFormat: payload.general.dateTimeFormat ?? current.general.dateTimeFormat,
+        defaultLandingContext: payload.general.defaultLandingContext ?? current.general.defaultLandingContext,
+      };
+    }
+    if (payload.community && (payload.community.onboardingRulesLink !== undefined || payload.community.codeOfConductLink !== undefined || payload.community.massMentionPolicy !== undefined)) {
+      configPatch.communityExtra = {
+        onboardingRulesLink: payload.community.onboardingRulesLink ?? current.community.onboardingRulesLink,
+        codeOfConductLink: payload.community.codeOfConductLink ?? current.community.codeOfConductLink,
+        massMentionPolicy: payload.community.massMentionPolicy ?? current.community.massMentionPolicy,
+      };
+    }
+    if (payload.recruitment?.recruiterWelcomeGreeting !== undefined) configPatch.recruiterIntroMessage = payload.recruitment.recruiterWelcomeGreeting;
+    if (payload.recruitment?.blacklistEnforcementEnabled !== undefined) configPatch.blacklistEnforcementEnabled = payload.recruitment.blacklistEnforcementEnabled;
+    if (payload.notifications) {
+      const n: any = payload.notifications;
+      const categories: Record<string, any> = {};
+      for (const [k, base] of Object.entries<any>(current.notifications.categories)) {
+        const c: any = (n.categories || {})[k] || {};
+        categories[k] = {
+          enabled: c.enabled ?? base.enabled, destination: c.destination ?? base.destination, minimumRole: c.minimumRole ?? base.minimumRole,
+          channelName: 'channelName' in c ? c.channelName : base.channelName, channelId: 'channelId' in c ? c.channelId : base.channelId,
+        };
+      }
+      configPatch.notificationSettings = {
+        dmDeliveryFallback: n.dmDeliveryFallback ?? current.notifications.dmDeliveryFallback,
+        summaryFrequency: n.summaryFrequency ?? current.notifications.summaryFrequency,
+        categories,
+      };
+    }
+    if (payload.security) {
+      const sec: any = payload.security;
+      configPatch.securitySettings = {
+        massMentionPolicy: sec.massMentionPolicy ?? current.security.massMentionPolicy,
+        moderationBaselineSeverity: sec.moderationBaselineSeverity ?? current.security.moderationBaselineSeverity,
+        moderationLogChannel: sec.moderationLogChannel ?? current.security.moderationLogChannel,
+        blacklistEnforcement: sec.blacklistEnforcement ?? current.security.blacklistEnforcement,
+        suspiciousActivityAlerts: sec.suspiciousActivityAlerts ?? current.security.suspiciousActivityAlerts,
+        securityNotificationsEnabled: sec.securityNotificationsEnabled ?? current.security.securityNotificationsEnabled,
+      };
     }
 
     const existingConfig = await communityConfigurationRepository.getById(communityId);
