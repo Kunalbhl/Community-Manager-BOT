@@ -159,6 +159,7 @@ export async function handleToolkitInteraction(interaction: any): Promise<boolea
       (interaction as any).__gid = gid;
     }
     if (action === 'start') { await discordRecruitment.start(interaction); return true; }
+    if (action === 'retry') { await discordRecruitment.next(interaction, Number(arg) || 0); return true; }
     if (action === 'next') { await discordRecruitment.next(interaction, Number(arg) || 0); return true; }
     if (action === 'src' && interaction.isStringSelectMenu()) { await discordRecruitment.sourcePicked(interaction); return true; }
     if (action === 'page' && interaction.isModalSubmit()) { await discordRecruitment.pageSubmitted(interaction, Number(arg) || 0); return true; }

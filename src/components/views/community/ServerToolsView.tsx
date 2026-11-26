@@ -1252,10 +1252,10 @@ function AppQuestions({ api }: { api: any }) {
         </div>
       )}
       <div className="mt-5 grid gap-4 border-t border-slate-100 pt-4 md:grid-cols-2">
-        <label className="block text-sm font-medium text-slate-700">Name for their recruiter code comes from
+        <label className="block text-sm font-medium text-slate-700">Automatic recruiter code is made from
           <select className={`${input} mt-1`} value={d.codeNameQuestionId || ''} onChange={(e) => run(api('/recruitment/questions', 'PUT', { codeNameQuestionId: e.target.value }), '✓ Saved')}>
-            <option value="">Their Discord name</option>
-            {qs.map((q) => <option key={q.id} value={q.id}>Answer to: {q.questionText}</option>)}
+            <option value="">Their Discord name (member name)</option>
+            {qs.map((q) => <option key={q.id} value={q.id}>In-game / other name: {q.questionText}</option>)}
           </select>
           <span className="mt-1 block text-xs font-normal text-slate-500">e.g. pick “What is your in-game name?” so codes look like their game name, not their Discord name.</span>
         </label>

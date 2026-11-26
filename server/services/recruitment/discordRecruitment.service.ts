@@ -239,7 +239,7 @@ export const discordRecruitment = {
     const qs = await questionsFor(session.communityId);
     const src = sourceFor(cfg, session);
     const rule = codeRule(cfg, src);
-    const { pages } = pagesFor(formQuestions(cfg, qs), rule.ask, src?.detailLabel ? 1 : 0);
+    const { pages, codePage } = pagesFor(formQuestions(cfg, qs), rule.ask, src?.detailLabel ? 1 : 0);
     const srcQ = sourceQuestionId(cfg, qs);
     if (srcQ && src) session.answers[srcQ] = `${src.emoji ? `${src.emoji} ` : ''}${src.name}${session.sourceDetail ? ` · ${session.sourceDetail}` : ''}`;
 
@@ -272,7 +272,13 @@ export const discordRecruitment = {
       await interaction.editReply({ content: '🎉 **Application sent!** The team has been notified. You will get a DM when it is reviewed.' });
     } catch (err: any) {
       const msg = String(err?.message || 'Could not submit.').replace(/^[A-Z_]+:\s*/, '');
-      await interaction.editReply({ content: `⚠️ ${msg}${/code/i.test(msg) ? '\nPress **Apply** again to fix the recruiter code; your answers are kept for 30 minutes.' : ''}` });
+      const codeIssue = /code/i.test(msg);
+      const retryPage = codeIssue && codePage >= 0 ? codePage : 0;
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder().setCustomId(`cm:apply:retry:${retryPage}${dmTag(interaction)}`).setLabel(codeIssue ? 'Fix recruiter code' : 'Edit my answers').setEmoji('✏️').setStyle(ButtonStyle.Primary),
+      );
+      if (sourcesOf(cfg).length) row.addComponents(new ButtonBuilder().setCustomId(`cm:apply:start${dmTag(interaction)}`).setLabel('Change how I found you').setStyle(ButtonStyle.Secondary));
+      await interaction.editReply({ content: `⚠️ ${msg}\nPress the button below to fix it. Your other answers are kept for 30 minutes.`, components: [row] });
     }
   },
 
